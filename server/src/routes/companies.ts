@@ -5,8 +5,8 @@ import { authMiddleware } from '../auth';
 const router = Router();
 
 // GET /api/companies - Get company hierarchy tree
-router.get('/', authMiddleware, (req: Request, res: Response) => {
-  const allCompanies = db.getCompanies();
+router.get('/', authMiddleware, async (req: Request, res: Response) => {
+  const allCompanies = await db.getCompanies();
   const headquarter = allCompanies.find((c) => c.level === 'headquarter');
   const branches = allCompanies.filter((c) => c.level === 'branch');
 
@@ -19,8 +19,8 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
 });
 
 // GET /api/companies/branches - Get branch list for template assignment
-router.get('/branches', authMiddleware, (req: Request, res: Response) => {
-  const branches = db.getCompanies().filter((c) => c.level === 'branch' && c.status === 'active');
+router.get('/branches', authMiddleware, async (req: Request, res: Response) => {
+  const branches = (await db.getCompanies()).filter((c) => c.level === 'branch' && c.status === 'active');
   res.json(branches);
 });
 

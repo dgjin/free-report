@@ -1,49 +1,18 @@
-import fs from 'fs';
-import path from 'path';
-import bcrypt from 'bcryptjs';
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { getPool } from './mysql';
 import {
+  ApprovalRecord,
   Company,
-  User,
-  ReportTemplate,
-  ReportTemplateField,
+  ReportAggregation,
   ReportAssignment,
   ReportSubmission,
   ReportSubmissionData,
-  ApprovalRecord,
-  ReportAggregation,
+  ReportTemplate,
+  ReportTemplateField,
+  User,
 } from './types';
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const DB_FILE = path.join(DATA_DIR, 'free-report-db.json');
-
-export function writeJsonAtomically(filePath: string, value: unknown): void {
-  const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(temporaryPath, JSON.stringify(value, null, 2), 'utf-8');
-  fs.renameSync(temporaryPath, filePath);
-}
-
-interface DatabaseSchema {
-  companies: Company[];
-  users: User[];
-  report_templates: ReportTemplate[];
-  report_template_fields: ReportTemplateField[];
-  report_assignments: ReportAssignment[];
-  report_submissions: ReportSubmission[];
-  report_submission_data: ReportSubmissionData[];
-  approval_records: ApprovalRecord[];
-  report_aggregations: ReportAggregation[];
-  counters: {
-    companies: number;
-    users: number;
-    report_templates: number;
-    report_template_fields: number;
-    report_assignments: number;
-    report_submissions: number;
-    report_submission_data: number;
-    approval_records: number;
-    report_aggregations: number;
-  };
-}
+type Executor = Pool | PoolConnection;
 
 export class DomainError extends Error {
   constructor(message: string, public readonly statusCode: number) {
@@ -52,700 +21,351 @@ export class DomainError extends Error {
   }
 }
 
+async function all<T>(executor: Executor, sql: string, params: any[] = []): Promise<T[]> {
+  const [rows] = await executor.execute<RowDataPacket[]>(sql, params);
+  return rows as T[];
+}
+
+async function first<T>(executor: Executor, sql: string, params: any[] = []): Promise<T | undefined> {
+  return (await all<T>(executor, sql, params))[0];
+}
+
+async function transaction<T>(callback: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  const connection = await getPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await callback(connection);
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 class Database {
-  private data: DatabaseSchema;
-
-  constructor() {
-    this.ensureDirectory();
-    this.data = this.loadDatabase();
+  async getCompanies(): Promise<Company[]> {
+    return all<Company>(getPool(), 'SELECT * FROM companies ORDER BY id');
   }
 
-  private ensureDirectory() {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
+  async getCompanyById(id: number): Promise<Company | undefined> {
+    return first<Company>(getPool(), 'SELECT * FROM companies WHERE id = ?', [id]);
   }
 
-  private loadDatabase(): DatabaseSchema {
-    if (fs.existsSync(DB_FILE)) {
-      try {
-        const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(raw);
-      } catch (e) {
-        console.error('Error reading DB file, creating new:', e);
-      }
-    }
-    const initial = this.getSeedData();
-    this.saveDatabase(initial);
-    return initial;
+  async getUsers(): Promise<User[]> {
+    return all<User>(getPool(), 'SELECT * FROM users ORDER BY id');
   }
 
-  private saveDatabase(dataToSave?: DatabaseSchema) {
-    this.ensureDirectory();
-    const data = dataToSave || this.data;
-    writeJsonAtomically(DB_FILE, data);
+  async getUserById(id: number): Promise<User | undefined> {
+    return first<User>(getPool(), 'SELECT * FROM users WHERE id = ?', [id]);
   }
 
-  public save() {
-    this.saveDatabase();
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return first<User>(getPool(), 'SELECT * FROM users WHERE LOWER(username) = LOWER(?)', [username]);
   }
 
-  private getSeedData(): DatabaseSchema {
-    const passwordHash = bcrypt.hashSync('123456', 10);
-    const now = new Date().toISOString();
-
-    const companies: Company[] = [
-      { id: 1, name: '总部', code: 'HQ', parent_id: null, level: 'headquarter', address: '北京市朝阳区总部大厦', contact: '张总', phone: '010-88888888', status: 'active', created_at: now, updated_at: now },
-      { id: 2, name: '北京分公司', code: 'BJ', parent_id: 1, level: 'branch', address: '北京市海淀区科技园', contact: '李经理', phone: '010-66666666', status: 'active', created_at: now, updated_at: now },
-      { id: 3, name: '上海分公司', code: 'SH', parent_id: 1, level: 'branch', address: '上海市浦东新区陆家嘴金融中心', contact: '王经理', phone: '021-88886666', status: 'active', created_at: now, updated_at: now },
-      { id: 4, name: '广州分公司', code: 'GZ', parent_id: 1, level: 'branch', address: '广州市天河区珠江新城', contact: '陈经理', phone: '020-88889999', status: 'active', created_at: now, updated_at: now },
-    ];
-
-    const users: User[] = [
-      { id: 1, username: 'admin', password_hash: passwordHash, display_name: '超级管理员', company_id: 1, role: 'super_admin', status: 'active', created_at: now },
-      { id: 2, username: 'hq_admin', password_hash: passwordHash, display_name: '总部管理员', company_id: 1, role: 'headquarter_admin', status: 'active', created_at: now },
-      
-      { id: 3, username: 'bj_handler', password_hash: passwordHash, display_name: '北京经办人', company_id: 2, role: 'handler', status: 'active', created_at: now },
-      { id: 4, username: 'bj_reviewer', password_hash: passwordHash, display_name: '北京复核人', company_id: 2, role: 'reviewer', status: 'active', created_at: now },
-      { id: 5, username: 'bj_approver', password_hash: passwordHash, display_name: '北京审批人', company_id: 2, role: 'approver', status: 'active', created_at: now },
-      
-      { id: 6, username: 'sh_handler', password_hash: passwordHash, display_name: '上海经办人', company_id: 3, role: 'handler', status: 'active', created_at: now },
-      { id: 7, username: 'sh_reviewer', password_hash: passwordHash, display_name: '上海复核人', company_id: 3, role: 'reviewer', status: 'active', created_at: now },
-      { id: 8, username: 'sh_approver', password_hash: passwordHash, display_name: '上海审批人', company_id: 3, role: 'approver', status: 'active', created_at: now },
-
-      { id: 9, username: 'gz_handler', password_hash: passwordHash, display_name: '广州经办人', company_id: 4, role: 'handler', status: 'active', created_at: now },
-      { id: 10, username: 'gz_reviewer', password_hash: passwordHash, display_name: '广州复核人', company_id: 4, role: 'reviewer', status: 'active', created_at: now },
-      { id: 11, username: 'gz_approver', password_hash: passwordHash, display_name: '广州审批人', company_id: 4, role: 'approver', status: 'active', created_at: now },
-    ];
-
-    const report_templates: ReportTemplate[] = [
-      { id: 1, name: '月度销售与经营报表', description: '汇总各分公司月度销售收入、利润及核心产品销售明细', period_type: 'monthly', status: 'published', created_by: 1, created_at: now, updated_at: now },
-      { id: 2, name: '季度资产与设备清查表', description: '清查各分公司季度固定资产、设备状况及盘点明细', period_type: 'quarterly', status: 'published', created_by: 2, created_at: now, updated_at: now },
-    ];
-
-    const report_template_fields: ReportTemplateField[] = [
-      // Template 1 Summary
-      { id: 1, template_id: 1, field_name: 'total_revenue', field_label: '总收入（万元）', field_type: 'number', data_type: 'summary', field_config: { required: true }, sort_order: 1, status: 'active' },
-      { id: 2, template_id: 1, field_name: 'net_profit', field_label: '净利润（万元）', field_type: 'number', data_type: 'summary', field_config: { required: true }, sort_order: 2, status: 'active' },
-      { id: 3, template_id: 1, field_name: 'total_employees', field_label: '在册员工数（人）', field_type: 'number', data_type: 'summary', field_config: { required: false }, sort_order: 3, status: 'active' },
-      { id: 4, template_id: 1, field_name: 'reporting_date', field_label: '填报基准日', field_type: 'date', data_type: 'summary', field_config: { required: true }, sort_order: 4, status: 'active' },
-      { id: 5, template_id: 1, field_name: 'remark', field_label: '经营情况说明', field_type: 'textarea', data_type: 'summary', field_config: { required: false }, sort_order: 5, status: 'active' },
-      // Template 1 Detail
-      { id: 6, template_id: 1, field_name: 'product_name', field_label: '产品/项目名称', field_type: 'text', data_type: 'detail', field_config: { required: true }, sort_order: 1, status: 'active' },
-      { id: 7, template_id: 1, field_name: 'sales_amount', field_label: '销量/数量（件）', field_type: 'number', data_type: 'detail', field_config: { required: true }, sort_order: 2, status: 'active' },
-      { id: 8, template_id: 1, field_name: 'sales_revenue', field_label: '产品销售额（万元）', field_type: 'number', data_type: 'detail', field_config: { required: true }, sort_order: 3, status: 'active' },
-      { id: 9, template_id: 1, field_name: 'channel', field_label: '销售渠道', field_type: 'select', data_type: 'detail', field_config: { required: false, options: ['直销', '代理商', '线上平台', '大客户'] }, sort_order: 4, status: 'active' },
-
-      // Template 2 Summary
-      { id: 10, template_id: 2, field_name: 'asset_total_value', field_label: '资产总估值（万元）', field_type: 'number', data_type: 'summary', field_config: { required: true }, sort_order: 1, status: 'active' },
-      { id: 11, template_id: 2, field_name: 'inspect_result', field_label: '盘点结论', field_type: 'select', data_type: 'summary', field_config: { required: true, options: ['良好', '正常', '存在轻微异常', '需要整改'] }, sort_order: 2, status: 'active' },
-      // Template 2 Detail
-      { id: 12, template_id: 2, field_name: 'asset_code', field_label: '资产编号', field_type: 'text', data_type: 'detail', field_config: { required: true }, sort_order: 1, status: 'active' },
-      { id: 13, template_id: 2, field_name: 'asset_name', field_label: '资产名称', field_type: 'text', data_type: 'detail', field_config: { required: true }, sort_order: 2, status: 'active' },
-      { id: 14, template_id: 2, field_name: 'category', field_label: '资产类别', field_type: 'select', data_type: 'detail', field_config: { required: true, options: ['办公设备', 'IT基础设施', '生产机械', '运输车辆', '其他'] }, sort_order: 3, status: 'active' },
-      { id: 15, template_id: 2, field_name: 'original_value', field_label: '原值（元）', field_type: 'number', data_type: 'detail', field_config: { required: true }, sort_order: 4, status: 'active' },
-      { id: 16, template_id: 2, field_name: 'current_status', field_label: '使用状态', field_type: 'select', data_type: 'detail', field_config: { required: true, options: ['正常在用', '待维修', '已提报废', '闲置中'] }, sort_order: 5, status: 'active' },
-    ];
-
-    const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    const report_assignments: ReportAssignment[] = [
-      { id: 1, template_id: 1, assigned_to_company_id: 2, title: '2026年7月月度销售与经营报表（北京）', period_label: '2026年07月', deadline, status: 'approved', assigned_by: 1, created_at: now },
-      { id: 2, template_id: 1, assigned_to_company_id: 3, title: '2026年7月月度销售与经营报表（上海）', period_label: '2026年07月', deadline, status: 'submitted', assigned_by: 1, created_at: now },
-      { id: 3, template_id: 1, assigned_to_company_id: 4, title: '2026年7月月度销售与经营报表（广州）', period_label: '2026年07月', deadline, status: 'filling', assigned_by: 1, created_at: now },
-      { id: 4, template_id: 2, assigned_to_company_id: 2, title: '2026年Q3资产与设备清查（北京）', period_label: '2026年Q3', deadline, status: 'pending', assigned_by: 2, created_at: now },
-      { id: 5, template_id: 2, assigned_to_company_id: 3, title: '2026年Q3资产与设备清查（上海）', period_label: '2026年Q3', deadline, status: 'pending', assigned_by: 2, created_at: now },
-    ];
-
-    const report_submissions: ReportSubmission[] = [
-      // Submission 1: Beijing (Approved)
-      { id: 1, assignment_id: 1, version: 1, submitted_by_company_id: 2, submitted_by: 3, status: 'approved', comment: '月度经营指标良好，已完成全员审批', submitted_at: now, created_at: now },
-      // Submission 2: Shanghai (Pending Approval at Approver level)
-      { id: 2, assignment_id: 2, version: 1, submitted_by_company_id: 3, submitted_by: 6, status: 'pending_approval', comment: '经办人与复核人已校验完毕，请审批人终审', submitted_at: now, created_at: now },
-    ];
-
-    const report_submission_data: ReportSubmissionData[] = [
-      // Beijing Submission Data
-      { id: 1, submission_id: 1, field_id: 1, row_index: 0, value: '5200', created_at: now },
-      { id: 2, submission_id: 1, field_id: 2, row_index: 0, value: '1380', created_at: now },
-      { id: 3, submission_id: 1, field_id: 3, row_index: 0, value: '260', created_at: now },
-      { id: 4, submission_id: 1, field_id: 4, row_index: 0, value: '2026-07-20', created_at: now },
-      { id: 5, submission_id: 1, field_id: 5, row_index: 0, value: '本月华北市场开拓顺利，云服务订单增长显著。', created_at: now },
-      // Beijing Detail Rows (Row 1 & Row 2)
-      { id: 6, submission_id: 1, field_id: 6, row_index: 1, value: '企业级云平台A版', created_at: now },
-      { id: 7, submission_id: 1, field_id: 7, row_index: 1, value: '150', created_at: now },
-      { id: 8, submission_id: 1, field_id: 8, row_index: 1, value: '3000', created_at: now },
-      { id: 9, submission_id: 1, field_id: 9, row_index: 1, value: '直销', created_at: now },
-
-      { id: 10, submission_id: 1, field_id: 6, row_index: 2, value: '智能运维套件B版', created_at: now },
-      { id: 11, submission_id: 1, field_id: 7, row_index: 2, value: '220', created_at: now },
-      { id: 12, submission_id: 1, field_id: 8, row_index: 2, value: '2200', created_at: now },
-      { id: 13, submission_id: 1, field_id: 9, row_index: 2, value: '代理商', created_at: now },
-
-      // Shanghai Submission Data
-      { id: 14, submission_id: 2, field_id: 1, row_index: 0, value: '6800', created_at: now },
-      { id: 15, submission_id: 2, field_id: 2, row_index: 0, value: '1850', created_at: now },
-      { id: 16, submission_id: 2, field_id: 3, row_index: 0, value: '310', created_at: now },
-      { id: 17, submission_id: 2, field_id: 4, row_index: 0, value: '2026-07-21', created_at: now },
-      { id: 18, submission_id: 2, field_id: 5, row_index: 0, value: '华东区域跨国公司大单交割完成。', created_at: now },
-      // Shanghai Detail Rows (Row 1)
-      { id: 19, submission_id: 2, field_id: 6, row_index: 1, value: '金融大数据解决方案', created_at: now },
-      { id: 20, submission_id: 2, field_id: 7, row_index: 1, value: '80', created_at: now },
-      { id: 21, submission_id: 2, field_id: 8, row_index: 1, value: '6800', created_at: now },
-      { id: 22, submission_id: 2, field_id: 9, row_index: 1, value: '大客户', created_at: now },
-    ];
-
-    const approval_records: ApprovalRecord[] = [
-      // Beijing 3-level approvals
-      { id: 1, submission_id: 1, approval_level: 'handler', approver_id: 3, status: 'approved', comment: '经办人填报完成，申请复核', created_at: now, updated_at: now },
-      { id: 2, submission_id: 1, approval_level: 'reviewer', approver_id: 4, status: 'approved', comment: '复核人核对单据无误，提交终审', created_at: now, updated_at: now },
-      { id: 3, submission_id: 1, approval_level: 'approver', approver_id: 5, status: 'approved', comment: '审批通过，数据准予上报总部', created_at: now, updated_at: now },
-
-      // Shanghai 3-level approvals (handler & reviewer approved, approver pending)
-      { id: 4, submission_id: 2, approval_level: 'handler', approver_id: 6, status: 'approved', comment: '经办人完成填报', created_at: now, updated_at: now },
-      { id: 5, submission_id: 2, approval_level: 'reviewer', approver_id: 7, status: 'approved', comment: '复核人校验通过', created_at: now, updated_at: now },
-      { id: 6, submission_id: 2, approval_level: 'approver', approver_id: 8, status: 'pending', comment: '等待审批人终审', created_at: now, updated_at: now },
-    ];
-
-    const report_aggregations: ReportAggregation[] = [
-      {
-        id: 1,
-        template_id: 1,
-        assignment_id: 1,
-        aggregated_data: {
-          total_revenue: 5200,
-          net_profit: 1380,
-          total_employees: 260,
-        },
-        branch_count: 3,
-        submitted_count: 1,
-        created_at: now,
-      },
-    ];
-
-    return {
-      companies,
-      users,
-      report_templates,
-      report_template_fields,
-      report_assignments,
-      report_submissions,
-      report_submission_data,
-      approval_records,
-      report_aggregations,
-      counters: {
-        companies: 4,
-        users: 11,
-        report_templates: 2,
-        report_template_fields: 16,
-        report_assignments: 5,
-        report_submissions: 2,
-        report_submission_data: 22,
-        approval_records: 6,
-        report_aggregations: 1,
-      },
-    };
+  async getTemplates(): Promise<ReportTemplate[]> {
+    return all<ReportTemplate>(getPool(), 'SELECT * FROM report_templates ORDER BY id DESC');
   }
 
-  // Helper getters and mutators
-  public getCompanies(): Company[] {
-    return this.data.companies;
+  async getTemplateById(id: number): Promise<ReportTemplate | undefined> {
+    return first<ReportTemplate>(getPool(), 'SELECT * FROM report_templates WHERE id = ?', [id]);
   }
 
-  public getCompanyById(id: number): Company | undefined {
-    return this.data.companies.find((c) => c.id === id);
+  async getTemplateFields(templateId: number): Promise<ReportTemplateField[]> {
+    return all<ReportTemplateField>(
+      getPool(),
+      'SELECT * FROM report_template_fields WHERE template_id = ? ORDER BY sort_order, id',
+      [templateId],
+    );
   }
 
-  public getUsers(): User[] {
-    return this.data.users;
-  }
-
-  public getUserById(id: number): User | undefined {
-    return this.data.users.find((u) => u.id === id);
-  }
-
-  public getUserByUsername(username: string): User | undefined {
-    return this.data.users.find((u) => u.username.toLowerCase() === username.toLowerCase());
-  }
-
-  public getTemplates(): ReportTemplate[] {
-    return this.data.report_templates;
-  }
-
-  public getTemplateById(id: number): ReportTemplate | undefined {
-    return this.data.report_templates.find((t) => t.id === id);
-  }
-
-  public getTemplateFields(templateId: number): ReportTemplateField[] {
-    return this.data.report_template_fields
-      .filter((f) => f.template_id === templateId)
-      .sort((a, b) => a.sort_order - b.sort_order);
-  }
-
-  public createTemplate(
+  async createTemplate(
     templateData: Omit<ReportTemplate, 'id' | 'created_at' | 'updated_at'>,
-    fieldsData: Omit<ReportTemplateField, 'id' | 'template_id'>[]
-  ): { template: ReportTemplate; fields: ReportTemplateField[] } {
-    const now = new Date().toISOString();
-    this.data.counters.report_templates += 1;
-    const templateId = this.data.counters.report_templates;
-
-    const template: ReportTemplate = {
-      ...templateData,
-      id: templateId,
-      created_at: now,
-      updated_at: now,
-    };
-    this.data.report_templates.push(template);
-
-    const fields: ReportTemplateField[] = fieldsData.map((f, idx) => {
-      this.data.counters.report_template_fields += 1;
-      return {
-        ...f,
-        id: this.data.counters.report_template_fields,
-        template_id: templateId,
-        sort_order: f.sort_order ?? idx + 1,
-        status: f.status || 'active',
-      };
-    });
-
-    this.data.report_template_fields.push(...fields);
-    this.save();
-
-    return { template, fields };
-  }
-
-  public updateTemplate(id: number, updates: Partial<ReportTemplate>): ReportTemplate | null {
-    const t = this.getTemplateById(id);
-    if (!t) return null;
-    Object.assign(t, updates, { updated_at: new Date().toISOString() });
-    this.save();
-    return t;
-  }
-
-  public addTemplateField(fieldData: Omit<ReportTemplateField, 'id'>): ReportTemplateField {
-    this.data.counters.report_template_fields += 1;
-    const field: ReportTemplateField = {
-      ...fieldData,
-      id: this.data.counters.report_template_fields,
-    };
-    this.data.report_template_fields.push(field);
-    this.save();
-    return field;
-  }
-
-  public disableTemplateField(fieldId: number): ReportTemplateField | null {
-    const f = this.data.report_template_fields.find((field) => field.id === fieldId);
-    if (!f) return null;
-    f.status = 'inactive';
-    this.save();
-    return f;
-  }
-
-  public getAssignments(): ReportAssignment[] {
-    return this.data.report_assignments;
-  }
-
-  public getAssignmentById(id: number): ReportAssignment | undefined {
-    return this.data.report_assignments.find((a) => a.id === id);
-  }
-
-  public createAssignments(
-    templateId: number,
-    companyIds: number[],
-    title: string,
-    periodLabel: string,
-    deadline: string,
-    assignedBy: number
-  ): ReportAssignment[] {
-    const now = new Date().toISOString();
-    const newAssignments: ReportAssignment[] = [];
-
-    for (const companyId of companyIds) {
-      // Check existing unique constraint UNIQUE(template_id, assigned_to_company_id, period_label)
-      const existing = this.data.report_assignments.find(
-        (a) =>
-          a.template_id === templateId &&
-          a.assigned_to_company_id === companyId &&
-          a.period_label === periodLabel
+    fieldsData: Omit<ReportTemplateField, 'id' | 'template_id'>[],
+  ): Promise<{ template: ReportTemplate; fields: ReportTemplateField[] }> {
+    return transaction(async (connection) => {
+      const [result] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO report_templates (name,description,period_type,status,created_by)
+         VALUES (?,?,?,?,?)`,
+        [templateData.name, templateData.description, templateData.period_type, templateData.status, templateData.created_by],
       );
-
-      if (existing) {
-        continue;
-      }
-
-      this.data.counters.report_assignments += 1;
-      const assignment: ReportAssignment = {
-        id: this.data.counters.report_assignments,
-        template_id: templateId,
-        assigned_to_company_id: companyId,
-        title,
-        period_label: periodLabel,
-        deadline,
-        status: 'pending',
-        assigned_by: assignedBy,
-        created_at: now,
-      };
-      this.data.report_assignments.push(assignment);
-      newAssignments.push(assignment);
-    }
-
-    this.save();
-    return newAssignments;
-  }
-
-  public updateAssignmentStatus(assignmentId: number, status: ReportAssignment['status']) {
-    const a = this.getAssignmentById(assignmentId);
-    if (a) {
-      a.status = status;
-      this.save();
-    }
-  }
-
-  public getSubmissions(): ReportSubmission[] {
-    return this.data.report_submissions;
-  }
-
-  public getSubmissionById(id: number): ReportSubmission | undefined {
-    return this.data.report_submissions.find((s) => s.id === id);
-  }
-
-  public getLatestSubmissionByAssignment(assignmentId: number): ReportSubmission | undefined {
-    const list = this.data.report_submissions
-      .filter((s) => s.assignment_id === assignmentId)
-      .sort((a, b) => b.version - a.version);
-    return list[0];
-  }
-
-  public getLatestApprovedSubmissionByAssignment(assignmentId: number): ReportSubmission | undefined {
-    return this.data.report_submissions
-      .filter((submission) => submission.assignment_id === assignmentId && submission.status === 'approved')
-      .sort((a, b) => b.version - a.version)[0];
-  }
-
-  public createOrUpdateSubmission(
-    assignmentId: number,
-    userId: number,
-    companyId: number,
-    summaryData: Record<number, string>,
-    detailData: Array<Record<number, string>>,
-    comment?: string,
-    isSubmit = false
-  ): { submission: ReportSubmission; approvals: ApprovalRecord[] } {
-    const now = new Date().toISOString();
-    const assignment = this.getAssignmentById(assignmentId);
-    if (!assignment) {
-      throw new Error('Assignment not found');
-    }
-
-    const user = this.getUserById(userId);
-    const isSuperAdmin = user?.role === 'super_admin';
-    if (
-      !user ||
-      user.status !== 'active' ||
-      user.company_id !== companyId ||
-      (!isSuperAdmin && assignment.assigned_to_company_id !== companyId) ||
-      (!isSuperAdmin && user.role !== 'handler' && user.role !== 'branch_admin')
-    ) {
-      throw new DomainError('你无权填写该任务', 403);
-    }
-
-    let existing = this.getLatestSubmissionByAssignment(assignmentId);
-    let submission: ReportSubmission;
-
-    if (existing && (existing.status === 'draft' || existing.status === 'rejected')) {
-      // Update existing draft / rejected submission by incrementing version if rejected
-      if (existing.status === 'rejected') {
-        this.data.counters.report_submissions += 1;
-        submission = {
-          id: this.data.counters.report_submissions,
-          assignment_id: assignmentId,
-          version: existing.version + 1,
-          submitted_by_company_id: companyId,
-          submitted_by: userId,
-          status: isSubmit ? 'pending_review' : 'draft',
-          comment,
-          submitted_at: isSubmit ? now : undefined,
-          created_at: now,
-        };
-        this.data.report_submissions.push(submission);
-      } else {
-        existing.submitted_by = userId;
-        existing.status = isSubmit ? 'pending_review' : 'draft';
-        existing.comment = comment;
-        if (isSubmit) existing.submitted_at = now;
-        submission = existing;
-
-        // Clear old submission data
-        this.data.report_submission_data = this.data.report_submission_data.filter(
-          (d) => d.submission_id !== submission.id
+      const templateId = result.insertId;
+      for (const [index, field] of fieldsData.entries()) {
+        await connection.execute(
+          `INSERT INTO report_template_fields
+           (template_id,field_name,field_label,field_type,data_type,field_config,sort_order,status)
+           VALUES (?,?,?,?,?,?,?,?)`,
+          [templateId, field.field_name, field.field_label, field.field_type, field.data_type,
+            JSON.stringify(field.field_config || {}), field.sort_order ?? index + 1, field.status || 'active'],
         );
       }
-    } else {
-      // New submission
-      this.data.counters.report_submissions += 1;
-      submission = {
-        id: this.data.counters.report_submissions,
-        assignment_id: assignmentId,
-        version: existing ? existing.version + 1 : 1,
-        submitted_by_company_id: companyId,
-        submitted_by: userId,
-        status: isSubmit ? 'pending_review' : 'draft',
-        comment,
-        submitted_at: isSubmit ? now : undefined,
-        created_at: now,
-      };
-      this.data.report_submissions.push(submission);
-    }
-
-    // Insert Summary Data (row_index = 0)
-    for (const [fieldIdStr, val] of Object.entries(summaryData)) {
-      const fieldId = parseInt(fieldIdStr, 10);
-      this.data.counters.report_submission_data += 1;
-      this.data.report_submission_data.push({
-        id: this.data.counters.report_submission_data,
-        submission_id: submission.id,
-        field_id: fieldId,
-        row_index: 0,
-        value: val ?? '',
-        created_at: now,
-      });
-    }
-
-    // Insert Detail Rows (row_index = 1, 2, ...)
-    detailData.forEach((rowObj, index) => {
-      const rowIndex = index + 1;
-      for (const [fieldIdStr, val] of Object.entries(rowObj)) {
-        const fieldId = parseInt(fieldIdStr, 10);
-        this.data.counters.report_submission_data += 1;
-        this.data.report_submission_data.push({
-          id: this.data.counters.report_submission_data,
-          submission_id: submission.id,
-          field_id: fieldId,
-          row_index: rowIndex,
-          value: val ?? '',
-          created_at: now,
-        });
-      }
-    });
-
-    // Update assignment status
-    if (isSubmit) {
-      assignment.status = 'submitted';
-    } else {
-      assignment.status = 'filling';
-    }
-
-    // Approval records creation if submitting
-    const createdApprovals: ApprovalRecord[] = [];
-    if (isSubmit) {
-      // Add handler approval record
-      this.data.counters.approval_records += 1;
-      const handlerRecord: ApprovalRecord = {
-        id: this.data.counters.approval_records,
-        submission_id: submission.id,
-        approval_level: 'handler',
-        approver_id: userId,
-        status: 'approved',
-        comment: comment || '经办人已提交填报',
-        created_at: now,
-        updated_at: now,
-      };
-      this.data.approval_records.push(handlerRecord);
-      createdApprovals.push(handlerRecord);
-
-      // Find reviewer in same company
-      const reviewer = this.data.users.find(
-        (u) => u.company_id === companyId && u.role === 'reviewer'
-      );
-
-      this.data.counters.approval_records += 1;
-      const reviewerRecord: ApprovalRecord = {
-        id: this.data.counters.approval_records,
-        submission_id: submission.id,
-        approval_level: 'reviewer',
-        approver_id: reviewer ? reviewer.id : userId,
-        status: 'pending',
-        comment: '等候复核',
-        created_at: now,
-        updated_at: now,
-      };
-      this.data.approval_records.push(reviewerRecord);
-      createdApprovals.push(reviewerRecord);
-    }
-
-    this.save();
-    return { submission, approvals: createdApprovals };
-  }
-
-  public getSubmissionData(submissionId: number): ReportSubmissionData[] {
-    return this.data.report_submission_data.filter((d) => d.submission_id === submissionId);
-  }
-
-  public getApprovalRecords(submissionId: number): ApprovalRecord[] {
-    return this.data.approval_records.filter((a) => a.submission_id === submissionId);
-  }
-
-  public processApprovalAction(
-    submissionId: number,
-    approverUser: User,
-    action: 'approved' | 'rejected',
-    comment?: string
-  ): { submission: ReportSubmission; approval: ApprovalRecord } {
-    const submission = this.getSubmissionById(submissionId);
-    if (!submission) throw new Error('Submission not found');
-
-    const assignment = this.getAssignmentById(submission.assignment_id);
-    const now = new Date().toISOString();
-
-    const pendingRecord = this.data.approval_records.find(
-      (a) => a.submission_id === submissionId && a.status === 'pending'
-    );
-
-    if (!pendingRecord) {
-      throw new DomainError('该填报当前没有待处理的审批步骤', 409);
-    }
-
-    const expectedSubmissionStatus =
-      pendingRecord.approval_level === 'reviewer' ? 'pending_review' : 'pending_approval';
-    if (submission.status !== expectedSubmissionStatus) {
-      throw new DomainError('审批状态已变化，请刷新后重试', 409);
-    }
-
-    if (
-      pendingRecord.approver_id !== approverUser.id ||
-      submission.submitted_by_company_id !== approverUser.company_id ||
-      pendingRecord.approval_level !== approverUser.role
-    ) {
-      throw new DomainError('你不是该审批步骤的指定处理人', 403);
-    }
-
-    pendingRecord.status = action;
-    pendingRecord.comment = comment || (action === 'approved' ? '同意' : '驳回');
-    pendingRecord.updated_at = now;
-
-    if (action === 'rejected') {
-      submission.status = 'rejected';
-      if (assignment) assignment.status = 'rejected';
-    } else {
-      if (pendingRecord.approval_level === 'reviewer') {
-        // Reviewer approved -> move to pending_approval (Approver level)
-        submission.status = 'pending_approval';
-
-        // Find approver in company
-        const companyApprover = this.data.users.find(
-          (u) => u.company_id === approverUser.company_id && u.role === 'approver'
-        );
-
-        this.data.counters.approval_records += 1;
-        this.data.approval_records.push({
-          id: this.data.counters.approval_records,
-          submission_id: submissionId,
-          approval_level: 'approver',
-          approver_id: companyApprover ? companyApprover.id : approverUser.id,
-          status: 'pending',
-          comment: '等候终审',
-          created_at: now,
-          updated_at: now,
-        });
-      } else if (pendingRecord.approval_level === 'approver') {
-        // Approver approved -> Final approval
-        submission.status = 'approved';
-        if (assignment) assignment.status = 'approved';
-      }
-    }
-
-    this.save();
-    return { submission, approval: pendingRecord };
-  }
-
-  public getPendingApprovalsForUser(user: User) {
-    // Find all submissions with pending approval records matching the user's role and company
-    const pendingRecords = this.data.approval_records.filter((r) => {
-      if (r.status !== 'pending') return false;
-      const sub = this.getSubmissionById(r.submission_id);
-      if (!sub) return false;
-      if (sub.submitted_by_company_id !== user.company_id) return false;
-
-      if (user.role === 'reviewer' && r.approval_level === 'reviewer') return true;
-      if (user.role === 'approver' && r.approval_level === 'approver') return true;
-      if (user.role === 'branch_admin' || user.role === 'super_admin') return true;
-
-      return false;
-    });
-
-    return pendingRecords.map((rec) => {
-      const sub = this.getSubmissionById(rec.submission_id)!;
-      const assignment = this.getAssignmentById(sub.assignment_id)!;
-      const template = this.getTemplateById(assignment.template_id)!;
-      const submitter = this.getUserById(sub.submitted_by);
-      const company = this.getCompanyById(sub.submitted_by_company_id);
-
       return {
-        approval_id: rec.id,
-        submission_id: sub.id,
-        approval_level: rec.approval_level,
-        assignment_title: assignment.title,
-        period_label: assignment.period_label,
-        template_name: template ? template.name : '',
-        company_name: company ? company.name : '',
-        submitted_by_name: submitter ? submitter.display_name : '',
-        submitted_at: sub.submitted_at || sub.created_at,
-        version: sub.version,
-        comment: sub.comment,
+        template: (await first<ReportTemplate>(connection, 'SELECT * FROM report_templates WHERE id = ?', [templateId]))!,
+        fields: await all<ReportTemplateField>(connection,
+          'SELECT * FROM report_template_fields WHERE template_id = ? ORDER BY sort_order,id', [templateId]),
       };
     });
   }
 
-  public aggregateAssignment(assignmentId: number): ReportAggregation {
-    const assignment = this.getAssignmentById(assignmentId);
-    if (!assignment) throw new Error('Assignment not found');
+  async updateTemplate(id: number, updates: Partial<ReportTemplate>): Promise<ReportTemplate | null> {
+    const allowed = ['name', 'description', 'period_type', 'status'] as const;
+    const entries = allowed.filter((key) => updates[key] !== undefined).map((key) => [key, updates[key]] as const);
+    if (entries.length) {
+      await getPool().execute(
+        `UPDATE report_templates SET ${entries.map(([key]) => `${key} = ?`).join(', ')} WHERE id = ?`,
+        [...entries.map(([, value]) => value), id],
+      );
+    }
+    return (await this.getTemplateById(id)) || null;
+  }
 
-    const template = this.getTemplateById(assignment.template_id);
-    if (!template) throw new Error('Template not found');
-
-    const fields = this.getTemplateFields(template.id);
-    const submissions = this.data.report_submissions.filter(
-      (s) => s.assignment_id === assignmentId && s.status === 'approved'
+  async addTemplateField(field: Omit<ReportTemplateField, 'id'>): Promise<ReportTemplateField> {
+    const [result] = await getPool().execute<ResultSetHeader>(
+      `INSERT INTO report_template_fields
+       (template_id,field_name,field_label,field_type,data_type,field_config,sort_order,status)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [field.template_id, field.field_name, field.field_label, field.field_type, field.data_type,
+        JSON.stringify(field.field_config || {}), field.sort_order, field.status],
     );
+    return (await first<ReportTemplateField>(getPool(), 'SELECT * FROM report_template_fields WHERE id = ?', [result.insertId]))!;
+  }
 
-    const numericSums: Record<string, number> = {};
+  async disableTemplateField(fieldId: number): Promise<ReportTemplateField | null> {
+    const [result] = await getPool().execute<ResultSetHeader>(
+      "UPDATE report_template_fields SET status = 'inactive' WHERE id = ?", [fieldId],
+    );
+    if (!result.affectedRows) return null;
+    return (await first<ReportTemplateField>(getPool(), 'SELECT * FROM report_template_fields WHERE id = ?', [fieldId]))!;
+  }
 
-    submissions.forEach((sub) => {
-      const subData = this.getSubmissionData(sub.id);
-      subData.forEach((d) => {
-        const field = fields.find((f) => f.id === d.field_id);
-        if (field && field.field_type === 'number') {
-          const num = parseFloat(d.value) || 0;
-          numericSums[field.field_name] = (numericSums[field.field_name] || 0) + num;
+  async getAssignments(): Promise<ReportAssignment[]> {
+    return all<ReportAssignment>(getPool(), 'SELECT * FROM report_assignments ORDER BY id DESC');
+  }
+
+  async getAssignmentById(id: number): Promise<ReportAssignment | undefined> {
+    return first<ReportAssignment>(getPool(), 'SELECT * FROM report_assignments WHERE id = ?', [id]);
+  }
+
+  async createAssignments(
+    templateId: number, companyIds: number[], title: string, periodLabel: string,
+    deadline: string, assignedBy: number,
+  ): Promise<ReportAssignment[]> {
+    return transaction(async (connection) => {
+      const created: ReportAssignment[] = [];
+      for (const companyId of companyIds) {
+        const [result] = await connection.execute<ResultSetHeader>(
+          `INSERT IGNORE INTO report_assignments
+           (template_id,assigned_to_company_id,title,period_label,deadline,status,assigned_by)
+           VALUES (?,?,?,?,?,'pending',?)`,
+          [templateId, companyId, title, periodLabel, deadline, assignedBy],
+        );
+        if (result.insertId) {
+          created.push((await first<ReportAssignment>(connection,
+            'SELECT * FROM report_assignments WHERE id = ?', [result.insertId]))!);
         }
-      });
+      }
+      return created;
     });
+  }
 
-    assignment.status = 'aggregated';
+  async updateAssignmentStatus(id: number, status: ReportAssignment['status']): Promise<void> {
+    await getPool().execute('UPDATE report_assignments SET status = ? WHERE id = ?', [status, id]);
+  }
 
-    let agg = this.data.report_aggregations.find((a) => a.assignment_id === assignmentId);
-    const now = new Date().toISOString();
+  async getSubmissions(): Promise<ReportSubmission[]> {
+    return all<ReportSubmission>(getPool(), 'SELECT * FROM report_submissions ORDER BY assignment_id, version DESC');
+  }
 
-    if (agg) {
-      agg.aggregated_data = numericSums;
-      agg.submitted_count = submissions.length;
-    } else {
-      this.data.counters.report_aggregations += 1;
-      agg = {
-        id: this.data.counters.report_aggregations,
-        template_id: template.id,
-        assignment_id: assignmentId,
-        aggregated_data: numericSums,
-        branch_count: 1,
-        submitted_count: submissions.length,
-        created_at: now,
+  async getSubmissionById(id: number): Promise<ReportSubmission | undefined> {
+    return first<ReportSubmission>(getPool(), 'SELECT * FROM report_submissions WHERE id = ?', [id]);
+  }
+
+  async getLatestSubmissionByAssignment(assignmentId: number): Promise<ReportSubmission | undefined> {
+    return first<ReportSubmission>(getPool(),
+      'SELECT * FROM report_submissions WHERE assignment_id = ? ORDER BY version DESC LIMIT 1', [assignmentId]);
+  }
+
+  async getLatestApprovedSubmissionByAssignment(assignmentId: number): Promise<ReportSubmission | undefined> {
+    return first<ReportSubmission>(getPool(),
+      "SELECT * FROM report_submissions WHERE assignment_id = ? AND status = 'approved' ORDER BY version DESC LIMIT 1",
+      [assignmentId]);
+  }
+
+  async createOrUpdateSubmission(
+    assignmentId: number, userId: number, companyId: number,
+    summaryData: Record<number, string>, detailData: Array<Record<number, string>>,
+    comment = '', isSubmit = false,
+  ): Promise<{ submission: ReportSubmission; approvals: ApprovalRecord[] }> {
+    return transaction(async (connection) => {
+      const assignment = await first<ReportAssignment>(connection,
+        'SELECT * FROM report_assignments WHERE id = ? FOR UPDATE', [assignmentId]);
+      if (!assignment) throw new DomainError('下发任务不存在', 404);
+      const user = await first<User>(connection, 'SELECT * FROM users WHERE id = ?', [userId]);
+      const isSuperAdmin = user?.role === 'super_admin';
+      if (!user || user.status !== 'active' || user.company_id !== companyId ||
+        (!isSuperAdmin && assignment.assigned_to_company_id !== companyId) ||
+        (!isSuperAdmin && user.role !== 'handler' && user.role !== 'branch_admin')) {
+        throw new DomainError('你无权填写该任务', 403);
+      }
+
+      const existing = await first<ReportSubmission>(connection,
+        'SELECT * FROM report_submissions WHERE assignment_id = ? ORDER BY version DESC LIMIT 1 FOR UPDATE',
+        [assignmentId]);
+      let submissionId: number;
+      if (existing?.status === 'draft') {
+        submissionId = existing.id;
+        await connection.execute(
+          `UPDATE report_submissions SET submitted_by=?, submitted_by_company_id=?, status=?, comment=?, submitted_at=?
+           WHERE id=?`,
+          [userId, companyId, isSubmit ? 'pending_review' : 'draft', comment, isSubmit ? new Date() : null, submissionId],
+        );
+        await connection.execute('DELETE FROM report_submission_data WHERE submission_id = ?', [submissionId]);
+      } else {
+        const version = existing ? existing.version + 1 : 1;
+        const [result] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO report_submissions
+           (assignment_id,version,submitted_by_company_id,submitted_by,status,comment,submitted_at)
+           VALUES (?,?,?,?,?,?,?)`,
+          [assignmentId, version, companyId, userId, isSubmit ? 'pending_review' : 'draft', comment,
+            isSubmit ? new Date() : null],
+        );
+        submissionId = result.insertId;
+      }
+
+      const values: Array<[number, number, number, string]> = [];
+      for (const [fieldId, value] of Object.entries(summaryData)) values.push([submissionId, Number(fieldId), 0, value ?? '']);
+      detailData.forEach((row, index) => {
+        for (const [fieldId, value] of Object.entries(row)) values.push([submissionId, Number(fieldId), index + 1, value ?? '']);
+      });
+      for (const value of values) {
+        await connection.execute(
+          'INSERT INTO report_submission_data (submission_id,field_id,row_index,value) VALUES (?,?,?,?)', value,
+        );
+      }
+      await connection.execute('UPDATE report_assignments SET status = ? WHERE id = ?',
+        [isSubmit ? 'submitted' : 'filling', assignmentId]);
+
+      const approvals: ApprovalRecord[] = [];
+      if (isSubmit) {
+        const reviewer = await first<User>(connection,
+          "SELECT * FROM users WHERE company_id=? AND role='reviewer' AND status='active' ORDER BY id LIMIT 1", [companyId]);
+        if (!reviewer) throw new DomainError('该公司未配置有效复核人', 409);
+        await connection.execute(
+          `INSERT INTO approval_records (submission_id,approval_level,approver_id,status,comment)
+           VALUES (?,'handler',?,'approved',?),(?,'reviewer',?,'pending','等候复核')`,
+          [submissionId, userId, comment || '经办人已提交填报', submissionId, reviewer.id],
+        );
+        approvals.push(...await all<ApprovalRecord>(connection,
+          'SELECT * FROM approval_records WHERE submission_id=? ORDER BY id', [submissionId]));
+      }
+      return {
+        submission: (await first<ReportSubmission>(connection, 'SELECT * FROM report_submissions WHERE id=?', [submissionId]))!,
+        approvals,
       };
-      this.data.report_aggregations.push(agg);
-    }
+    });
+  }
 
-    this.save();
-    return agg;
+  async getSubmissionData(submissionId: number): Promise<ReportSubmissionData[]> {
+    return all<ReportSubmissionData>(getPool(),
+      'SELECT * FROM report_submission_data WHERE submission_id=? ORDER BY row_index,id', [submissionId]);
+  }
+
+  async getApprovalRecords(submissionId: number): Promise<ApprovalRecord[]> {
+    return all<ApprovalRecord>(getPool(),
+      'SELECT * FROM approval_records WHERE submission_id=? ORDER BY id', [submissionId]);
+  }
+
+  async processApprovalAction(
+    submissionId: number, approverUser: User, action: 'approved' | 'rejected', comment = '',
+  ): Promise<{ submission: ReportSubmission; approval: ApprovalRecord }> {
+    return transaction(async (connection) => {
+      const submission = await first<ReportSubmission>(connection,
+        'SELECT * FROM report_submissions WHERE id=? FOR UPDATE', [submissionId]);
+      if (!submission) throw new DomainError('填报记录不存在', 404);
+      const assignment = await first<ReportAssignment>(connection,
+        'SELECT * FROM report_assignments WHERE id=? FOR UPDATE', [submission.assignment_id]);
+      const pending = await first<ApprovalRecord>(connection,
+        "SELECT * FROM approval_records WHERE submission_id=? AND status='pending' ORDER BY id LIMIT 1 FOR UPDATE", [submissionId]);
+      if (!pending) throw new DomainError('该填报当前没有待处理的审批步骤', 409);
+      const expectedStatus = pending.approval_level === 'reviewer' ? 'pending_review' : 'pending_approval';
+      if (submission.status !== expectedStatus) throw new DomainError('审批状态已变化，请刷新后重试', 409);
+      if (pending.approver_id !== approverUser.id || submission.submitted_by_company_id !== approverUser.company_id ||
+        pending.approval_level !== approverUser.role) throw new DomainError('你不是该审批步骤的指定处理人', 403);
+
+      await connection.execute('UPDATE approval_records SET status=?, comment=? WHERE id=?',
+        [action, comment || (action === 'approved' ? '同意' : '驳回'), pending.id]);
+      if (action === 'rejected') {
+        await connection.execute("UPDATE report_submissions SET status='rejected' WHERE id=?", [submissionId]);
+        await connection.execute("UPDATE report_assignments SET status='rejected' WHERE id=?", [assignment!.id]);
+      } else if (pending.approval_level === 'reviewer') {
+        const approver = await first<User>(connection,
+          "SELECT * FROM users WHERE company_id=? AND role='approver' AND status='active' ORDER BY id LIMIT 1",
+          [approverUser.company_id]);
+        if (!approver) throw new DomainError('该公司未配置有效审批人', 409);
+        await connection.execute("UPDATE report_submissions SET status='pending_approval' WHERE id=?", [submissionId]);
+        await connection.execute(
+          `INSERT INTO approval_records (submission_id,approval_level,approver_id,status,comment)
+           VALUES (?,'approver',?,'pending','等候终审')`, [submissionId, approver.id]);
+      } else {
+        await connection.execute("UPDATE report_submissions SET status='approved' WHERE id=?", [submissionId]);
+        await connection.execute("UPDATE report_assignments SET status='approved' WHERE id=?", [assignment!.id]);
+      }
+      return {
+        submission: (await first<ReportSubmission>(connection, 'SELECT * FROM report_submissions WHERE id=?', [submissionId]))!,
+        approval: (await first<ApprovalRecord>(connection, 'SELECT * FROM approval_records WHERE id=?', [pending.id]))!,
+      };
+    });
+  }
+
+  async getPendingApprovalsForUser(user: User) {
+    return all<any>(getPool(),
+      `SELECT ar.id approval_id, s.id submission_id, ar.approval_level, a.title assignment_title,
+              a.period_label, t.name template_name, c.name company_name, u.display_name submitted_by_name,
+              COALESCE(s.submitted_at,s.created_at) submitted_at, s.version, s.comment
+       FROM approval_records ar
+       JOIN report_submissions s ON s.id=ar.submission_id
+       JOIN report_assignments a ON a.id=s.assignment_id
+       JOIN report_templates t ON t.id=a.template_id
+       JOIN companies c ON c.id=s.submitted_by_company_id
+       JOIN users u ON u.id=s.submitted_by
+       WHERE ar.status='pending' AND s.submitted_by_company_id=? AND
+         ((?='reviewer' AND ar.approval_level='reviewer') OR
+          (?='approver' AND ar.approval_level='approver') OR ? IN ('branch_admin','super_admin'))
+       ORDER BY s.submitted_at DESC`,
+      [user.company_id, user.role, user.role, user.role]);
+  }
+
+  async aggregateAssignment(assignmentId: number): Promise<ReportAggregation> {
+    return transaction(async (connection) => {
+      const assignment = await first<ReportAssignment>(connection,
+        'SELECT * FROM report_assignments WHERE id=? FOR UPDATE', [assignmentId]);
+      if (!assignment) throw new DomainError('下发任务不存在', 404);
+      const template = await first<ReportTemplate>(connection,
+        'SELECT * FROM report_templates WHERE id=?', [assignment.template_id]);
+      if (!template) throw new DomainError('模板不存在', 404);
+      const sums = await all<{ field_name: string; total: string }>(connection,
+        `SELECT f.field_name, SUM(CAST(d.value AS DECIMAL(30,6))) total
+         FROM report_submissions s
+         JOIN report_submission_data d ON d.submission_id=s.id
+         JOIN report_template_fields f ON f.id=d.field_id
+         WHERE s.assignment_id=? AND s.status='approved' AND f.field_type='number'
+         GROUP BY f.field_name`, [assignmentId]);
+      const data = Object.fromEntries(sums.map((item) => [item.field_name, Number(item.total)]));
+      const count = await first<{ count: number }>(connection,
+        "SELECT COUNT(*) count FROM report_submissions WHERE assignment_id=? AND status='approved'", [assignmentId]);
+      await connection.execute(
+        `INSERT INTO report_aggregations
+         (template_id,assignment_id,aggregated_data,branch_count,submitted_count)
+         VALUES (?,?,?,1,?) ON DUPLICATE KEY UPDATE aggregated_data=VALUES(aggregated_data),
+         submitted_count=VALUES(submitted_count), updated_at=CURRENT_TIMESTAMP(3)`,
+        [template.id, assignmentId, JSON.stringify(data), count?.count || 0]);
+      await connection.execute("UPDATE report_assignments SET status='aggregated' WHERE id=?", [assignmentId]);
+      return (await first<ReportAggregation>(connection,
+        'SELECT * FROM report_aggregations WHERE assignment_id=?', [assignmentId]))!;
+    });
   }
 }
 

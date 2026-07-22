@@ -5,20 +5,20 @@ import { authMiddleware, canReadAssignment } from '../auth';
 const router = Router();
 
 // GET /api/assignments - Get assignments list
-router.get('/', authMiddleware, (req: Request, res: Response) => {
+router.get('/', authMiddleware, async (req: Request, res: Response) => {
   const user = req.user!;
-  let assignments = db.getAssignments();
+  let assignments = await db.getAssignments();
 
   // If user is from branch, only return assignments assigned to their company
   if (user.company_level === 'branch') {
     assignments = assignments.filter((a) => a.assigned_to_company_id === user.company_id);
   }
 
-  const result = assignments.map((a) => {
-    const template = db.getTemplateById(a.template_id);
-    const company = db.getCompanyById(a.assigned_to_company_id);
-    const assigner = db.getUserById(a.assigned_by);
-    const latestSubmission = db.getLatestSubmissionByAssignment(a.id);
+  const result = await Promise.all(assignments.map(async (a) => {
+    const [template, company, assigner, latestSubmission] = await Promise.all([
+      db.getTemplateById(a.template_id), db.getCompanyById(a.assigned_to_company_id),
+      db.getUserById(a.assigned_by), db.getLatestSubmissionByAssignment(a.id),
+    ]);
 
     return {
       ...a,
@@ -31,15 +31,15 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
       submission_version: latestSubmission ? latestSubmission.version : 0,
       submission_id: latestSubmission ? latestSubmission.id : null,
     };
-  });
+  }));
 
   res.json(result);
 });
 
 // GET /api/assignments/:id - Get assignment detail
-router.get('/:id', authMiddleware, (req: Request, res: Response) => {
+router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  const assignment = db.getAssignmentById(id);
+  const assignment = await db.getAssignmentById(id);
 
   if (!assignment) {
     return res.status(404).json({ error: '下发任务不存在' });
@@ -48,10 +48,11 @@ router.get('/:id', authMiddleware, (req: Request, res: Response) => {
     return res.status(403).json({ error: '无权查看该下发任务' });
   }
 
-  const template = db.getTemplateById(assignment.template_id);
-  const company = db.getCompanyById(assignment.assigned_to_company_id);
-  const fields = template ? db.getTemplateFields(template.id) : [];
-  const latestSubmission = db.getLatestSubmissionByAssignment(assignment.id);
+  const [template, company, latestSubmission] = await Promise.all([
+    db.getTemplateById(assignment.template_id), db.getCompanyById(assignment.assigned_to_company_id),
+    db.getLatestSubmissionByAssignment(assignment.id),
+  ]);
+  const fields = template ? await db.getTemplateFields(template.id) : [];
 
   res.json({
     ...assignment,

@@ -5,7 +5,7 @@ import { authMiddleware, canReadAssignment, canReadSubmission, canWriteAssignmen
 const router = Router();
 
 // POST /api/submissions - Create or update report draft / submission
-router.post('/', authMiddleware, (req: Request, res: Response) => {
+router.post('/', authMiddleware, async (req: Request, res: Response) => {
   const user = req.user!;
   const { assignment_id, summary, details, comment, action } = req.body;
 
@@ -18,7 +18,7 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
   if (!Number.isInteger(assignmentId) || assignmentId <= 0) {
     return res.status(400).json({ error: '下发任务 ID 格式错误' });
   }
-  const assignment = db.getAssignmentById(assignmentId);
+  const assignment = await db.getAssignmentById(assignmentId);
   if (!assignment) {
     return res.status(404).json({ error: '下发任务不存在' });
   }
@@ -27,7 +27,7 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
   }
 
   try {
-    const result = db.createOrUpdateSubmission(
+    const result = await db.createOrUpdateSubmission(
       assignmentId,
       user.id,
       user.company_id,
@@ -48,9 +48,9 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
 });
 
 // POST /api/submissions/:id/submit - Submit existing draft for approval
-router.post('/:id/submit', authMiddleware, (req: Request, res: Response) => {
+router.post('/:id/submit', authMiddleware, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  const submission = db.getSubmissionById(id);
+  const submission = await db.getSubmissionById(id);
 
   if (!submission) {
     return res.status(404).json({ error: '填报记录不存在' });
@@ -58,13 +58,13 @@ router.post('/:id/submit', authMiddleware, (req: Request, res: Response) => {
 
   const { comment } = req.body;
   const user = req.user!;
-  const assignment = db.getAssignmentById(submission.assignment_id);
+  const assignment = await db.getAssignmentById(submission.assignment_id);
   if (!assignment || !canWriteAssignment(user, assignment)) {
     return res.status(403).json({ error: '无权提交该填报记录' });
   }
 
   try {
-    const subDataRaw = db.getSubmissionData(submission.id);
+    const subDataRaw = await db.getSubmissionData(submission.id);
     const summaryData: Record<number, string> = {};
     const detailRowsMap: Record<number, Record<number, string>> = {};
 
@@ -79,7 +79,7 @@ router.post('/:id/submit', authMiddleware, (req: Request, res: Response) => {
 
     const detailData = Object.values(detailRowsMap);
 
-    const result = db.createOrUpdateSubmission(
+    const result = await db.createOrUpdateSubmission(
       submission.assignment_id,
       user.id,
       user.company_id,
@@ -98,8 +98,8 @@ router.post('/:id/submit', authMiddleware, (req: Request, res: Response) => {
   }
 });
 
-function renderSubmissionDetail(submissionId: number, req: Request, res: Response) {
-  const submission = db.getSubmissionById(submissionId);
+async function renderSubmissionDetail(submissionId: number, req: Request, res: Response) {
+  const submission = await db.getSubmissionById(submissionId);
 
   if (!submission) {
     return res.status(404).json({ error: '填报记录不存在' });
@@ -108,12 +108,13 @@ function renderSubmissionDetail(submissionId: number, req: Request, res: Respons
     return res.status(403).json({ error: '无权查看该填报记录' });
   }
 
-  const assignment = db.getAssignmentById(submission.assignment_id);
-  const template = assignment ? db.getTemplateById(assignment.template_id) : undefined;
-  const templateFields = template ? db.getTemplateFields(template.id) : [];
+  const assignment = await db.getAssignmentById(submission.assignment_id);
+  const template = assignment ? await db.getTemplateById(assignment.template_id) : undefined;
+  const templateFields = template ? await db.getTemplateFields(template.id) : [];
 
-  const rawData = db.getSubmissionData(submissionId);
-  const approvals = db.getApprovalRecords(submissionId);
+  const [rawData, approvals] = await Promise.all([
+    db.getSubmissionData(submissionId), db.getApprovalRecords(submissionId),
+  ]);
 
   // Group summary fields
   const summary: Array<{
@@ -164,17 +165,18 @@ function renderSubmissionDetail(submissionId: number, req: Request, res: Respons
 
   const details = Object.values(detailRowsMap);
 
-  const formattedApprovals = approvals.map((app) => {
-    const approverUser = db.getUserById(app.approver_id);
+  const formattedApprovals = await Promise.all(approvals.map(async (app) => {
+    const approverUser = await db.getUserById(app.approver_id);
     return {
       ...app,
       approver_name: approverUser ? approverUser.display_name : '未指定',
       approver_role: approverUser ? approverUser.role : '',
     };
-  });
+  }));
 
-  const submitter = db.getUserById(submission.submitted_by);
-  const company = db.getCompanyById(submission.submitted_by_company_id);
+  const [submitter, company] = await Promise.all([
+    db.getUserById(submission.submitted_by), db.getCompanyById(submission.submitted_by_company_id),
+  ]);
 
   res.json({
     ...submission,
@@ -189,28 +191,28 @@ function renderSubmissionDetail(submissionId: number, req: Request, res: Respons
 }
 
 // GET /api/submissions/:id - Get submission detail with parsed summary, details & approvals
-router.get('/:id', authMiddleware, (req: Request, res: Response) => {
+router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(400).json({ error: '填报记录 ID 格式错误' });
-  renderSubmissionDetail(id, req, res);
+  await renderSubmissionDetail(id, req, res);
 });
 
 // GET /api/submissions/by-assignment/:assignmentId - Get latest submission for assignment
-router.get('/by-assignment/:assignmentId', authMiddleware, (req: Request, res: Response) => {
+router.get('/by-assignment/:assignmentId', authMiddleware, async (req: Request, res: Response) => {
   const assignmentId = parseInt(req.params.assignmentId, 10);
   if (!Number.isInteger(assignmentId)) return res.status(400).json({ error: '下发任务 ID 格式错误' });
-  const assignment = db.getAssignmentById(assignmentId);
+  const assignment = await db.getAssignmentById(assignmentId);
   if (!assignment) return res.status(404).json({ error: '下发任务不存在' });
   if (!canReadAssignment(req.user!, assignment)) {
     return res.status(403).json({ error: '无权查看该任务的填报记录' });
   }
-  const submission = db.getLatestSubmissionByAssignment(assignmentId);
+  const submission = await db.getLatestSubmissionByAssignment(assignmentId);
 
   if (!submission) {
     return res.status(404).json({ error: '暂无填报数据' });
   }
 
-  renderSubmissionDetail(submission.id, req, res);
+  await renderSubmissionDetail(submission.id, req, res);
 });
 
 export default router;

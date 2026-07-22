@@ -5,12 +5,13 @@ import { authMiddleware, requireHeadquarter } from '../auth';
 const router = Router();
 
 // GET /api/templates - Get template list
-router.get('/', authMiddleware, (req: Request, res: Response) => {
-  const templates = db.getTemplates();
-  const result = templates.map((t) => {
-    const fields = db.getTemplateFields(t.id).filter((f) => f.status === 'active');
-    const assignments = db.getAssignments().filter((a) => a.template_id === t.id);
-    const creator = db.getUserById(t.created_by);
+router.get('/', authMiddleware, async (req: Request, res: Response) => {
+  const templates = await db.getTemplates();
+  const allAssignments = await db.getAssignments();
+  const result = await Promise.all(templates.map(async (t) => {
+    const fields = (await db.getTemplateFields(t.id)).filter((f) => f.status === 'active');
+    const assignments = allAssignments.filter((a) => a.template_id === t.id);
+    const creator = await db.getUserById(t.created_by);
 
     return {
       ...t,
@@ -18,21 +19,20 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
       assignment_count: assignments.length,
       created_by_name: creator ? creator.display_name : '管理员',
     };
-  });
+  }));
 
   res.json(result);
 });
 
 // GET /api/templates/:id - Get template details with fields
-router.get('/:id', authMiddleware, (req: Request, res: Response) => {
+router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  const template = db.getTemplateById(id);
+  const template = await db.getTemplateById(id);
   if (!template) {
     return res.status(404).json({ error: '模板不存在' });
   }
 
-  const fields = db.getTemplateFields(id);
-  const creator = db.getUserById(template.created_by);
+  const [fields, creator] = await Promise.all([db.getTemplateFields(id), db.getUserById(template.created_by)]);
 
   res.json({
     ...template,
@@ -42,7 +42,7 @@ router.get('/:id', authMiddleware, (req: Request, res: Response) => {
 });
 
 // POST /api/templates - Create template with initial fields
-router.post('/', authMiddleware, requireHeadquarter, (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
   const { name, description, period_type, fields } = req.body;
 
   if (!name || !period_type) {
@@ -50,7 +50,7 @@ router.post('/', authMiddleware, requireHeadquarter, (req: Request, res: Respons
   }
 
   try {
-    const created = db.createTemplate(
+    const created = await db.createTemplate(
       {
         name,
         description: description || '',
@@ -68,11 +68,11 @@ router.post('/', authMiddleware, requireHeadquarter, (req: Request, res: Respons
 });
 
 // PUT /api/templates/:id - Update template basic info
-router.put('/:id', authMiddleware, requireHeadquarter, (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   const { name, description, period_type, status } = req.body;
 
-  const updated = db.updateTemplate(id, {
+  const updated = await db.updateTemplate(id, {
     ...(name && { name }),
     ...(description !== undefined && { description }),
     ...(period_type && { period_type }),
@@ -87,9 +87,9 @@ router.put('/:id', authMiddleware, requireHeadquarter, (req: Request, res: Respo
 });
 
 // POST /api/templates/:id/fields - Add field to template
-router.post('/:id/fields', authMiddleware, requireHeadquarter, (req: Request, res: Response) => {
+router.post('/:id/fields', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
   const templateId = parseInt(req.params.id, 10);
-  const template = db.getTemplateById(templateId);
+  const template = await db.getTemplateById(templateId);
   if (!template) {
     return res.status(404).json({ error: '模板不存在' });
   }
@@ -100,12 +100,12 @@ router.post('/:id/fields', authMiddleware, requireHeadquarter, (req: Request, re
     return res.status(400).json({ error: '字段标识、名称、字段类型和数据分类为必填项' });
   }
 
-  const existing = db.getTemplateFields(templateId).find((f) => f.field_name === field_name);
+  const existing = (await db.getTemplateFields(templateId)).find((f) => f.field_name === field_name);
   if (existing) {
     return res.status(400).json({ error: `字段标识 "${field_name}" 在该模板中已存在` });
   }
 
-  const field = db.addTemplateField({
+  const field = await db.addTemplateField({
     template_id: templateId,
     field_name,
     field_label,
@@ -120,9 +120,9 @@ router.post('/:id/fields', authMiddleware, requireHeadquarter, (req: Request, re
 });
 
 // PUT /api/templates/:id/fields/:fieldId/disable - Disable (soft delete) field
-router.put('/:id/fields/:fieldId/disable', authMiddleware, requireHeadquarter, (req: Request, res: Response) => {
+router.put('/:id/fields/:fieldId/disable', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
   const fieldId = parseInt(req.params.fieldId, 10);
-  const disabled = db.disableTemplateField(fieldId);
+  const disabled = await db.disableTemplateField(fieldId);
 
   if (!disabled) {
     return res.status(404).json({ error: '字段不存在' });
@@ -132,9 +132,9 @@ router.put('/:id/fields/:fieldId/disable', authMiddleware, requireHeadquarter, (
 });
 
 // POST /api/templates/:id/assign - Assign template to branches
-router.post('/:id/assign', authMiddleware, requireHeadquarter, (req: Request, res: Response) => {
+router.post('/:id/assign', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
   const templateId = parseInt(req.params.id, 10);
-  const template = db.getTemplateById(templateId);
+  const template = await db.getTemplateById(templateId);
   if (!template) {
     return res.status(404).json({ error: '模板不存在' });
   }
@@ -149,7 +149,7 @@ router.post('/:id/assign', authMiddleware, requireHeadquarter, (req: Request, re
     return res.status(400).json({ error: '下发标题和截止日期为必填项' });
   }
 
-  const newAssignments = db.createAssignments(
+  const newAssignments = await db.createAssignments(
     templateId,
     company_ids,
     title,

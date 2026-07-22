@@ -57,8 +57,8 @@ declare global {
   }
 }
 
-export function generateToken(user: User): string {
-  const company = db.getCompanyById(user.company_id);
+export async function generateToken(user: User): Promise<string> {
+  const company = await db.getCompanyById(user.company_id);
   const payload: AuthenticatedUser = {
     id: user.id,
     username: user.username,
@@ -73,8 +73,8 @@ export function generateToken(user: User): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
 }
 
-function toAuthenticatedUser(user: User): AuthenticatedUser {
-  const company = db.getCompanyById(user.company_id);
+async function toAuthenticatedUser(user: User): Promise<AuthenticatedUser> {
+  const company = await db.getCompanyById(user.company_id);
   return {
     id: user.id,
     username: user.username,
@@ -87,7 +87,7 @@ function toAuthenticatedUser(user: User): AuthenticatedUser {
   };
 }
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: '未提供认证 Token 或格式错误' });
@@ -96,11 +96,11 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   const token = authHeader.substring(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
-    const currentUser = db.getUserById(decoded.id);
+    const currentUser = await db.getUserById(decoded.id);
     if (!currentUser || currentUser.status !== 'active') {
       return res.status(401).json({ error: '账号不存在或已停用，请重新登录' });
     }
-    req.user = toAuthenticatedUser(currentUser);
+    req.user = await toAuthenticatedUser(currentUser);
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Token 无效或已过期，请重新登录' });

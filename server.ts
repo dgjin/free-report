@@ -1,3 +1,4 @@
+import 'express-async-errors';
 import express, { Request, Response } from 'express';
 import path from 'path';
 import cors from 'cors';
@@ -13,8 +14,11 @@ import aggregationsRouter from './server/src/routes/aggregations';
 
 import { db } from './server/src/db';
 import { generateToken, authMiddleware } from './server/src/auth';
+import { describeMysqlConfig, readMysqlConfig, verifyMysqlConnection } from './server/src/mysql';
 
 async function startServer() {
+  await verifyMysqlConnection();
+  console.log(`[FreeReport DB] Connected to ${describeMysqlConfig(readMysqlConfig())}`);
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
   const allowedOrigins = (process.env.CORS_ORIGINS || '')
@@ -34,14 +38,14 @@ async function startServer() {
   app.use(express.json());
 
   // Auth Routes
-  app.post('/api/auth/login', (req: Request, res: Response) => {
+  app.post('/api/auth/login', async (req: Request, res: Response) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ error: '请填写用户名和密码' });
     }
 
-    const user = db.getUserByUsername(username);
+    const user = await db.getUserByUsername(username);
     if (!user) {
       return res.status(401).json({ error: '用户名或密码错误' });
     }
@@ -55,8 +59,8 @@ async function startServer() {
       return res.status(401).json({ error: '用户名或密码错误' });
     }
 
-    const token = generateToken(user);
-    const company = db.getCompanyById(user.company_id);
+    const token = await generateToken(user);
+    const company = await db.getCompanyById(user.company_id);
 
     res.json({
       token,
@@ -90,6 +94,17 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
+  app.use('/api', (error: unknown, req: Request, res: Response, next: express.NextFunction) => {
+    console.error('[FreeReport API]', error);
+    if (res.headersSent) return next(error);
+    const statusCode = typeof error === 'object' && error && 'statusCode' in error
+      ? Number((error as { statusCode: number }).statusCode)
+      : 500;
+    res.status(statusCode).json({
+      error: statusCode === 500 ? '服务器处理请求时发生异常' : (error as Error).message,
+    });
+  });
+
   // Vite Middleware for SPA development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -110,4 +125,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((error) => {
+  console.error('[FreeReport Server] Startup failed:', error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});

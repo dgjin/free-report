@@ -16,24 +16,24 @@ export function selectAssignmentsForPeriod(
 }
 
 // GET /api/aggregations/by-template/:templateId - Get aggregation view for template across branches
-router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, (req: Request, res: Response) => {
+router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
   const templateId = parseInt(req.params.templateId, 10);
   const periodLabel = typeof req.query.period_label === 'string' ? req.query.period_label.trim() : '';
   if (!periodLabel) {
     return res.status(400).json({ error: '请指定汇总周期 period_label' });
   }
-  const template = db.getTemplateById(templateId);
+  const template = await db.getTemplateById(templateId);
 
   if (!template) {
     return res.status(404).json({ error: '模板不存在' });
   }
 
-  const allFields = db.getTemplateFields(templateId).filter((f) => f.status === 'active');
+  const allFields = (await db.getTemplateFields(templateId)).filter((f) => f.status === 'active');
   const summaryFields = allFields.filter((f) => f.data_type === 'summary');
   const detailFields = allFields.filter((f) => f.data_type === 'detail');
 
-  const branches = db.getCompanies().filter((c) => c.level === 'branch' && c.status === 'active');
-  const assignments = selectAssignmentsForPeriod(db.getAssignments(), templateId, periodLabel);
+  const branches = (await db.getCompanies()).filter((c) => c.level === 'branch' && c.status === 'active');
+  const assignments = selectAssignmentsForPeriod(await db.getAssignments(), templateId, periodLabel);
 
   const companyDataList: any[] = [];
   const mergedDetailRows: any[] = [];
@@ -52,7 +52,7 @@ router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, (req:
     }
   });
 
-  branches.forEach((branch) => {
+  for (const branch of branches) {
     const assignment = assignments.find((a) => a.assigned_to_company_id === branch.id);
     const companyItem: any = {
       company_id: branch.id,
@@ -66,13 +66,13 @@ router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, (req:
     };
 
     if (assignment) {
-      const latestSub = db.getLatestApprovedSubmissionByAssignment(assignment.id);
+      const latestSub = await db.getLatestApprovedSubmissionByAssignment(assignment.id);
       if (latestSub) {
         companyItem.has_submitted = true;
         companyItem.submission_status = latestSub.status;
         companyItem.submission_version = latestSub.version;
 
-        const rawData = db.getSubmissionData(latestSub.id);
+        const rawData = await db.getSubmissionData(latestSub.id);
 
         // Parse summary values
         rawData
@@ -119,7 +119,7 @@ router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, (req:
     }
 
     companyDataList.push(companyItem);
-  });
+  }
 
   // Calculate averages
   Object.keys(summaryStats).forEach((key) => {
@@ -144,10 +144,10 @@ router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, (req:
 });
 
 // POST /api/aggregations/aggregate/:assignmentId - Manually trigger single assignment aggregation
-router.post('/aggregate/:assignmentId', authMiddleware, requireHeadquarter, (req: Request, res: Response) => {
+router.post('/aggregate/:assignmentId', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
   const assignmentId = parseInt(req.params.assignmentId, 10);
   try {
-    const agg = db.aggregateAssignment(assignmentId);
+    const agg = await db.aggregateAssignment(assignmentId);
     res.json({ message: '数据汇总成功', aggregation: agg });
   } catch (err: any) {
     res.status(400).json({ error: err.message || '汇总操作失败' });
@@ -155,13 +155,14 @@ router.post('/aggregate/:assignmentId', authMiddleware, requireHeadquarter, (req
 });
 
 // GET /api/aggregations/history/:templateId - View report history & submission versions
-router.get('/history/:templateId', authMiddleware, requireHeadquarter, (req: Request, res: Response) => {
+router.get('/history/:templateId', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
   const templateId = parseInt(req.params.templateId, 10);
-  const assignments = db.getAssignments().filter((a) => a.template_id === templateId);
+  const assignments = (await db.getAssignments()).filter((a) => a.template_id === templateId);
+  const allSubmissions = await db.getSubmissions();
 
-  const history = assignments.map((a) => {
-    const company = db.getCompanyById(a.assigned_to_company_id);
-    const submissions = db.getSubmissions().filter((s) => s.assignment_id === a.id);
+  const history = await Promise.all(assignments.map(async (a) => {
+    const company = await db.getCompanyById(a.assigned_to_company_id);
+    const submissions = allSubmissions.filter((s) => s.assignment_id === a.id);
 
     return {
       assignment_id: a.id,
@@ -171,8 +172,8 @@ router.get('/history/:templateId', authMiddleware, requireHeadquarter, (req: Req
       company_code: company ? company.code : '',
       deadline: a.deadline,
       status: a.status,
-      submissions_history: submissions.map((s) => {
-        const submitter = db.getUserById(s.submitted_by);
+      submissions_history: await Promise.all(submissions.map(async (s) => {
+        const submitter = await db.getUserById(s.submitted_by);
         return {
           submission_id: s.id,
           version: s.version,
@@ -181,9 +182,9 @@ router.get('/history/:templateId', authMiddleware, requireHeadquarter, (req: Req
           submitted_at: s.submitted_at || s.created_at,
           comment: s.comment,
         };
-      }),
+      })),
     };
-  });
+  }));
 
   res.json(history);
 });
