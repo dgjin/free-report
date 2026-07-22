@@ -20,6 +20,7 @@ import {
 import { api } from '../services/api';
 import { ReportTemplate, ReportTemplateField, FieldType } from '../types';
 import { DEFAULT_FIELD_DATA_TYPE } from '../utils/templateFields';
+import { getTemplateLifecycleView } from '../utils/templateLifecycle';
 
 export const TemplateEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -140,6 +141,8 @@ export const TemplateEditor: React.FC = () => {
   }
 
   const fieldsList = template.fields || [];
+  const lifecycle = getTemplateLifecycleView(template.status);
+  const canWrite = lifecycle.canWrite;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -163,15 +166,23 @@ export const TemplateEditor: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-3 shrink-0">
-          <button
-            onClick={() => setAddFieldModalOpen(true)}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>新增模版字段</span>
-          </button>
+          {canWrite && (
+            <button
+              onClick={() => setAddFieldModalOpen(true)}
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>新增模版字段</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {!canWrite && (
+        <div className="p-4 bg-slate-100 border border-slate-200 rounded-2xl text-xs text-slate-600">
+          该报表模板已停用，字段配置为只读；历史任务和数据仍可正常查看与处理。
+        </div>
+      )}
 
       {/* Safety Notice */}
       <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-start space-x-3 text-xs text-amber-900">
@@ -244,16 +255,16 @@ export const TemplateEditor: React.FC = () => {
                       </div>
                     </div>
 
-                    {isActive ? (
+                    {isActive && canWrite ? (
                       <button
                         onClick={() => handleDisableField(field.id)}
                         className="px-2.5 py-1 text-[11px] text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200 font-medium"
                       >
                         停用
                       </button>
-                    ) : (
+                    ) : !isActive ? (
                       <span className="text-[11px] text-slate-400 font-medium">已停用</span>
-                    )}
+                    ) : null}
                   </div>
 
                   {field.field_type === 'select' && config.options && (

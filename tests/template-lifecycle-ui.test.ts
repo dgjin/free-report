@@ -71,3 +71,13 @@ test('template cards expose lifecycle status and guarded lifecycle actions', () 
   assert.match(source, /confirm\('停用后不能编辑或新下发，历史任务和数据不受影响。确认停用？'\)/);
   assert.match(source, /lifecycle\.isArchived \? '.*opacity-60.*border-slate-300.*'/s);
 });
+
+test('template editor makes archived templates read only', () => {
+  const source = readFileSync(new URL('../src/pages/TemplateEditor.tsx', import.meta.url), 'utf8');
+
+  assert.match(source, /getTemplateLifecycleView\(template\.status\)/);
+  assert.match(source, /const canWrite = lifecycle\.canWrite/);
+  assert.match(source, /该报表模板已停用，字段配置为只读；历史任务和数据仍可正常查看与处理。/);
+  assert.match(source, /\{canWrite && \(/);
+  assert.match(source, /\{isActive && canWrite \?/);
+});
