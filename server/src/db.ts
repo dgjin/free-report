@@ -447,7 +447,7 @@ class Database {
 
         // Clear old submission data
         this.data.report_submission_data = this.data.report_submission_data.filter(
-          (d) => d.submission_id === submission.id
+          (d) => d.submission_id !== submission.id
         );
       }
     } else {
