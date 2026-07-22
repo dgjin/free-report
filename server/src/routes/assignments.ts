@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { authMiddleware } from '../auth';
+import { authMiddleware, canReadAssignment } from '../auth';
 
 const router = Router();
 
@@ -43,6 +43,9 @@ router.get('/:id', authMiddleware, (req: Request, res: Response) => {
 
   if (!assignment) {
     return res.status(404).json({ error: '下发任务不存在' });
+  }
+  if (!canReadAssignment(req.user!, assignment)) {
+    return res.status(403).json({ error: '无权查看该下发任务' });
   }
 
   const template = db.getTemplateById(assignment.template_id);

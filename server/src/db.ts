@@ -426,6 +426,18 @@ class Database {
       throw new Error('Assignment not found');
     }
 
+    const user = this.getUserById(userId);
+    const isSuperAdmin = user?.role === 'super_admin';
+    if (
+      !user ||
+      user.status !== 'active' ||
+      user.company_id !== companyId ||
+      (!isSuperAdmin && assignment.assigned_to_company_id !== companyId) ||
+      (!isSuperAdmin && user.role !== 'handler' && user.role !== 'branch_admin')
+    ) {
+      throw new DomainError('你无权填写该任务', 403);
+    }
+
     let existing = this.getLatestSubmissionByAssignment(assignmentId);
     let submission: ReportSubmission;
 

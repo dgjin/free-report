@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from './db';
-import { User, Role, CompanyLevel } from './types';
+import { User, Role, CompanyLevel, ReportAssignment, ReportSubmission } from './types';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'free-report-secret-key-2026';
 
@@ -14,6 +14,30 @@ export interface AuthenticatedUser {
   company_code: string;
   company_level: CompanyLevel;
   role: Role;
+}
+
+type AccessUser = Pick<User, 'id' | 'company_id' | 'role'> & {
+  company_level?: CompanyLevel;
+};
+
+function isHeadquarterUser(user: AccessUser): boolean {
+  return user.company_level === 'headquarter' ||
+    user.role === 'super_admin' ||
+    user.role === 'headquarter_admin';
+}
+
+export function canReadAssignment(user: AccessUser, assignment: ReportAssignment): boolean {
+  return isHeadquarterUser(user) || assignment.assigned_to_company_id === user.company_id;
+}
+
+export function canWriteAssignment(user: AccessUser, assignment: ReportAssignment): boolean {
+  if (user.role === 'super_admin') return true;
+  return assignment.assigned_to_company_id === user.company_id &&
+    (user.role === 'handler' || user.role === 'branch_admin');
+}
+
+export function canReadSubmission(user: AccessUser, submission: ReportSubmission): boolean {
+  return isHeadquarterUser(user) || submission.submitted_by_company_id === user.company_id;
 }
 
 declare global {
