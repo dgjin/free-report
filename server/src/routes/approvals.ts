@@ -29,7 +29,7 @@ router.post('/:submissionId/action', authMiddleware, (req: Request, res: Respons
       approval: result.approval,
     });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || '审批操作失败' });
+    res.status(err.statusCode || 400).json({ error: err.message || '审批操作失败' });
   }
 });
 

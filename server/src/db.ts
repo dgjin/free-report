@@ -39,6 +39,13 @@ interface DatabaseSchema {
   };
 }
 
+export class DomainError extends Error {
+  constructor(message: string, public readonly statusCode: number) {
+    super(message);
+    this.name = 'DomainError';
+  }
+}
+
 class Database {
   private data: DatabaseSchema;
 
@@ -572,10 +579,23 @@ class Database {
     );
 
     if (!pendingRecord) {
-      throw new Error('No pending approval step for this submission');
+      throw new DomainError('该填报当前没有待处理的审批步骤', 409);
     }
 
-    pendingRecord.approver_id = approverUser.id;
+    const expectedSubmissionStatus =
+      pendingRecord.approval_level === 'reviewer' ? 'pending_review' : 'pending_approval';
+    if (submission.status !== expectedSubmissionStatus) {
+      throw new DomainError('审批状态已变化，请刷新后重试', 409);
+    }
+
+    if (
+      pendingRecord.approver_id !== approverUser.id ||
+      submission.submitted_by_company_id !== approverUser.company_id ||
+      pendingRecord.approval_level !== approverUser.role
+    ) {
+      throw new DomainError('你不是该审批步骤的指定处理人', 403);
+    }
+
     pendingRecord.status = action;
     pendingRecord.comment = comment || (action === 'approved' ? '同意' : '驳回');
     pendingRecord.updated_at = now;
