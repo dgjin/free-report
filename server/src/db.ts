@@ -1,5 +1,7 @@
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { getPool } from './mysql';
+import { DomainError } from './errors';
+import { assertTemplateWritable, setTemplateEnabledStatus } from './template-lifecycle';
 import {
   ApprovalRecord,
   Company,
@@ -12,14 +14,9 @@ import {
   User,
 } from './types';
 
-type Executor = Pool | PoolConnection;
+export { DomainError } from './errors';
 
-export class DomainError extends Error {
-  constructor(message: string, public readonly statusCode: number) {
-    super(message);
-    this.name = 'DomainError';
-  }
-}
+type Executor = Pool | PoolConnection;
 
 async function all<T>(executor: Executor, sql: string, params: any[] = []): Promise<T[]> {
   const [rows] = await executor.execute<RowDataPacket[]>(sql, params);
@@ -30,53 +27,73 @@ async function first<T>(executor: Executor, sql: string, params: any[] = []): Pr
   return (await all<T>(executor, sql, params))[0];
 }
 
-async function transaction<T>(callback: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  const connection = await getPool().getConnection();
-  try {
-    await connection.beginTransaction();
-    const result = await callback(connection);
-    await connection.commit();
-    return result;
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
+type PoolProvider = () => Pool;
+type TemplateMetadataUpdates = Partial<Pick<ReportTemplate, 'name' | 'description' | 'period_type'>>;
 
-class Database {
+export class Database {
+  constructor(private readonly poolProvider: PoolProvider = getPool) {}
+
+  private pool(): Pool {
+    return this.poolProvider();
+  }
+
+  private async transaction<T>(callback: (connection: PoolConnection) => Promise<T>): Promise<T> {
+    const connection = await this.pool().getConnection();
+    try {
+      await connection.beginTransaction();
+      const result = await callback(connection);
+      await connection.commit();
+      return result;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  private async lockWritableTemplate(connection: PoolConnection, templateId: number): Promise<ReportTemplate> {
+    const template = await first<ReportTemplate>(
+      connection,
+      'SELECT * FROM report_templates WHERE id = ? FOR UPDATE',
+      [templateId],
+    );
+    if (!template) throw new DomainError('模板不存在', 404);
+    assertTemplateWritable(template.status);
+    return template;
+  }
+
   async getCompanies(): Promise<Company[]> {
-    return all<Company>(getPool(), 'SELECT * FROM companies ORDER BY id');
+    return all<Company>(this.pool(), 'SELECT * FROM companies ORDER BY id');
   }
 
   async getCompanyById(id: number): Promise<Company | undefined> {
-    return first<Company>(getPool(), 'SELECT * FROM companies WHERE id = ?', [id]);
+    return first<Company>(this.pool(), 'SELECT * FROM companies WHERE id = ?', [id]);
   }
 
   async getUsers(): Promise<User[]> {
-    return all<User>(getPool(), 'SELECT * FROM users ORDER BY id');
+    return all<User>(this.pool(), 'SELECT * FROM users ORDER BY id');
   }
 
   async getUserById(id: number): Promise<User | undefined> {
-    return first<User>(getPool(), 'SELECT * FROM users WHERE id = ?', [id]);
+    return first<User>(this.pool(), 'SELECT * FROM users WHERE id = ?', [id]);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return first<User>(getPool(), 'SELECT * FROM users WHERE LOWER(username) = LOWER(?)', [username]);
+    return first<User>(this.pool(), 'SELECT * FROM users WHERE LOWER(username) = LOWER(?)', [username]);
   }
 
   async getTemplates(): Promise<ReportTemplate[]> {
-    return all<ReportTemplate>(getPool(), 'SELECT * FROM report_templates ORDER BY id DESC');
+    return all<ReportTemplate>(this.pool(), 'SELECT * FROM report_templates ORDER BY id DESC');
   }
 
   async getTemplateById(id: number): Promise<ReportTemplate | undefined> {
-    return first<ReportTemplate>(getPool(), 'SELECT * FROM report_templates WHERE id = ?', [id]);
+    return first<ReportTemplate>(this.pool(), 'SELECT * FROM report_templates WHERE id = ?', [id]);
   }
 
   async getTemplateFields(templateId: number): Promise<ReportTemplateField[]> {
     return all<ReportTemplateField>(
-      getPool(),
+      this.pool(),
       'SELECT * FROM report_template_fields WHERE template_id = ? ORDER BY sort_order, id',
       [templateId],
     );
@@ -86,7 +103,7 @@ class Database {
     templateData: Omit<ReportTemplate, 'id' | 'created_at' | 'updated_at'>,
     fieldsData: Omit<ReportTemplateField, 'id' | 'template_id'>[],
   ): Promise<{ template: ReportTemplate; fields: ReportTemplateField[] }> {
-    return transaction(async (connection) => {
+    return this.transaction(async (connection) => {
       const [result] = await connection.execute<ResultSetHeader>(
         `INSERT INTO report_templates (name,description,period_type,status,created_by)
          VALUES (?,?,?,?,?)`,
@@ -110,55 +127,96 @@ class Database {
     });
   }
 
-  async updateTemplate(id: number, updates: Partial<ReportTemplate>): Promise<ReportTemplate | null> {
-    const allowed = ['name', 'description', 'period_type', 'status'] as const;
-    const entries = allowed.filter((key) => updates[key] !== undefined).map((key) => [key, updates[key]] as const);
-    if (entries.length) {
-      await getPool().execute(
-        `UPDATE report_templates SET ${entries.map(([key]) => `${key} = ?`).join(', ')} WHERE id = ?`,
-        [...entries.map(([, value]) => value), id],
-      );
-    }
-    return (await this.getTemplateById(id)) || null;
+  async updateTemplate(id: number, updates: TemplateMetadataUpdates): Promise<ReportTemplate | null> {
+    return this.transaction(async (connection) => {
+      await this.lockWritableTemplate(connection, id);
+      const allowed = ['name', 'description', 'period_type'] as const;
+      const entries = allowed.filter((key) => updates[key] !== undefined).map((key) => [key, updates[key]] as const);
+      if (entries.length) {
+        await connection.execute(
+          `UPDATE report_templates SET ${entries.map(([key]) => `${key} = ?`).join(', ')} WHERE id = ?`,
+          [...entries.map(([, value]) => value), id],
+        );
+      }
+      return (await first<ReportTemplate>(connection, 'SELECT * FROM report_templates WHERE id = ?', [id])) || null;
+    });
   }
 
-  async setTemplateStatus(id: number, status: ReportTemplate['status']): Promise<ReportTemplate | null> {
-    await getPool().execute('UPDATE report_templates SET status = ? WHERE id = ?', [status, id]);
-    return (await this.getTemplateById(id)) || null;
+  async setTemplateEnabled(id: number, enabled: boolean): Promise<ReportTemplate | null> {
+    return this.transaction(async (connection) => {
+      const template = await first<ReportTemplate>(
+        connection,
+        'SELECT * FROM report_templates WHERE id = ? FOR UPDATE',
+        [id],
+      );
+      if (!template) return null;
+      const status = setTemplateEnabledStatus(template.status, enabled);
+      if (status !== template.status) {
+        await connection.execute('UPDATE report_templates SET status = ? WHERE id = ?', [status, id]);
+      }
+      return (await first<ReportTemplate>(connection, 'SELECT * FROM report_templates WHERE id = ?', [id])) || null;
+    });
   }
 
   async addTemplateField(field: Omit<ReportTemplateField, 'id'>): Promise<ReportTemplateField> {
-    const [result] = await getPool().execute<ResultSetHeader>(
-      `INSERT INTO report_template_fields
-       (template_id,field_name,field_label,field_type,data_type,field_config,sort_order,status)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [field.template_id, field.field_name, field.field_label, field.field_type, field.data_type,
-        JSON.stringify(field.field_config || {}), field.sort_order, field.status],
-    );
-    return (await first<ReportTemplateField>(getPool(), 'SELECT * FROM report_template_fields WHERE id = ?', [result.insertId]))!;
+    return this.transaction(async (connection) => {
+      await this.lockWritableTemplate(connection, field.template_id);
+      const existing = await first<ReportTemplateField>(
+        connection,
+        'SELECT * FROM report_template_fields WHERE template_id = ? AND field_name = ?',
+        [field.template_id, field.field_name],
+      );
+      if (existing) throw new DomainError(`字段标识 "${field.field_name}" 在该模板中已存在`, 400);
+      const [result] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO report_template_fields
+         (template_id,field_name,field_label,field_type,data_type,field_config,sort_order,status)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [field.template_id, field.field_name, field.field_label, field.field_type, field.data_type,
+          JSON.stringify(field.field_config || {}), field.sort_order, field.status],
+      );
+      return (await first<ReportTemplateField>(
+        connection,
+        'SELECT * FROM report_template_fields WHERE id = ?',
+        [result.insertId],
+      ))!;
+    });
   }
 
-  async disableTemplateField(fieldId: number): Promise<ReportTemplateField | null> {
-    const [result] = await getPool().execute<ResultSetHeader>(
-      "UPDATE report_template_fields SET status = 'inactive' WHERE id = ?", [fieldId],
-    );
-    if (!result.affectedRows) return null;
-    return (await first<ReportTemplateField>(getPool(), 'SELECT * FROM report_template_fields WHERE id = ?', [fieldId]))!;
+  async disableTemplateField(templateId: number, fieldId: number): Promise<ReportTemplateField> {
+    return this.transaction(async (connection) => {
+      await this.lockWritableTemplate(connection, templateId);
+      const field = await first<ReportTemplateField>(
+        connection,
+        'SELECT * FROM report_template_fields WHERE id = ? AND template_id = ? FOR UPDATE',
+        [fieldId, templateId],
+      );
+      if (!field) throw new DomainError('字段不存在', 404);
+      await connection.execute(
+        "UPDATE report_template_fields SET status = 'inactive' WHERE id = ? AND template_id = ?",
+        [fieldId, templateId],
+      );
+      return (await first<ReportTemplateField>(
+        connection,
+        'SELECT * FROM report_template_fields WHERE id = ?',
+        [fieldId],
+      ))!;
+    });
   }
 
   async getAssignments(): Promise<ReportAssignment[]> {
-    return all<ReportAssignment>(getPool(), 'SELECT * FROM report_assignments ORDER BY id DESC');
+    return all<ReportAssignment>(this.pool(), 'SELECT * FROM report_assignments ORDER BY id DESC');
   }
 
   async getAssignmentById(id: number): Promise<ReportAssignment | undefined> {
-    return first<ReportAssignment>(getPool(), 'SELECT * FROM report_assignments WHERE id = ?', [id]);
+    return first<ReportAssignment>(this.pool(), 'SELECT * FROM report_assignments WHERE id = ?', [id]);
   }
 
   async createAssignments(
     templateId: number, companyIds: number[], title: string, periodLabel: string,
     deadline: string, assignedBy: number,
   ): Promise<ReportAssignment[]> {
-    return transaction(async (connection) => {
+    return this.transaction(async (connection) => {
+      await this.lockWritableTemplate(connection, templateId);
       const created: ReportAssignment[] = [];
       for (const companyId of companyIds) {
         const [result] = await connection.execute<ResultSetHeader>(
@@ -177,24 +235,24 @@ class Database {
   }
 
   async updateAssignmentStatus(id: number, status: ReportAssignment['status']): Promise<void> {
-    await getPool().execute('UPDATE report_assignments SET status = ? WHERE id = ?', [status, id]);
+    await this.pool().execute('UPDATE report_assignments SET status = ? WHERE id = ?', [status, id]);
   }
 
   async getSubmissions(): Promise<ReportSubmission[]> {
-    return all<ReportSubmission>(getPool(), 'SELECT * FROM report_submissions ORDER BY assignment_id, version DESC');
+    return all<ReportSubmission>(this.pool(), 'SELECT * FROM report_submissions ORDER BY assignment_id, version DESC');
   }
 
   async getSubmissionById(id: number): Promise<ReportSubmission | undefined> {
-    return first<ReportSubmission>(getPool(), 'SELECT * FROM report_submissions WHERE id = ?', [id]);
+    return first<ReportSubmission>(this.pool(), 'SELECT * FROM report_submissions WHERE id = ?', [id]);
   }
 
   async getLatestSubmissionByAssignment(assignmentId: number): Promise<ReportSubmission | undefined> {
-    return first<ReportSubmission>(getPool(),
+    return first<ReportSubmission>(this.pool(),
       'SELECT * FROM report_submissions WHERE assignment_id = ? ORDER BY version DESC LIMIT 1', [assignmentId]);
   }
 
   async getLatestApprovedSubmissionByAssignment(assignmentId: number): Promise<ReportSubmission | undefined> {
-    return first<ReportSubmission>(getPool(),
+    return first<ReportSubmission>(this.pool(),
       "SELECT * FROM report_submissions WHERE assignment_id = ? AND status = 'approved' ORDER BY version DESC LIMIT 1",
       [assignmentId]);
   }
@@ -204,7 +262,7 @@ class Database {
     summaryData: Record<number, string>, detailData: Array<Record<number, string>>,
     comment = '', isSubmit = false,
   ): Promise<{ submission: ReportSubmission; approvals: ApprovalRecord[] }> {
-    return transaction(async (connection) => {
+    return this.transaction(async (connection) => {
       const assignment = await first<ReportAssignment>(connection,
         'SELECT * FROM report_assignments WHERE id = ? FOR UPDATE', [assignmentId]);
       if (!assignment) throw new DomainError('下发任务不存在', 404);
@@ -274,19 +332,19 @@ class Database {
   }
 
   async getSubmissionData(submissionId: number): Promise<ReportSubmissionData[]> {
-    return all<ReportSubmissionData>(getPool(),
+    return all<ReportSubmissionData>(this.pool(),
       'SELECT * FROM report_submission_data WHERE submission_id=? ORDER BY row_index,id', [submissionId]);
   }
 
   async getApprovalRecords(submissionId: number): Promise<ApprovalRecord[]> {
-    return all<ApprovalRecord>(getPool(),
+    return all<ApprovalRecord>(this.pool(),
       'SELECT * FROM approval_records WHERE submission_id=? ORDER BY id', [submissionId]);
   }
 
   async processApprovalAction(
     submissionId: number, approverUser: User, action: 'approved' | 'rejected', comment = '',
   ): Promise<{ submission: ReportSubmission; approval: ApprovalRecord }> {
-    return transaction(async (connection) => {
+    return this.transaction(async (connection) => {
       const submission = await first<ReportSubmission>(connection,
         'SELECT * FROM report_submissions WHERE id=? FOR UPDATE', [submissionId]);
       if (!submission) throw new DomainError('填报记录不存在', 404);
@@ -326,7 +384,7 @@ class Database {
   }
 
   async getPendingApprovalsForUser(user: User) {
-    return all<any>(getPool(),
+    return all<any>(this.pool(),
       `SELECT ar.id approval_id, s.id submission_id, ar.approval_level, a.title assignment_title,
               a.period_label, t.name template_name, c.name company_name, u.display_name submitted_by_name,
               COALESCE(s.submitted_at,s.created_at) submitted_at, s.version, s.comment
@@ -344,7 +402,7 @@ class Database {
   }
 
   async aggregateAssignment(assignmentId: number): Promise<ReportAggregation> {
-    return transaction(async (connection) => {
+    return this.transaction(async (connection) => {
       const assignment = await first<ReportAssignment>(connection,
         'SELECT * FROM report_assignments WHERE id=? FOR UPDATE', [assignmentId]);
       if (!assignment) throw new DomainError('下发任务不存在', 404);

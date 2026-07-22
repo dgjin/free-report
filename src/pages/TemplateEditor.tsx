@@ -151,7 +151,7 @@ export const TemplateEditor: React.FC = () => {
         <div className="space-y-1">
           <button
             onClick={() => navigate('/templates')}
-            className="text-xs text-slate-500 hover:text-indigo-600 flex items-center space-x-1 mb-2 font-medium"
+            className="text-xs text-slate-500 hover:text-indigo-600 flex items-center space-x-1 mb-2 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>返回模板列表</span>
@@ -169,7 +169,7 @@ export const TemplateEditor: React.FC = () => {
           {canWrite && (
             <button
               onClick={() => setAddFieldModalOpen(true)}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center space-x-2"
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center space-x-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
             >
               <Plus className="w-4 h-4" />
               <span>新增模版字段</span>
@@ -180,7 +180,7 @@ export const TemplateEditor: React.FC = () => {
 
       {!canWrite && (
         <div className="p-4 bg-slate-100 border border-slate-200 rounded-2xl text-xs text-slate-600">
-          该报表模板已停用，字段配置为只读；历史任务和数据仍可正常查看与处理。
+          {lifecycle.readOnlyMessage}
         </div>
       )}
 
@@ -215,7 +215,7 @@ export const TemplateEditor: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {fieldsList.length === 0 ? (
             <div className="col-span-full py-12 text-center text-xs text-slate-400">
-              暂未添加字段，点击右上角“新增模版字段”即可开始配置
+              {canWrite ? '暂未添加字段，点击右上角“新增模版字段”即可开始配置' : '该模板暂无字段配置'}
             </div>
           ) : (
             fieldsList.map((field) => {
@@ -258,7 +258,7 @@ export const TemplateEditor: React.FC = () => {
                     {isActive && canWrite ? (
                       <button
                         onClick={() => handleDisableField(field.id)}
-                        className="px-2.5 py-1 text-[11px] text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200 font-medium"
+                        className="px-2.5 py-1 text-[11px] text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                       >
                         停用
                       </button>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileSpreadsheet,
@@ -41,6 +41,8 @@ export const TemplateList: React.FC = () => {
   const [deadline, setDeadline] = useState('');
   const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>([]);
   const [assigning, setAssigning] = useState(false);
+  const [lifecycleActionId, setLifecycleActionId] = useState<number | null>(null);
+  const lifecycleActionIdRef = useRef<number | null>(null);
 
   const navigate = useNavigate();
 
@@ -128,16 +130,22 @@ export const TemplateList: React.FC = () => {
 
   const handleTemplateLifecycle = async (t: ReportTemplate) => {
     const lifecycle = getTemplateLifecycleView(t.status);
+    if (lifecycleActionIdRef.current !== null || !lifecycle.canTransition) return;
     if (!lifecycle.isArchived && !confirm('停用后不能编辑或新下发，历史任务和数据不受影响。确认停用？')) {
       return;
     }
 
+    lifecycleActionIdRef.current = t.id;
+    setLifecycleActionId(t.id);
     try {
       const res = await (lifecycle.isArchived ? api.enableTemplate(t.id) : api.disableTemplate(t.id));
       alert(res.message);
       await loadTemplates();
     } catch (err: any) {
       alert(err.message || (lifecycle.isArchived ? '重新启用失败' : '停用失败'));
+    } finally {
+      lifecycleActionIdRef.current = null;
+      setLifecycleActionId(null);
     }
   };
 
@@ -166,7 +174,7 @@ export const TemplateList: React.FC = () => {
 
         <button
           onClick={() => setCreateModalOpen(true)}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md transition-all flex items-center space-x-2 shrink-0"
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md transition-all flex items-center space-x-2 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
           <Plus className="w-4 h-4" />
           <span>新建报表模板</span>
@@ -189,8 +197,8 @@ export const TemplateList: React.FC = () => {
             return (
               <div
                 key={t.id}
-                className={`bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 ${
-                  lifecycle.isArchived ? 'opacity-60 border-slate-300' : 'border-slate-200/80'
+                className={`rounded-2xl border p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 ${
+                  lifecycle.isArchived ? 'bg-slate-50 border-slate-300' : 'bg-white border-slate-200/80'
                 }`}
               >
                 <div className="space-y-2">
@@ -203,7 +211,9 @@ export const TemplateList: React.FC = () => {
                         className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border ${
                           lifecycle.isArchived
                             ? 'bg-slate-100 text-slate-600 border-slate-200'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                            : lifecycle.canWrite
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
                         }`}
                       >
                         {lifecycle.statusLabel}
@@ -230,7 +240,7 @@ export const TemplateList: React.FC = () => {
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                   <button
                     onClick={() => navigate(`/templates/${t.id}`)}
-                    className="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 transition-colors flex items-center justify-center space-x-1.5"
+                    className="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 transition-colors flex items-center justify-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                   >
                     <Sliders className="w-3.5 h-3.5 text-slate-500" />
                     <span>设计字段</span>
@@ -239,27 +249,31 @@ export const TemplateList: React.FC = () => {
                   <button
                     onClick={() => openAssignModal(t)}
                     disabled={!lifecycle.canWrite}
-                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl transition-colors shadow-sm flex items-center justify-center space-x-1.5 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 disabled:shadow-none"
+                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl transition-colors shadow-sm flex items-center justify-center space-x-1.5 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 disabled:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>按周期下发</span>
                   </button>
 
-                  <button
-                    onClick={() => handleTemplateLifecycle(t)}
-                    className={`flex-1 py-2 font-semibold text-xs rounded-xl border transition-colors flex items-center justify-center space-x-1.5 ${
-                      lifecycle.isArchived
-                        ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                        : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
-                    }`}
-                  >
-                    {lifecycle.isArchived ? (
-                      <RotateCcw className="w-3.5 h-3.5" />
-                    ) : (
-                      <Power className="w-3.5 h-3.5" />
-                    )}
-                    <span>{lifecycle.actionLabel}</span>
-                  </button>
+                  {lifecycle.canTransition && (
+                    <button
+                      onClick={() => handleTemplateLifecycle(t)}
+                      disabled={lifecycleActionId !== null}
+                      aria-busy={lifecycleActionId === t.id}
+                      className={`flex-1 py-2 font-semibold text-xs rounded-xl border transition-colors flex items-center justify-center space-x-1.5 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+                        lifecycle.isArchived
+                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 focus-visible:ring-emerald-500'
+                          : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 focus-visible:ring-amber-500'
+                      }`}
+                    >
+                      {lifecycle.isArchived ? (
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      ) : (
+                        <Power className="w-3.5 h-3.5" />
+                      )}
+                      <span>{lifecycle.actionLabel}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -9,20 +9,35 @@ test('archived template view disables writes and offers enable', async () => {
     statusLabel: '已停用',
     actionLabel: '重新启用',
     canWrite: false,
+    canTransition: true,
+    readOnlyMessage: '该报表模板已停用，字段配置为只读；历史任务和数据仍可正常查看与处理。',
   });
 });
 
-test('non-archived template view enables writes and offers disable', async () => {
+test('published template view enables writes and offers disable', async () => {
   const { getTemplateLifecycleView } = await import('../src/utils/templateLifecycle');
   const expected = {
     isArchived: false,
     statusLabel: '使用中',
     actionLabel: '停用',
     canWrite: true,
+    canTransition: true,
+    readOnlyMessage: null,
   };
 
   assert.deepEqual(getTemplateLifecycleView('published'), expected);
-  assert.deepEqual(getTemplateLifecycleView('draft'), expected);
+});
+
+test('draft template view is read only and has no lifecycle action', async () => {
+  const { getTemplateLifecycleView } = await import('../src/utils/templateLifecycle');
+  assert.deepEqual(getTemplateLifecycleView('draft'), {
+    isArchived: false,
+    statusLabel: '草稿',
+    actionLabel: null,
+    canWrite: false,
+    canTransition: false,
+    readOnlyMessage: '草稿模板当前只读，尚未配置发布工作流。',
+  });
 });
 
 test('template lifecycle API methods use the enable and disable PUT endpoints', async () => {
@@ -69,15 +84,28 @@ test('template cards expose lifecycle status and guarded lifecycle actions', () 
   assert.match(source, /disabled=\{!lifecycle\.canWrite\}/);
   assert.match(source, /lifecycle\.isArchived \? api\.enableTemplate\(t\.id\) : api\.disableTemplate\(t\.id\)/);
   assert.match(source, /confirm\('停用后不能编辑或新下发，历史任务和数据不受影响。确认停用？'\)/);
-  assert.match(source, /lifecycle\.isArchived \? '.*opacity-60.*border-slate-300.*'/s);
+  assert.match(source, /if \(lifecycleActionIdRef\.current !== null \|\| !lifecycle\.canTransition\) return/);
+  assert.match(source, /\{lifecycle\.canTransition && \(/);
+  assert.match(source, /disabled=\{lifecycleActionId !== null\}/);
+  assert.match(source, /aria-busy=\{lifecycleActionId === t\.id\}/);
+  assert.doesNotMatch(source, /opacity-60/);
+  assert.match(source, /focus-visible:ring-2/);
 });
 
-test('template editor makes archived templates read only', () => {
+test('template editor makes every non-published template read only with matching copy', () => {
   const source = readFileSync(new URL('../src/pages/TemplateEditor.tsx', import.meta.url), 'utf8');
 
   assert.match(source, /getTemplateLifecycleView\(template\.status\)/);
   assert.match(source, /const canWrite = lifecycle\.canWrite/);
-  assert.match(source, /该报表模板已停用，字段配置为只读；历史任务和数据仍可正常查看与处理。/);
+  assert.match(source, /\{lifecycle\.readOnlyMessage\}/);
   assert.match(source, /\{canWrite && \(/);
   assert.match(source, /\{isActive && canWrite \?/);
+  assert.match(source, /focus-visible:ring-2/);
+});
+
+test('template metadata client payload type excludes lifecycle status', () => {
+  const source = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
+
+  assert.match(source, /export type TemplateMetadataUpdate = Partial<Pick<ReportTemplate, 'name' \| 'description' \| 'period_type'>>/);
+  assert.match(source, /updateTemplate\(id: number, data: TemplateMetadataUpdate\)/);
 });
