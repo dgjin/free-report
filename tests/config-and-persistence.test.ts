@@ -5,11 +5,17 @@ import path from 'node:path';
 import test from 'node:test';
 
 test('production refuses to start without an explicit JWT secret', async () => {
-  const auth = await import('../server/src/auth.ts');
-  assert.throws(
-    () => (auth as any).getJwtSecret?.({ NODE_ENV: 'production' }),
-    /JWT_SECRET/,
-  );
+  const originalCwd = process.cwd();
+  process.chdir(mkdtempSync(path.join(tmpdir(), 'free-report-config-')));
+  try {
+    const auth = await import('../server/src/auth.ts');
+    assert.throws(
+      () => (auth as any).getJwtSecret?.({ NODE_ENV: 'production' }),
+      /JWT_SECRET/,
+    );
+  } finally {
+    process.chdir(originalCwd);
+  }
 });
 
 test('authentication rejects a token after its user is disabled', async () => {
