@@ -1,0 +1,6 @@
+{
+  "name": "自由报表",
+  "description": "企业级多层级报表设计、下发填报、三级在线审批与数据汇总整合平台",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
