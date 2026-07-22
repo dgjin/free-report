@@ -117,6 +117,18 @@ export const api = {
     });
   },
 
+  async disableTemplate(id: number): Promise<{ message: string; template: ReportTemplate }> {
+    return request(`/api/templates/${id}/disable`, {
+      method: 'PUT',
+    });
+  },
+
+  async enableTemplate(id: number): Promise<{ message: string; template: ReportTemplate }> {
+    return request(`/api/templates/${id}/enable`, {
+      method: 'PUT',
+    });
+  },
+
   async addField(templateId: number, field: Partial<ReportTemplateField>): Promise<ReportTemplateField> {
     return request<ReportTemplateField>(`/api/templates/${templateId}/fields`, {
       method: 'POST',
