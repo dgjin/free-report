@@ -201,8 +201,10 @@ export const api = {
   },
 
   // Aggregations
-  async getAggregationByTemplate(templateId: number): Promise<AggregationResponse> {
-    return request<AggregationResponse>(`/api/aggregations/by-template/${templateId}`);
+  async getAggregationByTemplate(templateId: number, periodLabel: string): Promise<AggregationResponse> {
+    return request<AggregationResponse>(
+      `/api/aggregations/by-template/${templateId}?period_label=${encodeURIComponent(periodLabel)}`,
+    );
   },
 
   async triggerAssignmentAggregation(assignmentId: number): Promise<{ message: string; aggregation: any }> {

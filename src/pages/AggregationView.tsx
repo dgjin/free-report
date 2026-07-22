@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   BarChart3,
@@ -14,34 +14,49 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { AggregationResponse, ReportTemplate } from '../types';
+import { AggregationResponse, ReportAssignment, ReportTemplate } from '../types';
 
 export const AggregationView: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const templateIdParam = searchParams.get('template_id');
 
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const [assignments, setAssignments] = useState<ReportAssignment[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(
     templateIdParam ? parseInt(templateIdParam, 10) : 1
   );
 
   const [aggregationData, setAggregationData] = useState<AggregationResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [selectedPeriod, setSelectedPeriod] = useState(searchParams.get('period_label') || '');
+  const periods = useMemo(
+    () => Array.from(new Set(
+      assignments
+        .filter((assignment) => assignment.template_id === selectedTemplateId)
+        .map((assignment) => assignment.period_label),
+    )),
+    [assignments, selectedTemplateId],
+  );
 
   useEffect(() => {
     loadInitialData();
   }, []);
 
   useEffect(() => {
-    if (selectedTemplateId) {
-      loadAggregation(selectedTemplateId);
+    if (selectedTemplateId && selectedPeriod) {
+      loadAggregation(selectedTemplateId, selectedPeriod);
     }
-  }, [selectedTemplateId]);
+  }, [selectedTemplateId, selectedPeriod]);
+
+  useEffect(() => {
+    if (!periods.includes(selectedPeriod)) setSelectedPeriod(periods[0] || '');
+  }, [periods, selectedPeriod]);
 
   const loadInitialData = async () => {
     try {
-      const tList = await api.getTemplates();
+      const [tList, assignmentList] = await Promise.all([api.getTemplates(), api.getAssignments()]);
       setTemplates(tList);
+      setAssignments(assignmentList);
       if (tList.length > 0 && !templateIdParam) {
         setSelectedTemplateId(tList[0].id);
       }
@@ -50,10 +65,10 @@ export const AggregationView: React.FC = () => {
     }
   };
 
-  const loadAggregation = async (tId: number) => {
+  const loadAggregation = async (tId: number, periodLabel: string) => {
     setLoading(true);
     try {
-      const data = await api.getAggregationByTemplate(tId);
+      const data = await api.getAggregationByTemplate(tId, periodLabel);
       setAggregationData(data);
     } catch {
       // ignore
@@ -100,6 +115,18 @@ export const AggregationView: React.FC = () => {
                   {t.name} ({t.period_type})
                 </option>
               ))}
+            </select>
+            <select
+              value={selectedPeriod}
+              onChange={(event) => {
+                const period = event.target.value;
+                setSelectedPeriod(period);
+                setSearchParams({ template_id: selectedTemplateId.toString(), period_label: period });
+              }}
+              className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+              aria-label="选择汇总周期"
+            >
+              {periods.map((period) => <option key={period} value={period}>{period}</option>)}
             </select>
           </div>
 

@@ -1,12 +1,27 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { authMiddleware, requireHeadquarter } from '../auth';
+import { ReportAssignment } from '../types';
 
 const router = Router();
+
+export function selectAssignmentsForPeriod(
+  assignments: ReportAssignment[],
+  templateId: number,
+  periodLabel: string,
+): ReportAssignment[] {
+  return assignments.filter(
+    (assignment) => assignment.template_id === templateId && assignment.period_label === periodLabel,
+  );
+}
 
 // GET /api/aggregations/by-template/:templateId - Get aggregation view for template across branches
 router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, (req: Request, res: Response) => {
   const templateId = parseInt(req.params.templateId, 10);
+  const periodLabel = typeof req.query.period_label === 'string' ? req.query.period_label.trim() : '';
+  if (!periodLabel) {
+    return res.status(400).json({ error: '请指定汇总周期 period_label' });
+  }
   const template = db.getTemplateById(templateId);
 
   if (!template) {
@@ -18,7 +33,7 @@ router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, (req:
   const detailFields = allFields.filter((f) => f.data_type === 'detail');
 
   const branches = db.getCompanies().filter((c) => c.level === 'branch' && c.status === 'active');
-  const assignments = db.getAssignments().filter((a) => a.template_id === templateId);
+  const assignments = selectAssignmentsForPeriod(db.getAssignments(), templateId, periodLabel);
 
   const companyDataList: any[] = [];
   const mergedDetailRows: any[] = [];
@@ -51,9 +66,9 @@ router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, (req:
     };
 
     if (assignment) {
-      const latestSub = db.getLatestSubmissionByAssignment(assignment.id);
+      const latestSub = db.getLatestApprovedSubmissionByAssignment(assignment.id);
       if (latestSub) {
-        companyItem.has_submitted = latestSub.status === 'approved' || latestSub.status === 'pending_approval';
+        companyItem.has_submitted = true;
         companyItem.submission_status = latestSub.status;
         companyItem.submission_version = latestSub.version;
 

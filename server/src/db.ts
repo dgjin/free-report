@@ -411,6 +411,12 @@ class Database {
     return list[0];
   }
 
+  public getLatestApprovedSubmissionByAssignment(assignmentId: number): ReportSubmission | undefined {
+    return this.data.report_submissions
+      .filter((submission) => submission.assignment_id === assignmentId && submission.status === 'approved')
+      .sort((a, b) => b.version - a.version)[0];
+  }
+
   public createOrUpdateSubmission(
     assignmentId: number,
     userId: number,
