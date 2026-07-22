@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { ReportTemplate, Company } from '../types';
+import { getInitialTemplateFields } from '../utils/templateFields';
 
 export const TemplateList: React.FC = () => {
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
@@ -66,23 +67,7 @@ export const TemplateList: React.FC = () => {
         name,
         description,
         period_type: periodType,
-        fields: [
-          // Default initial fields
-          {
-            field_name: 'total_value',
-            field_label: '本期主要指标',
-            field_type: 'number',
-            data_type: 'summary',
-            sort_order: 1,
-          },
-          {
-            field_name: 'item_name',
-            field_label: '明细条目',
-            field_type: 'text',
-            data_type: 'detail',
-            sort_order: 2,
-          },
-        ],
+        fields: getInitialTemplateFields(),
       });
       setCreateModalOpen(false);
       setName('');

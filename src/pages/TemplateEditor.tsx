@@ -18,7 +18,8 @@ import {
   Layers,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { ReportTemplate, ReportTemplateField, FieldType, DataType } from '../types';
+import { ReportTemplate, ReportTemplateField, FieldType } from '../types';
+import { DEFAULT_FIELD_DATA_TYPE } from '../utils/templateFields';
 
 export const TemplateEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -32,7 +33,6 @@ export const TemplateEditor: React.FC = () => {
   const [fieldName, setFieldName] = useState('');
   const [fieldLabel, setFieldLabel] = useState('');
   const [fieldType, setFieldType] = useState<FieldType>('text');
-  const [dataType, setDataType] = useState<DataType>('summary');
   const [required, setRequired] = useState(true);
   const [optionsStr, setOptionsStr] = useState('');
   const [addingField, setAddingField] = useState(false);
@@ -90,7 +90,7 @@ export const TemplateEditor: React.FC = () => {
         field_name: finalFieldName,
         field_label: fieldLabel.trim(),
         field_type: fieldType,
-        data_type: dataType,
+        data_type: DEFAULT_FIELD_DATA_TYPE,
         field_config: { required, options },
         sort_order: (template.fields?.length || 0) + 1,
       });

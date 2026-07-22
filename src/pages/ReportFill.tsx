@@ -249,8 +249,8 @@ export const ReportFill: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Summary Form Section (汇总字段) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+      {/* Summary Form Section (汇总字段) */}
+      {summaryFields.length > 0 && <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
         <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
@@ -319,7 +319,7 @@ export const ReportFill: React.FC = () => {
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* 2. Detail Grid Section (明细字段) */}
       {detailFields.length > 0 && (
@@ -328,7 +328,7 @@ export const ReportFill: React.FC = () => {
             <div>
               <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                 <CheckSquare className="w-4 h-4 text-emerald-600" />
-                <span>二、明细清单填写 (Detail Rows)</span>
+                <span>{summaryFields.length > 0 ? '二' : '一'}、明细清单填写 (Detail Rows)</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">支持多行表格展开添加，系统将自动对数值类型汇总计算</p>
             </div>
