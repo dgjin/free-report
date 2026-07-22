@@ -124,7 +124,7 @@ export class TransactionalTemplatePool {
 
     if (/^SELECT \* FROM report_templates WHERE id = \? FOR UPDATE$/i.test(sql)) {
       const templateId = Number(params[0]);
-      if (!connection) throw new Error('FOR UPDATE requires a transaction connection');
+      this.assertTransactionActive(connection);
       await connection.lockTemplate(templateId);
       return [[this.templates.get(templateId)].filter(Boolean), []];
     }
@@ -136,6 +136,7 @@ export class TransactionalTemplatePool {
     if (/^UPDATE report_templates SET status = \? WHERE id = \?$/i.test(sql)) {
       const [status, templateIdValue] = params as [TemplateStatus, number];
       const templateId = Number(templateIdValue);
+      this.assertTransactionActive(connection);
       this.assertLocked(connectionId, templateId);
       const template = this.templates.get(templateId);
       if (!template) return [{ affectedRows: 0 }, []];
@@ -146,6 +147,7 @@ export class TransactionalTemplatePool {
 
     if (/^UPDATE report_templates SET .+ WHERE id = \?$/i.test(sql)) {
       const templateId = Number(params.at(-1));
+      this.assertTransactionActive(connection);
       this.assertLocked(connectionId, templateId);
       const template = this.templates.get(templateId);
       if (!template) return [{ affectedRows: 0 }, []];
@@ -170,6 +172,7 @@ export class TransactionalTemplatePool {
 
     if (/^INSERT INTO report_template_fields /i.test(sql)) {
       const templateId = Number(params[0]);
+      this.assertTransactionActive(connection);
       this.assertLocked(connectionId, templateId);
       const duplicate = [...this.fields.values()].some(
         (candidate) => candidate.template_id === templateId && candidate.field_name === params[1],
@@ -193,6 +196,7 @@ export class TransactionalTemplatePool {
     }
 
     if (/^SELECT \* FROM report_template_fields WHERE id = \? AND template_id = \? FOR UPDATE$/i.test(sql)) {
+      this.assertTransactionActive(connection);
       const [fieldId, templateId] = params.map(Number);
       const field = this.fields.get(fieldId);
       return [[field?.template_id === templateId ? field : undefined].filter(Boolean), []];
@@ -200,6 +204,7 @@ export class TransactionalTemplatePool {
 
     if (/^UPDATE report_template_fields SET status = 'inactive' WHERE id = \? AND template_id = \?$/i.test(sql)) {
       const [fieldId, templateId] = params.map(Number);
+      this.assertTransactionActive(connection);
       this.assertLocked(connectionId, templateId);
       const field = this.fields.get(fieldId);
       if (!field || field.template_id !== templateId) return [{ affectedRows: 0 }, []];
@@ -214,6 +219,7 @@ export class TransactionalTemplatePool {
 
     if (/^INSERT IGNORE INTO report_assignments /i.test(sql)) {
       const templateId = Number(params[0]);
+      this.assertTransactionActive(connection);
       this.assertLocked(connectionId, templateId);
       const [template_id, assigned_to_company_id, title, period_label, deadline, assigned_by] = params;
       const duplicate = [...this.assignments.values()].find(
@@ -251,38 +257,57 @@ export class TransactionalTemplatePool {
       throw new Error(`template ${templateId} mutated without SELECT FOR UPDATE lock`);
     }
   }
+
+  private assertTransactionActive(connection: TransactionalTemplateConnection | undefined): asserts connection {
+    if (!connection) throw new Error('operation requires an active transaction connection');
+    connection.assertActiveTransaction();
+  }
 }
 
 class TransactionalTemplateConnection {
+  private transactionActive = false;
   private lockedTemplateIds = new Set<number>();
   private undo: Array<() => void> = [];
 
   constructor(private readonly pool: TransactionalTemplatePool, readonly id: number) {}
 
-  async beginTransaction(): Promise<void> {}
+  async beginTransaction(): Promise<void> {
+    if (this.transactionActive) throw new Error('transaction is already active');
+    this.transactionActive = true;
+  }
 
   async execute(sql: string, params: any[] = []): Promise<any> {
     return this.pool.executeQuery(this.id, this, sql, params);
   }
 
   async lockTemplate(templateId: number): Promise<void> {
+    this.assertActiveTransaction();
     await this.pool.acquireTemplateLock(templateId, this.id);
     this.lockedTemplateIds.add(templateId);
   }
 
   recordUndo(action: () => void): void {
+    this.assertActiveTransaction();
     this.undo.push(action);
   }
 
   async commit(): Promise<void> {
+    this.assertActiveTransaction();
     this.undo = [];
     this.releaseLocks();
+    this.transactionActive = false;
   }
 
   async rollback(): Promise<void> {
+    this.assertActiveTransaction();
     for (const action of this.undo.reverse()) action();
     this.undo = [];
     this.releaseLocks();
+    this.transactionActive = false;
+  }
+
+  assertActiveTransaction(): void {
+    if (!this.transactionActive) throw new Error('operation requires an active transaction');
   }
 
   release(): void {

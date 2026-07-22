@@ -26,6 +26,35 @@ async function expectConflict(action: Promise<unknown>, message: RegExp): Promis
   });
 }
 
+test('transactional pool requires an active transaction for locks and mutations', async () => {
+  const inactivePool = new TransactionalTemplatePool();
+  inactivePool.seedTemplate({ id: 1, status: 'published' });
+  const inactiveConnection = await inactivePool.getConnection();
+
+  await assert.rejects(
+    inactiveConnection.execute('SELECT * FROM report_templates WHERE id = ? FOR UPDATE', [1]),
+    /active transaction/,
+  );
+  await assert.rejects(
+    inactiveConnection.execute('UPDATE report_templates SET status = ? WHERE id = ?', ['archived', 1]),
+    /active transaction/,
+  );
+
+  for (const finish of ['commit', 'rollback'] as const) {
+    const pool = new TransactionalTemplatePool();
+    pool.seedTemplate({ id: 1, status: 'published' });
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+    await connection.execute('SELECT * FROM report_templates WHERE id = ? FOR UPDATE', [1]);
+    await connection[finish]();
+
+    await assert.rejects(
+      connection.execute('SELECT * FROM report_templates WHERE id = ? FOR UPDATE', [1]),
+      /active transaction/,
+    );
+  }
+});
+
 test('lifecycle transition is locked, reversible, idempotent, and rejects draft', async () => {
   const pool = new TransactionalTemplatePool();
   pool.seedTemplate({ id: 1, status: 'published' });
