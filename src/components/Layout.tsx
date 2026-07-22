@@ -72,7 +72,7 @@ export const Layout: React.FC = () => {
     approver: '审批人',
   };
 
-  const quickAccounts = [
+  const quickAccounts = import.meta.env.DEV ? [
     { username: 'admin', label: '总部 - 超级管理员', company: '总部' },
     { username: 'hq_admin', label: '总部 - 总部管理员', company: '总部' },
     { username: 'bj_handler', label: '北京 - 经办人', company: '北京分公司' },
@@ -81,7 +81,7 @@ export const Layout: React.FC = () => {
     { username: 'sh_handler', label: '上海 - 经办人', company: '上海分公司' },
     { username: 'sh_reviewer', label: '上海 - 复核人', company: '上海分公司' },
     { username: 'sh_approver', label: '上海 - 审批人', company: '上海分公司' },
-  ];
+  ] : [];
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
@@ -114,7 +114,7 @@ export const Layout: React.FC = () => {
           {/* Right Profile & Quick Switcher */}
           <div className="flex items-center space-x-3 sm:space-x-4">
             {/* Quick Switch Demo Button */}
-            <div className="relative">
+            {import.meta.env.DEV && <div className="relative">
               <button
                 onClick={() => setAccountSwitchOpen(!accountSwitchOpen)}
                 className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-xs"
@@ -153,7 +153,7 @@ export const Layout: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Current User Info Badge */}
             {user && (

@@ -3,7 +3,16 @@ import jwt from 'jsonwebtoken';
 import { db } from './db';
 import { User, Role, CompanyLevel, ReportAssignment, ReportSubmission } from './types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'free-report-secret-key-2026';
+export function getJwtSecret(env: NodeJS.ProcessEnv = process.env): string {
+  const configuredSecret = env.JWT_SECRET?.trim();
+  if (configuredSecret) return configuredSecret;
+  if (env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be configured in production');
+  }
+  return 'free-report-development-secret';
+}
+
+const JWT_SECRET = getJwtSecret();
 
 export interface AuthenticatedUser {
   id: number;
@@ -64,6 +73,20 @@ export function generateToken(user: User): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
 }
 
+function toAuthenticatedUser(user: User): AuthenticatedUser {
+  const company = db.getCompanyById(user.company_id);
+  return {
+    id: user.id,
+    username: user.username,
+    display_name: user.display_name,
+    company_id: user.company_id,
+    company_name: company?.name || '',
+    company_code: company?.code || '',
+    company_level: company?.level || 'branch',
+    role: user.role,
+  };
+}
+
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -73,7 +96,11 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   const token = authHeader.substring(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
-    req.user = decoded;
+    const currentUser = db.getUserById(decoded.id);
+    if (!currentUser || currentUser.status !== 'active') {
+      return res.status(401).json({ error: '账号不存在或已停用，请重新登录' });
+    }
+    req.user = toAuthenticatedUser(currentUser);
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Token 无效或已过期，请重新登录' });

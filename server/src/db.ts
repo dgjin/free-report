@@ -16,6 +16,12 @@ import {
 const DATA_DIR = path.join(process.cwd(), 'server', 'data');
 const DB_FILE = path.join(DATA_DIR, 'free-report-db.json');
 
+export function writeJsonAtomically(filePath: string, value: unknown): void {
+  const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporaryPath, JSON.stringify(value, null, 2), 'utf-8');
+  fs.renameSync(temporaryPath, filePath);
+}
+
 interface DatabaseSchema {
   companies: Company[];
   users: User[];
@@ -77,7 +83,7 @@ class Database {
   private saveDatabase(dataToSave?: DatabaseSchema) {
     this.ensureDirectory();
     const data = dataToSave || this.data;
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    writeJsonAtomically(DB_FILE, data);
   }
 
   public save() {

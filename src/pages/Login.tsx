@@ -5,7 +5,7 @@ import { api } from '../services/api';
 
 export const Login: React.FC = () => {
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('123456');
+  const [password, setPassword] = useState(import.meta.env.DEV ? '123456' : '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -14,8 +14,8 @@ export const Login: React.FC = () => {
   const handleLogin = async (e?: React.FormEvent, customUsername?: string) => {
     if (e) e.preventDefault();
     const u = customUsername || username;
-    if (!u) {
-      setError('请输入用户名');
+    if (!u || !password) {
+      setError('请输入用户名和密码');
       return;
     }
 
@@ -23,7 +23,7 @@ export const Login: React.FC = () => {
     setError('');
 
     try {
-      await api.login(u, password || '123456');
+      await api.login(u, password);
       navigate('/');
     } catch (err: any) {
       setError(err.message || '登录失败，请检查账号密码');
@@ -32,14 +32,14 @@ export const Login: React.FC = () => {
     }
   };
 
-  const presetAccounts = [
+  const presetAccounts = import.meta.env.DEV ? [
     { username: 'admin', role: '超级管理员', company: '总部', color: 'bg-indigo-50 border-indigo-200 text-indigo-700' },
     { username: 'hq_admin', role: '总部管理员', company: '总部', color: 'bg-blue-50 border-blue-200 text-blue-700' },
     { username: 'bj_handler', role: '经办人', company: '北京分公司', color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
     { username: 'bj_reviewer', role: '复核人', company: '北京分公司', color: 'bg-amber-50 border-amber-200 text-amber-700' },
     { username: 'bj_approver', role: '审批人', company: '北京分公司', color: 'bg-rose-50 border-rose-200 text-rose-700' },
     { username: 'sh_handler', role: '经办人', company: '上海分公司', color: 'bg-teal-50 border-teal-200 text-teal-700' },
-  ];
+  ] : [];
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
@@ -82,7 +82,7 @@ export const Login: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                密码 (默认: 123456)
+                密码{import.meta.env.DEV ? ' (开发环境默认: 123456)' : ''}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
@@ -107,7 +107,7 @@ export const Login: React.FC = () => {
           </form>
 
           {/* Quick Preset Account Selector */}
-          <div className="pt-6 border-t border-slate-200/80">
+          {import.meta.env.DEV && <div className="pt-6 border-t border-slate-200/80">
             <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-3">
               <span>预设体验账号 (点击一键登录)</span>
               <ShieldCheck className="w-4 h-4 text-emerald-500" />
@@ -134,7 +134,7 @@ export const Login: React.FC = () => {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </div>

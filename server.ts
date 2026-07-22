@@ -16,9 +16,21 @@ import { generateToken, authMiddleware } from './server/src/auth';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
+  const allowedOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
-  app.use(cors());
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || process.env.NODE_ENV !== 'production' || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Origin is not allowed by CORS policy'));
+      }
+    },
+  }));
   app.use(express.json());
 
   // Auth Routes
