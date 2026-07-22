@@ -122,6 +122,11 @@ class Database {
     return (await this.getTemplateById(id)) || null;
   }
 
+  async setTemplateStatus(id: number, status: ReportTemplate['status']): Promise<ReportTemplate | null> {
+    await getPool().execute('UPDATE report_templates SET status = ? WHERE id = ?', [status, id]);
+    return (await this.getTemplateById(id)) || null;
+  }
+
   async addTemplateField(field: Omit<ReportTemplateField, 'id'>): Promise<ReportTemplateField> {
     const [result] = await getPool().execute<ResultSetHeader>(
       `INSERT INTO report_template_fields

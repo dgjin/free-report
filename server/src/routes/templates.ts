@@ -1,8 +1,27 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { authMiddleware, requireHeadquarter } from '../auth';
+import { assertTemplateWritable, setTemplateEnabledStatus } from '../template-lifecycle';
 
 const router = Router();
+
+function setTemplateEnabled(enabled: boolean) {
+  return async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    const template = await db.getTemplateById(id);
+    if (!template) {
+      return res.status(404).json({ error: '模板不存在' });
+    }
+
+    const status = setTemplateEnabledStatus(template.status, enabled);
+    const updated = await db.setTemplateStatus(id, status);
+
+    res.json({
+      message: enabled ? '模板已启用' : '模板已停用',
+      template: updated,
+    });
+  };
+}
 
 // GET /api/templates - Get template list
 router.get('/', authMiddleware, async (req: Request, res: Response) => {
@@ -67,16 +86,21 @@ router.post('/', authMiddleware, requireHeadquarter, async (req: Request, res: R
   }
 });
 
+// PUT /api/templates/:id/disable - Disable template
+router.put('/:id/disable', authMiddleware, requireHeadquarter, setTemplateEnabled(false));
+
+// PUT /api/templates/:id/enable - Enable template
+router.put('/:id/enable', authMiddleware, requireHeadquarter, setTemplateEnabled(true));
+
 // PUT /api/templates/:id - Update template basic info
 router.put('/:id', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  const { name, description, period_type, status } = req.body;
+  const { name, description, period_type } = req.body;
 
   const updated = await db.updateTemplate(id, {
     ...(name && { name }),
     ...(description !== undefined && { description }),
     ...(period_type && { period_type }),
-    ...(status && { status }),
   });
 
   if (!updated) {
@@ -93,6 +117,7 @@ router.post('/:id/fields', authMiddleware, requireHeadquarter, async (req: Reque
   if (!template) {
     return res.status(404).json({ error: '模板不存在' });
   }
+  assertTemplateWritable(template.status);
 
   const { field_name, field_label, field_type, data_type, field_config, sort_order } = req.body;
 
@@ -138,6 +163,7 @@ router.post('/:id/assign', authMiddleware, requireHeadquarter, async (req: Reque
   if (!template) {
     return res.status(404).json({ error: '模板不存在' });
   }
+  assertTemplateWritable(template.status);
 
   const { company_ids, title, period_label, deadline } = req.body;
 
