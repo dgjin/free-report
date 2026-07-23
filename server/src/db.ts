@@ -291,7 +291,7 @@ export class Database {
 
   async getLatestApprovedSubmissionByAssignment(assignmentId: number): Promise<ReportSubmission | undefined> {
     return first<ReportSubmission>(this.pool(),
-      "SELECT * FROM report_submissions WHERE assignment_id = ? AND status = 'approved' ORDER BY version DESC LIMIT 1",
+      "SELECT * FROM report_submissions WHERE assignment_id = ? AND status IN ('approved','received') ORDER BY version DESC LIMIT 1",
       [assignmentId]);
   }
 

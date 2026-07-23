@@ -25,7 +25,7 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
 
   const navigate = useNavigate();
-  const isHQ = user?.company_level === 'headquarter';
+  const isHQ = user?.role === 'department_report_admin' || user?.role === 'super_admin';
 
   useEffect(() => {
     loadData();
@@ -37,7 +37,7 @@ export const Dashboard: React.FC = () => {
       const uRes = await api.getMe();
       setUser(uRes.user);
 
-      if (uRes.user.company_level === 'headquarter') {
+      if (uRes.user.role === 'department_report_admin' || uRes.user.role === 'super_admin') {
         const [tList, aList, bList] = await Promise.all([
           api.getTemplates(),
           api.getAssignments(),
@@ -91,7 +91,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-3 shrink-0">
-            {isHQ ? (
+            {user?.role === 'department_report_admin' ? (
               <button
                 onClick={() => navigate('/templates')}
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center space-x-2"
@@ -99,6 +99,8 @@ export const Dashboard: React.FC = () => {
                 <Plus className="w-4 h-4" />
                 <span>新建模板</span>
               </button>
+            ) : user?.role === 'super_admin' ? (
+              <button onClick={() => navigate('/global-view')} className="px-4 py-2.5 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl">进入全局只读视图</button>
             ) : (
               <button
                 onClick={() => navigate('/fill')}

@@ -23,7 +23,7 @@ export const AssignmentList: React.FC = () => {
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
 
   const navigate = useNavigate();
-  const isHQ = user?.company_level === 'headquarter';
+  const isHQ = user?.role === 'department_report_admin' || user?.role === 'super_admin';
 
   useEffect(() => {
     loadAssignments();

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { authMiddleware, requireHeadquarter } from '../auth';
+import { authMiddleware } from '../auth';
+import { canManageTemplate, canReadTemplate } from '../department-policy';
 import { ReportAssignment } from '../types';
 
 const router = Router();
@@ -16,7 +17,7 @@ export function selectAssignmentsForPeriod(
 }
 
 // GET /api/aggregations/by-template/:templateId - Get aggregation view for template across branches
-router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
+router.get('/by-template/:templateId', authMiddleware, async (req: Request, res: Response) => {
   const templateId = parseInt(req.params.templateId, 10);
   const periodLabel = typeof req.query.period_label === 'string' ? req.query.period_label.trim() : '';
   if (!periodLabel) {
@@ -27,12 +28,13 @@ router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, async
   if (!template) {
     return res.status(404).json({ error: '模板不存在' });
   }
+  if (!canReadTemplate(req.user!, { owner_department_id: template.owner_department_id! })) return res.status(404).json({ error: '模板不存在' });
 
   const allFields = (await db.getTemplateFields(templateId)).filter((f) => f.status === 'active');
   const summaryFields = allFields.filter((f) => f.data_type === 'summary');
   const detailFields = allFields.filter((f) => f.data_type === 'detail');
 
-  const branches = (await db.getCompanies()).filter((c) => c.level === 'branch' && c.status === 'active');
+  const branches = (await db.getCompanies()).filter((c) => ['branch','department'].includes(c.level) && c.status === 'active');
   const assignments = selectAssignmentsForPeriod(await db.getAssignments(), templateId, periodLabel);
 
   const companyDataList: any[] = [];
@@ -144,9 +146,13 @@ router.get('/by-template/:templateId', authMiddleware, requireHeadquarter, async
 });
 
 // POST /api/aggregations/aggregate/:assignmentId - Manually trigger single assignment aggregation
-router.post('/aggregate/:assignmentId', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
+router.post('/aggregate/:assignmentId', authMiddleware, async (req: Request, res: Response) => {
   const assignmentId = parseInt(req.params.assignmentId, 10);
   try {
+    const assignment = await db.getAssignmentById(assignmentId);
+    const template = assignment ? await db.getTemplateById(assignment.template_id) : undefined;
+    if (!assignment || !template) return res.status(404).json({ error: '任务不存在' });
+    if (!canManageTemplate(req.user!, { owner_department_id: template.owner_department_id! })) return res.status(403).json({ error: '无权汇总该任务' });
     const agg = await db.aggregateAssignment(assignmentId);
     res.json({ message: '数据汇总成功', aggregation: agg });
   } catch (err: any) {
@@ -155,8 +161,10 @@ router.post('/aggregate/:assignmentId', authMiddleware, requireHeadquarter, asyn
 });
 
 // GET /api/aggregations/history/:templateId - View report history & submission versions
-router.get('/history/:templateId', authMiddleware, requireHeadquarter, async (req: Request, res: Response) => {
+router.get('/history/:templateId', authMiddleware, async (req: Request, res: Response) => {
   const templateId = parseInt(req.params.templateId, 10);
+  const template = await db.getTemplateById(templateId);
+  if (!template || !canReadTemplate(req.user!, { owner_department_id: template.owner_department_id! })) return res.status(404).json({ error: '模板不存在' });
   const assignments = (await db.getAssignments()).filter((a) => a.template_id === templateId);
   const allSubmissions = await db.getSubmissions();
 
