@@ -91,6 +91,20 @@ export const api = {
     return request<Company[]>('/api/companies/branches');
   },
 
+  async getAssignmentTargets(): Promise<Company[]> { return request('/api/companies/targets'); },
+  async createCompany(data: Partial<Company>): Promise<Company> {
+    return request('/api/companies', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async disableCompany(id: number): Promise<Company> { return request(`/api/companies/${id}/disable`, { method: 'PUT' }); },
+  async getUsers(): Promise<any[]> { return request('/api/users'); },
+  async updateUserOrganizationRole(id: number, company_id: number, role: string): Promise<any> {
+    return request(`/api/users/${id}/organization-role`, { method: 'PUT', body: JSON.stringify({ company_id, role }) });
+  },
+  async getPendingReceipts(): Promise<any[]> { return request('/api/receipts/pending'); },
+  async processReceipt(id: number, action: 'received' | 'returned', comment = ''): Promise<any> {
+    return request(`/api/receipts/${id}/action`, { method: 'POST', body: JSON.stringify({ action, comment }) });
+  },
+
   // Templates
   async getTemplates(): Promise<ReportTemplate[]> {
     return request<ReportTemplate[]>('/api/templates');

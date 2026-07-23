@@ -53,7 +53,7 @@ export const TemplateList: React.FC = () => {
   const loadTemplates = async () => {
     setLoading(true);
     try {
-      const [tList, bList] = await Promise.all([api.getTemplates(), api.getBranches()]);
+      const [tList, bList] = await Promise.all([api.getTemplates(), api.getAssignmentTargets()]);
       setTemplates(tList);
       setBranches(bList);
     } catch {

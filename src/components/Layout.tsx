@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api, getStoredUser, removeToken } from '../services/api';
 import { UserInfo } from '../types';
+import { getClientAccess } from '../utils/access';
 
 export const Layout: React.FC = () => {
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
@@ -61,11 +62,13 @@ export const Layout: React.FC = () => {
     }
   };
 
-  const isHQ = user?.company_level === 'headquarter';
+  const access = user ? getClientAccess(user) : null;
+  const isHQ = access?.isDepartmentAdmin === true;
 
   const roleLabels: Record<string, string> = {
     super_admin: '超级管理员',
     headquarter_admin: '总部管理员',
+    department_report_admin: '部门报表管理员',
     branch_admin: '分公司管理员',
     handler: '经办人',
     reviewer: '复核人',
@@ -283,8 +286,12 @@ export const Layout: React.FC = () => {
                 </>
               )}
 
+              {access?.canReceive && <Link to="/receipts" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><CheckSquare className="w-4 h-4"/><span>签收中心</span></Link>}
+              {access?.canManageOrganizations && <Link to="/organizations" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><Building2 className="w-4 h-4"/><span>机构管理</span></Link>}
+              {access?.isSuperAdmin && <Link to="/global-view" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><Shield className="w-4 h-4"/><span>全局查看</span></Link>}
+
               {/* Branch Specific Routes */}
-              {!isHQ && (
+              {!isHQ && !access?.isSuperAdmin && (
                 <>
                   <Link
                     to="/fill"
@@ -328,7 +335,7 @@ export const Layout: React.FC = () => {
           {/* Quick Info Footer */}
           <div className="p-4 border-t border-slate-200/80 bg-slate-50/50 text-[11px] text-slate-500 space-y-1">
             <div className="font-semibold text-slate-700">自由报表 FreeReport v0.1.0</div>
-            <div className="text-slate-400">系统状态: 运行正常 (SQLite WAL)</div>
+            <div className="text-slate-400">系统状态: 本地 MySQL 运行正常</div>
           </div>
         </aside>
 

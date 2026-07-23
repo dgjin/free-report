@@ -10,6 +10,9 @@ import { ReportFill } from './pages/ReportFill';
 import { ApprovalList } from './pages/ApprovalList';
 import { AggregationView } from './pages/AggregationView';
 import { getToken } from './services/api';
+import { ReceiptCenter } from './pages/ReceiptCenter';
+import { OrganizationManagement } from './pages/OrganizationManagement';
+import { GlobalReadOnlyView } from './pages/GlobalReadOnlyView';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const token = getToken();
@@ -43,6 +46,9 @@ export default function App() {
           <Route path="fill/:assignmentId" element={<ReportFill />} />
           <Route path="approvals" element={<ApprovalList />} />
           <Route path="aggregation" element={<AggregationView />} />
+          <Route path="receipts" element={<ReceiptCenter />} />
+          <Route path="organizations" element={<OrganizationManagement />} />
+          <Route path="global-view" element={<GlobalReadOnlyView />} />
         </Route>
 
         {/* Fallback */}
