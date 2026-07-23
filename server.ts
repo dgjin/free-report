@@ -12,6 +12,8 @@ import assignmentsRouter from './server/src/routes/assignments';
 import submissionsRouter from './server/src/routes/submissions';
 import approvalsRouter from './server/src/routes/approvals';
 import aggregationsRouter from './server/src/routes/aggregations';
+import usersRouter from './server/src/routes/users';
+import receiptsRouter from './server/src/routes/receipts';
 
 import { db } from './server/src/db';
 import { generateToken, authMiddleware } from './server/src/auth';
@@ -89,6 +91,8 @@ async function startServer() {
   app.use('/api/submissions', submissionsRouter);
   app.use('/api/approvals', approvalsRouter);
   app.use('/api/aggregations', aggregationsRouter);
+  app.use('/api/users', usersRouter);
+  app.use('/api/receipts', receiptsRouter);
 
   // Health check
   app.get('/api/health', (req: Request, res: Response) => {
