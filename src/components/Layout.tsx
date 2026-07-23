@@ -287,6 +287,7 @@ export const Layout: React.FC = () => {
               )}
 
               {access?.canReceive && <Link to="/receipts" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><CheckSquare className="w-4 h-4"/><span>签收中心</span></Link>}
+              {isHQ && <Link to="/fill" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><FileSpreadsheet className="w-4 h-4"/><span>收到的任务</span></Link>}
               {access?.canManageOrganizations && <Link to="/organizations" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><Building2 className="w-4 h-4"/><span>机构管理</span></Link>}
               {access?.isSuperAdmin && <Link to="/global-view" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><Shield className="w-4 h-4"/><span>全局查看</span></Link>}
 

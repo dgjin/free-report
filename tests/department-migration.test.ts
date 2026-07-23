@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const migration = fs.readFileSync(new URL('../sql/004_department_reporting.sql', import.meta.url), 'utf8');
 const runner = fs.readFileSync(new URL('../scripts/run-sql-file.ts', import.meta.url), 'utf8');
+const adminBackfill = fs.readFileSync(new URL('../sql/005_department_admin_backfill.sql', import.meta.url), 'utf8');
 
 test('department migration creates stable departments and ownership', () => {
   for (const code of ['HQ-OFFICE', 'HQ-BUSINESS', 'HQ-FINANCE', 'HQ-RISK']) assert.match(migration, new RegExp(code));
@@ -12,6 +13,12 @@ test('department migration creates stable departments and ownership', () => {
   assert.match(migration, /submission_receipts/);
   assert.match(migration, /pending_receipt/);
   assert.match(migration, /department_report_admin/);
+});
+
+test('legacy headquarters administrator is assigned to the business department', () => {
+  assert.match(adminBackfill, /HQ-BUSINESS/);
+  assert.match(adminBackfill, /department_report_admin/);
+  assert.match(adminBackfill, /hq_admin/);
 });
 
 test('migration runner records and skips applied filenames', () => {

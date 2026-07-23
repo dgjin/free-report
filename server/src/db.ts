@@ -83,6 +83,9 @@ export class Database {
   }
 
   async disableCompany(id: number): Promise<Company | null> {
+    const active = await first<{ count: number }>(this.pool(),
+      "SELECT COUNT(*) count FROM report_assignments WHERE assigned_to_company_id=? AND status NOT IN ('received','approved','aggregated','rejected')", [id]);
+    if (Number(active?.count || 0) > 0) throw new DomainError('该机构仍有未完成任务，暂不能停用', 409);
     await this.pool().execute("UPDATE companies SET status='inactive' WHERE id=? AND level <> 'headquarter'", [id]);
     return (await this.getCompanyById(id)) || null;
   }

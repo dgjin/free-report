@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-const schema = fs.readFileSync(new URL('../sql/001_schema.sql', import.meta.url), 'utf8');
+const schema = fs.readFileSync(new URL('../sql/001_schema.sql', import.meta.url), 'utf8') +
+  fs.readFileSync(new URL('../sql/004_department_reporting.sql', import.meta.url), 'utf8');
 
 test('schema defines every report table with transactional storage', () => {
   const tables = [
