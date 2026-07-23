@@ -12,6 +12,8 @@ import {
 const TOKEN_KEY = 'free_report_token';
 const USER_KEY = 'free_report_user';
 
+export type TemplateMetadataUpdate = Partial<Pick<ReportTemplate, 'name' | 'description' | 'period_type'>>;
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -110,10 +112,22 @@ export const api = {
     });
   },
 
-  async updateTemplate(id: number, data: Partial<ReportTemplate>): Promise<ReportTemplate> {
+  async updateTemplate(id: number, data: TemplateMetadataUpdate): Promise<ReportTemplate> {
     return request<ReportTemplate>(`/api/templates/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  },
+
+  async disableTemplate(id: number): Promise<{ message: string; template: ReportTemplate }> {
+    return request(`/api/templates/${id}/disable`, {
+      method: 'PUT',
+    });
+  },
+
+  async enableTemplate(id: number): Promise<{ message: string; template: ReportTemplate }> {
+    return request(`/api/templates/${id}/enable`, {
+      method: 'PUT',
     });
   },
 
