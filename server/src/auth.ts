@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from './db';
 import { User, Role, CompanyLevel, ReportAssignment, ReportSubmission } from './types';
+import { canReadAssignment as scopedCanReadAssignment, canWriteAssignment as scopedCanWriteAssignment } from './department-policy';
 
 export function getJwtSecret(env: NodeJS.ProcessEnv = process.env): string {
   const configuredSecret = env.JWT_SECRET?.trim();
@@ -36,13 +37,11 @@ function isHeadquarterUser(user: AccessUser): boolean {
 }
 
 export function canReadAssignment(user: AccessUser, assignment: ReportAssignment): boolean {
-  return isHeadquarterUser(user) || assignment.assigned_to_company_id === user.company_id;
+  return scopedCanReadAssignment(user, assignment);
 }
 
 export function canWriteAssignment(user: AccessUser, assignment: ReportAssignment): boolean {
-  if (user.role === 'super_admin') return true;
-  return assignment.assigned_to_company_id === user.company_id &&
-    (user.role === 'handler' || user.role === 'branch_admin');
+  return scopedCanWriteAssignment(user, assignment);
 }
 
 export function canReadSubmission(user: AccessUser, submission: ReportSubmission): boolean {

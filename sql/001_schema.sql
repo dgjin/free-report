@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS companies (
   name VARCHAR(120) NOT NULL,
   code VARCHAR(40) NOT NULL UNIQUE,
   parent_id BIGINT UNSIGNED NULL,
-  level ENUM('headquarter', 'branch') NOT NULL,
+  level ENUM('headquarter', 'department', 'branch') NOT NULL,
   address VARCHAR(255) NULL,
   contact VARCHAR(80) NULL,
   phone VARCHAR(40) NULL,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(100) NOT NULL,
   display_name VARCHAR(120) NOT NULL,
   company_id BIGINT UNSIGNED NOT NULL,
-  role ENUM('super_admin','headquarter_admin','branch_admin','handler','reviewer','approver') NOT NULL,
+  role ENUM('super_admin','headquarter_admin','department_report_admin','branch_admin','handler','reviewer','approver') NOT NULL,
   status ENUM('active','inactive') NOT NULL DEFAULT 'active',
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   INDEX idx_users_company_role (company_id, role, status),
@@ -33,9 +33,12 @@ CREATE TABLE IF NOT EXISTS report_templates (
   period_type ENUM('daily','weekly','monthly','quarterly','yearly','custom') NOT NULL,
   status ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
   created_by BIGINT UNSIGNED NOT NULL,
+  owner_department_id BIGINT UNSIGNED NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  CONSTRAINT fk_templates_creator FOREIGN KEY (created_by) REFERENCES users(id)
+  INDEX idx_templates_owner_status (owner_department_id, status),
+  CONSTRAINT fk_templates_creator FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT fk_templates_owner_department FOREIGN KEY (owner_department_id) REFERENCES companies(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS report_template_fields (
@@ -60,14 +63,17 @@ CREATE TABLE IF NOT EXISTS report_assignments (
   title VARCHAR(200) NOT NULL,
   period_label VARCHAR(80) NOT NULL,
   deadline DATE NOT NULL,
-  status ENUM('pending','filling','submitted','approved','aggregated','rejected') NOT NULL DEFAULT 'pending',
+  status ENUM('pending','filling','submitted','pending_receipt','received','returned','approved','aggregated','rejected') NOT NULL DEFAULT 'pending',
   assigned_by BIGINT UNSIGNED NOT NULL,
+  issuer_department_id BIGINT UNSIGNED NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   UNIQUE KEY uq_assignment_period (template_id, assigned_to_company_id, period_label),
   INDEX idx_assignments_company_status (assigned_to_company_id, status),
+  INDEX idx_assignments_issuer_status (issuer_department_id, status),
   CONSTRAINT fk_assignments_template FOREIGN KEY (template_id) REFERENCES report_templates(id),
   CONSTRAINT fk_assignments_company FOREIGN KEY (assigned_to_company_id) REFERENCES companies(id),
-  CONSTRAINT fk_assignments_assigner FOREIGN KEY (assigned_by) REFERENCES users(id)
+  CONSTRAINT fk_assignments_assigner FOREIGN KEY (assigned_by) REFERENCES users(id),
+  CONSTRAINT fk_assignments_issuer_department FOREIGN KEY (issuer_department_id) REFERENCES companies(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS report_submissions (
@@ -76,7 +82,7 @@ CREATE TABLE IF NOT EXISTS report_submissions (
   version INT UNSIGNED NOT NULL,
   submitted_by_company_id BIGINT UNSIGNED NOT NULL,
   submitted_by BIGINT UNSIGNED NOT NULL,
-  status ENUM('draft','pending_review','pending_approval','approved','rejected') NOT NULL,
+  status ENUM('draft','pending_review','pending_approval','pending_receipt','received','returned','approved','rejected') NOT NULL,
   comment TEXT NULL,
   submitted_at DATETIME(3) NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -98,6 +104,21 @@ CREATE TABLE IF NOT EXISTS report_submission_data (
   INDEX idx_submission_data_submission (submission_id, row_index),
   CONSTRAINT fk_submission_data_submission FOREIGN KEY (submission_id) REFERENCES report_submissions(id) ON DELETE CASCADE,
   CONSTRAINT fk_submission_data_field FOREIGN KEY (field_id) REFERENCES report_template_fields(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS submission_receipts (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  submission_id BIGINT UNSIGNED NOT NULL,
+  issuer_department_id BIGINT UNSIGNED NOT NULL,
+  received_by BIGINT UNSIGNED NOT NULL,
+  action ENUM('received','returned') NOT NULL,
+  comment TEXT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uq_submission_receipt (submission_id),
+  INDEX idx_receipts_department_action (issuer_department_id, action, created_at),
+  CONSTRAINT fk_receipts_submission FOREIGN KEY (submission_id) REFERENCES report_submissions(id),
+  CONSTRAINT fk_receipts_department FOREIGN KEY (issuer_department_id) REFERENCES companies(id),
+  CONSTRAINT fk_receipts_user FOREIGN KEY (received_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS approval_records (

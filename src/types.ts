@@ -1,7 +1,8 @@
-export type CompanyLevel = 'headquarter' | 'branch';
+export type CompanyLevel = 'headquarter' | 'department' | 'branch';
 export type Role =
   | 'super_admin'
   | 'headquarter_admin'
+  | 'department_report_admin'
   | 'branch_admin'
   | 'handler'
   | 'reviewer'
@@ -52,6 +53,7 @@ export interface ReportTemplate {
   period_type: PeriodType;
   status: TemplateStatus;
   created_by: number;
+  owner_department_id?: number;
   created_by_name?: string;
   field_count?: number;
   assignment_count?: number;
@@ -94,6 +96,7 @@ export interface ReportAssignment {
   deadline: string;
   status: AssignmentStatus;
   assigned_by: number;
+  issuer_department_id?: number;
   assigned_by_name?: string;
   submission_status?: string;
   submission_version?: number;

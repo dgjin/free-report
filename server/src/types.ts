@@ -1,4 +1,4 @@
-export type CompanyLevel = 'headquarter' | 'branch';
+export type CompanyLevel = 'headquarter' | 'department' | 'branch';
 export type CompanyStatus = 'active' | 'inactive';
 
 export interface Company {
@@ -18,6 +18,7 @@ export interface Company {
 export type Role =
   | 'super_admin'
   | 'headquarter_admin'
+  | 'department_report_admin'
   | 'branch_admin'
   | 'handler'
   | 'reviewer'
@@ -46,6 +47,7 @@ export interface ReportTemplate {
   period_type: PeriodType;
   status: TemplateStatus;
   created_by: number;
+  owner_department_id?: number;
   created_at: string;
   updated_at: string;
 }
@@ -91,6 +93,7 @@ export interface ReportAssignment {
   deadline: string;
   status: AssignmentStatus;
   assigned_by: number;
+  issuer_department_id?: number;
   created_at: string;
 }
 
@@ -98,6 +101,9 @@ export type SubmissionStatus =
   | 'draft'
   | 'pending_review'
   | 'pending_approval'
+  | 'pending_receipt'
+  | 'received'
+  | 'returned'
   | 'approved'
   | 'rejected';
 
