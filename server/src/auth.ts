@@ -118,6 +118,20 @@ export function requireHeadquarter(req: Request, res: Response, next: NextFuncti
   next();
 }
 
+export function requireDepartmentReportAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) return res.status(401).json({ error: '未登录' });
+  if (req.user.role !== 'department_report_admin' || req.user.company_level !== 'department') {
+    return res.status(403).json({ error: '仅所属部门报表管理员可执行此操作' });
+  }
+  next();
+}
+
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) return res.status(401).json({ error: '未登录' });
+  if (req.user.role !== 'super_admin') return res.status(403).json({ error: '仅超级管理员可执行此操作' });
+  next();
+}
+
 export function requireRole(...roles: Role[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {

@@ -80,6 +80,9 @@ export type AssignmentStatus =
   | 'pending'
   | 'filling'
   | 'submitted'
+  | 'pending_receipt'
+  | 'received'
+  | 'returned'
   | 'approved'
   | 'aggregated'
   | 'rejected';

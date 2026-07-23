@@ -1,6 +1,7 @@
 import { Router, Request, Response, type RequestHandler } from 'express';
 import { db, type Database } from '../db';
-import { authMiddleware, requireHeadquarter } from '../auth';
+import { authMiddleware, requireDepartmentReportAdmin } from '../auth';
+import { canReadTemplate } from '../department-policy';
 
 type TemplateRouterMiddleware = {
   authMiddleware: RequestHandler;
@@ -9,7 +10,7 @@ type TemplateRouterMiddleware = {
 
 export function createTemplatesRouter(
   database: Database = db,
-  middleware: TemplateRouterMiddleware = { authMiddleware, requireHeadquarter },
+  middleware: TemplateRouterMiddleware = { authMiddleware, requireHeadquarter: requireDepartmentReportAdmin },
 ) {
   const router = Router();
   const authenticate = middleware.authMiddleware;
@@ -18,7 +19,7 @@ export function createTemplatesRouter(
   function setTemplateEnabled(enabled: boolean) {
     return async (req: Request, res: Response) => {
       const id = parseInt(req.params.id, 10);
-      const updated = await database.setTemplateEnabled(id, enabled);
+      const updated = await database.setTemplateEnabled(id, enabled, req.user!.company_id);
       if (!updated) {
         return res.status(404).json({ error: '模板不存在' });
       }
@@ -32,7 +33,9 @@ export function createTemplatesRouter(
 
 // GET /api/templates - Get template list
 router.get('/', authenticate, async (req: Request, res: Response) => {
-  const templates = await database.getTemplates();
+  const templates = req.user!.role === 'super_admin'
+    ? await database.getTemplates()
+    : await database.getTemplatesByDepartment(req.user!.company_id);
   const allAssignments = await database.getAssignments();
   const result = await Promise.all(templates.map(async (t) => {
     const fields = (await database.getTemplateFields(t.id)).filter((f) => f.status === 'active');
@@ -57,6 +60,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
   if (!template) {
     return res.status(404).json({ error: '模板不存在' });
   }
+  if (!canReadTemplate(req.user!, { owner_department_id: template.owner_department_id! })) return res.status(404).json({ error: '模板不存在' });
 
   const [fields, creator] = await Promise.all([
     database.getTemplateFields(id),
@@ -86,6 +90,7 @@ router.post('/', authenticate, authorizeHeadquarter, async (req: Request, res: R
         period_type,
         status: 'published',
         created_by: req.user!.id,
+        owner_department_id: req.user!.company_id,
       },
       fields || []
     );
@@ -111,7 +116,7 @@ router.put('/:id', authenticate, authorizeHeadquarter, async (req: Request, res:
     ...(name && { name }),
     ...(description !== undefined && { description }),
     ...(period_type && { period_type }),
-  });
+  }, req.user!.company_id);
 
   if (!updated) {
     return res.status(404).json({ error: '模板不存在' });
@@ -138,7 +143,7 @@ router.post('/:id/fields', authenticate, authorizeHeadquarter, async (req: Reque
     field_config: field_config || {},
     sort_order: sort_order || 0,
     status: 'active',
-  });
+  }, req.user!.company_id);
 
   res.status(201).json(field);
 });
@@ -147,7 +152,7 @@ router.post('/:id/fields', authenticate, authorizeHeadquarter, async (req: Reque
 router.put('/:id/fields/:fieldId/disable', authenticate, authorizeHeadquarter, async (req: Request, res: Response) => {
   const templateId = parseInt(req.params.id, 10);
   const fieldId = parseInt(req.params.fieldId, 10);
-  const disabled = await database.disableTemplateField(templateId, fieldId);
+  const disabled = await database.disableTemplateField(templateId, fieldId, req.user!.company_id);
 
   res.json({ message: '字段已停用', field: disabled });
 });
@@ -171,7 +176,8 @@ router.post('/:id/assign', authenticate, authorizeHeadquarter, async (req: Reque
     title,
     period_label || '本期',
     deadline,
-    req.user!.id
+    req.user!.id,
+    req.user!.company_id
   );
 
   res.status(201).json({

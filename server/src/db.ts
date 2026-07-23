@@ -52,13 +52,16 @@ export class Database {
     }
   }
 
-  private async lockWritableTemplate(connection: PoolConnection, templateId: number): Promise<ReportTemplate> {
+  private async lockWritableTemplate(connection: PoolConnection, templateId: number, ownerDepartmentId?: number): Promise<ReportTemplate> {
     const template = await first<ReportTemplate>(
       connection,
       'SELECT * FROM report_templates WHERE id = ? FOR UPDATE',
       [templateId],
     );
     if (!template) throw new DomainError('模板不存在', 404);
+    if (ownerDepartmentId !== undefined && template.owner_department_id !== undefined && template.owner_department_id !== ownerDepartmentId) {
+      throw new DomainError('无权管理该模板', 404);
+    }
     assertTemplateWritable(template.status);
     return template;
   }
@@ -69,6 +72,25 @@ export class Database {
 
   async getCompanyById(id: number): Promise<Company | undefined> {
     return first<Company>(this.pool(), 'SELECT * FROM companies WHERE id = ?', [id]);
+  }
+
+  async createCompany(data: Pick<Company, 'name' | 'code' | 'parent_id' | 'level'>): Promise<Company> {
+    const [result] = await this.pool().execute<ResultSetHeader>(
+      "INSERT INTO companies(name,code,parent_id,level,status) VALUES(?,?,?,?,'active')",
+      [data.name, data.code, data.parent_id, data.level],
+    );
+    return (await this.getCompanyById(result.insertId))!;
+  }
+
+  async disableCompany(id: number): Promise<Company | null> {
+    await this.pool().execute("UPDATE companies SET status='inactive' WHERE id=? AND level <> 'headquarter'", [id]);
+    return (await this.getCompanyById(id)) || null;
+  }
+
+  async getAssignmentTargets(excludeId?: number): Promise<Company[]> {
+    return all<Company>(this.pool(),
+      "SELECT * FROM companies WHERE status='active' AND level IN ('department','branch') AND (? IS NULL OR id<>?) ORDER BY level,name",
+      [excludeId ?? null, excludeId ?? null]);
   }
 
   async getUsers(): Promise<User[]> {
@@ -83,8 +105,20 @@ export class Database {
     return first<User>(this.pool(), 'SELECT * FROM users WHERE LOWER(username) = LOWER(?)', [username]);
   }
 
+  async updateUserOrganizationRole(id: number, companyId: number, role: User['role']): Promise<User | null> {
+    const company = await this.getCompanyById(companyId);
+    if (!company || company.status !== 'active') throw new DomainError('目标机构不存在或已停用', 400);
+    if (role === 'department_report_admin' && company.level !== 'department') throw new DomainError('报表管理员必须属于总部部门', 400);
+    await this.pool().execute('UPDATE users SET company_id=?, role=? WHERE id=?', [companyId, role, id]);
+    return (await this.getUserById(id)) || null;
+  }
+
   async getTemplates(): Promise<ReportTemplate[]> {
     return all<ReportTemplate>(this.pool(), 'SELECT * FROM report_templates ORDER BY id DESC');
+  }
+
+  async getTemplatesByDepartment(departmentId: number): Promise<ReportTemplate[]> {
+    return all<ReportTemplate>(this.pool(), 'SELECT * FROM report_templates WHERE owner_department_id = ? ORDER BY id DESC', [departmentId]);
   }
 
   async getTemplateById(id: number): Promise<ReportTemplate | undefined> {
@@ -105,9 +139,9 @@ export class Database {
   ): Promise<{ template: ReportTemplate; fields: ReportTemplateField[] }> {
     return this.transaction(async (connection) => {
       const [result] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO report_templates (name,description,period_type,status,created_by)
-         VALUES (?,?,?,?,?)`,
-        [templateData.name, templateData.description, templateData.period_type, templateData.status, templateData.created_by],
+        `INSERT INTO report_templates (name,description,period_type,status,created_by,owner_department_id)
+         VALUES (?,?,?,?,?,?)`,
+        [templateData.name, templateData.description, templateData.period_type, templateData.status, templateData.created_by, templateData.owner_department_id],
       );
       const templateId = result.insertId;
       for (const [index, field] of fieldsData.entries()) {
@@ -127,9 +161,9 @@ export class Database {
     });
   }
 
-  async updateTemplate(id: number, updates: TemplateMetadataUpdates): Promise<ReportTemplate | null> {
+  async updateTemplate(id: number, updates: TemplateMetadataUpdates, ownerDepartmentId?: number): Promise<ReportTemplate | null> {
     return this.transaction(async (connection) => {
-      await this.lockWritableTemplate(connection, id);
+      await this.lockWritableTemplate(connection, id, ownerDepartmentId);
       const allowed = ['name', 'description', 'period_type'] as const;
       const entries = allowed.filter((key) => updates[key] !== undefined).map((key) => [key, updates[key]] as const);
       if (entries.length) {
@@ -142,7 +176,7 @@ export class Database {
     });
   }
 
-  async setTemplateEnabled(id: number, enabled: boolean): Promise<ReportTemplate | null> {
+  async setTemplateEnabled(id: number, enabled: boolean, ownerDepartmentId?: number): Promise<ReportTemplate | null> {
     return this.transaction(async (connection) => {
       const template = await first<ReportTemplate>(
         connection,
@@ -150,6 +184,7 @@ export class Database {
         [id],
       );
       if (!template) return null;
+      if (ownerDepartmentId !== undefined && template.owner_department_id !== undefined && template.owner_department_id !== ownerDepartmentId) throw new DomainError('无权管理该模板', 404);
       const status = setTemplateEnabledStatus(template.status, enabled);
       if (status !== template.status) {
         await connection.execute('UPDATE report_templates SET status = ? WHERE id = ?', [status, id]);
@@ -158,9 +193,9 @@ export class Database {
     });
   }
 
-  async addTemplateField(field: Omit<ReportTemplateField, 'id'>): Promise<ReportTemplateField> {
+  async addTemplateField(field: Omit<ReportTemplateField, 'id'>, ownerDepartmentId?: number): Promise<ReportTemplateField> {
     return this.transaction(async (connection) => {
-      await this.lockWritableTemplate(connection, field.template_id);
+      await this.lockWritableTemplate(connection, field.template_id, ownerDepartmentId);
       const existing = await first<ReportTemplateField>(
         connection,
         'SELECT * FROM report_template_fields WHERE template_id = ? AND field_name = ?',
@@ -182,9 +217,9 @@ export class Database {
     });
   }
 
-  async disableTemplateField(templateId: number, fieldId: number): Promise<ReportTemplateField> {
+  async disableTemplateField(templateId: number, fieldId: number, ownerDepartmentId?: number): Promise<ReportTemplateField> {
     return this.transaction(async (connection) => {
-      await this.lockWritableTemplate(connection, templateId);
+      await this.lockWritableTemplate(connection, templateId, ownerDepartmentId);
       const field = await first<ReportTemplateField>(
         connection,
         'SELECT * FROM report_template_fields WHERE id = ? AND template_id = ? FOR UPDATE',
@@ -213,17 +248,17 @@ export class Database {
 
   async createAssignments(
     templateId: number, companyIds: number[], title: string, periodLabel: string,
-    deadline: string, assignedBy: number,
+    deadline: string, assignedBy: number, ownerDepartmentId?: number,
   ): Promise<ReportAssignment[]> {
     return this.transaction(async (connection) => {
-      await this.lockWritableTemplate(connection, templateId);
+      const template = await this.lockWritableTemplate(connection, templateId, ownerDepartmentId);
       const created: ReportAssignment[] = [];
       for (const companyId of companyIds) {
         const [result] = await connection.execute<ResultSetHeader>(
           `INSERT IGNORE INTO report_assignments
-           (template_id,assigned_to_company_id,title,period_label,deadline,status,assigned_by)
-           VALUES (?,?,?,?,?,'pending',?)`,
-          [templateId, companyId, title, periodLabel, deadline, assignedBy],
+           (template_id,assigned_to_company_id,title,period_label,deadline,status,assigned_by,issuer_department_id)
+           VALUES (?,?,?,?,?,'pending',?,?)`,
+          [templateId, companyId, title, periodLabel, deadline, assignedBy, template.owner_department_id],
         );
         if (result.insertId) {
           created.push((await first<ReportAssignment>(connection,
@@ -267,10 +302,9 @@ export class Database {
         'SELECT * FROM report_assignments WHERE id = ? FOR UPDATE', [assignmentId]);
       if (!assignment) throw new DomainError('下发任务不存在', 404);
       const user = await first<User>(connection, 'SELECT * FROM users WHERE id = ?', [userId]);
-      const isSuperAdmin = user?.role === 'super_admin';
       if (!user || user.status !== 'active' || user.company_id !== companyId ||
-        (!isSuperAdmin && assignment.assigned_to_company_id !== companyId) ||
-        (!isSuperAdmin && user.role !== 'handler' && user.role !== 'branch_admin')) {
+        assignment.assigned_to_company_id !== companyId ||
+        !['handler', 'branch_admin', 'department_report_admin'].includes(user.role)) {
         throw new DomainError('你无权填写该任务', 403);
       }
 
@@ -283,7 +317,7 @@ export class Database {
         await connection.execute(
           `UPDATE report_submissions SET submitted_by=?, submitted_by_company_id=?, status=?, comment=?, submitted_at=?
            WHERE id=?`,
-          [userId, companyId, isSubmit ? 'pending_review' : 'draft', comment, isSubmit ? new Date() : null, submissionId],
+          [userId, companyId, isSubmit ? 'pending_receipt' : 'draft', comment, isSubmit ? new Date() : null, submissionId],
         );
         await connection.execute('DELETE FROM report_submission_data WHERE submission_id = ?', [submissionId]);
       } else {
@@ -292,7 +326,7 @@ export class Database {
           `INSERT INTO report_submissions
            (assignment_id,version,submitted_by_company_id,submitted_by,status,comment,submitted_at)
            VALUES (?,?,?,?,?,?,?)`,
-          [assignmentId, version, companyId, userId, isSubmit ? 'pending_review' : 'draft', comment,
+          [assignmentId, version, companyId, userId, isSubmit ? 'pending_receipt' : 'draft', comment,
             isSubmit ? new Date() : null],
         );
         submissionId = result.insertId;
@@ -309,25 +343,40 @@ export class Database {
         );
       }
       await connection.execute('UPDATE report_assignments SET status = ? WHERE id = ?',
-        [isSubmit ? 'submitted' : 'filling', assignmentId]);
+        [isSubmit ? 'pending_receipt' : 'filling', assignmentId]);
 
       const approvals: ApprovalRecord[] = [];
-      if (isSubmit) {
-        const reviewer = await first<User>(connection,
-          "SELECT * FROM users WHERE company_id=? AND role='reviewer' AND status='active' ORDER BY id LIMIT 1", [companyId]);
-        if (!reviewer) throw new DomainError('该公司未配置有效复核人', 409);
-        await connection.execute(
-          `INSERT INTO approval_records (submission_id,approval_level,approver_id,status,comment)
-           VALUES (?,'handler',?,'approved',?),(?,'reviewer',?,'pending','等候复核')`,
-          [submissionId, userId, comment || '经办人已提交填报', submissionId, reviewer.id],
-        );
-        approvals.push(...await all<ApprovalRecord>(connection,
-          'SELECT * FROM approval_records WHERE submission_id=? ORDER BY id', [submissionId]));
-      }
       return {
         submission: (await first<ReportSubmission>(connection, 'SELECT * FROM report_submissions WHERE id=?', [submissionId]))!,
         approvals,
       };
+    });
+  }
+
+  async getPendingReceipts(departmentId: number): Promise<any[]> {
+    return all<any>(this.pool(), `SELECT s.*,a.title assignment_title,t.name template_name,c.name company_name
+      FROM report_submissions s JOIN report_assignments a ON a.id=s.assignment_id
+      JOIN report_templates t ON t.id=a.template_id JOIN companies c ON c.id=s.submitted_by_company_id
+      WHERE a.issuer_department_id=? AND s.status='pending_receipt' ORDER BY s.submitted_at`, [departmentId]);
+  }
+
+  async processReceipt(submissionId: number, userId: number, departmentId: number,
+    action: 'received' | 'returned', comment = ''): Promise<any> {
+    return this.transaction(async (connection) => {
+      const submission = await first<ReportSubmission>(connection, 'SELECT * FROM report_submissions WHERE id=? FOR UPDATE', [submissionId]);
+      if (!submission) throw new DomainError('填报记录不存在', 404);
+      const assignment = await first<ReportAssignment>(connection, 'SELECT * FROM report_assignments WHERE id=? FOR UPDATE', [submission.assignment_id]);
+      if (!assignment || assignment.issuer_department_id !== departmentId) throw new DomainError('无权签收该填报', 404);
+      const user = await first<User>(connection, 'SELECT * FROM users WHERE id=? FOR UPDATE', [userId]);
+      if (!user || user.role !== 'department_report_admin' || user.company_id !== departmentId) throw new DomainError('仅发起部门报表管理员可以签收', 403);
+      if (submission.status !== 'pending_receipt') throw new DomainError('填报状态已变化，请刷新后重试', 409);
+      if (action === 'returned' && !comment.trim()) throw new DomainError('退回时必须填写原因', 400);
+      await connection.execute(`INSERT INTO submission_receipts(submission_id,issuer_department_id,received_by,action,comment)
+        VALUES(?,?,?,?,?)`, [submissionId, departmentId, userId, action, comment]);
+      await connection.execute('UPDATE report_submissions SET status=? WHERE id=?', [action, submissionId]);
+      await connection.execute('UPDATE report_assignments SET status=? WHERE id=?', [action, assignment.id]);
+      return { submission: await first(connection, 'SELECT * FROM report_submissions WHERE id=?', [submissionId]),
+        receipt: await first(connection, 'SELECT * FROM submission_receipts WHERE submission_id=?', [submissionId]) };
     });
   }
 

@@ -9,10 +9,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
   const user = req.user!;
   let assignments = await db.getAssignments();
 
-  // If user is from branch, only return assignments assigned to their company
-  if (user.company_level === 'branch') {
-    assignments = assignments.filter((a) => a.assigned_to_company_id === user.company_id);
-  }
+  assignments = assignments.filter((a) => canReadAssignment(user, a));
 
   const result = await Promise.all(assignments.map(async (a) => {
     const [template, company, assigner, latestSubmission] = await Promise.all([

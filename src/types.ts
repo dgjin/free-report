@@ -79,6 +79,9 @@ export type AssignmentStatus =
   | 'pending'
   | 'filling'
   | 'submitted'
+  | 'pending_receipt'
+  | 'received'
+  | 'returned'
   | 'approved'
   | 'aggregated'
   | 'rejected';
@@ -109,6 +112,9 @@ export type SubmissionStatus =
   | 'draft'
   | 'pending_review'
   | 'pending_approval'
+  | 'pending_receipt'
+  | 'received'
+  | 'returned'
   | 'approved'
   | 'rejected';
 

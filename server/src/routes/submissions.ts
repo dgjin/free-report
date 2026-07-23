@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { authMiddleware, canReadAssignment, canReadSubmission, canWriteAssignment } from '../auth';
+import { authMiddleware, canReadAssignment, canWriteAssignment } from '../auth';
 
 const router = Router();
 
@@ -104,11 +104,8 @@ async function renderSubmissionDetail(submissionId: number, req: Request, res: R
   if (!submission) {
     return res.status(404).json({ error: '填报记录不存在' });
   }
-  if (!canReadSubmission(req.user!, submission)) {
-    return res.status(403).json({ error: '无权查看该填报记录' });
-  }
-
   const assignment = await db.getAssignmentById(submission.assignment_id);
+  if (!assignment || !canReadAssignment(req.user!, assignment)) return res.status(403).json({ error: '无权查看该填报记录' });
   const template = assignment ? await db.getTemplateById(assignment.template_id) : undefined;
   const templateFields = template ? await db.getTemplateFields(template.id) : [];
 
