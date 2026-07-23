@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { authMiddleware } from '../auth';
 import { canManageTemplate, canReadTemplate } from '../department-policy';
-import { ReportAssignment } from '../types';
+import { Company, ReportAssignment } from '../types';
 
 const router = Router();
 
@@ -14,6 +14,24 @@ export function selectAssignmentsForPeriod(
   return assignments.filter(
     (assignment) => assignment.template_id === templateId && assignment.period_label === periodLabel,
   );
+}
+
+export function selectAggregationTargets(
+  assignments: ReportAssignment[],
+  companies: Company[],
+  templateId: number,
+  periodLabel: string,
+): Array<{ assignment: ReportAssignment; company: Company }> {
+  const companiesById = new Map(companies.map((company) => [company.id, company]));
+  return selectAssignmentsForPeriod(assignments, templateId, periodLabel)
+    .map((assignment) => ({
+      assignment,
+      company: companiesById.get(assignment.assigned_to_company_id),
+    }))
+    .filter(
+      (target): target is { assignment: ReportAssignment; company: Company } =>
+        target.company !== undefined,
+    );
 }
 
 // GET /api/aggregations/by-template/:templateId - Get aggregation view for template across branches
