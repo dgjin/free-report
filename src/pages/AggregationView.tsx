@@ -186,7 +186,7 @@ export const AggregationView: React.FC = () => {
               </h2>
               <span className="text-xs text-slate-500">
                 已统计 {aggregationData.company_data.filter((c) => c.has_submitted).length} /{' '}
-                {aggregationData.company_data.length} 个分公司
+                {aggregationData.company_data.length} 个机构
               </span>
             </div>
 

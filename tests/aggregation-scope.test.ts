@@ -37,3 +37,12 @@ test('aggregation route iterates assignment-scoped targets instead of all instit
   assert.match(source, /for \(const \{ assignment, company \} of targets\)/);
   assert.doesNotMatch(source, /for \(const branch of branches\)/);
 });
+
+test('aggregation view labels the scoped denominator as institutions', () => {
+  const source = readFileSync(
+    new URL('../src/pages/AggregationView.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /\{aggregationData\.company_data\.length\} 个机构/);
+  assert.doesNotMatch(source, /\{aggregationData\.company_data\.length\} 个分公司/);
+});
