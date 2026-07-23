@@ -2,6 +2,7 @@ import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql
 import { getPool } from './mysql';
 import { DomainError } from './errors';
 import { assertTemplateWritable, setTemplateEnabledStatus } from './template-lifecycle';
+import { canWriteSubmissionStatus } from './submission-workflow';
 import {
   ApprovalRecord,
   Company,
@@ -330,6 +331,9 @@ export class Database {
       const existing = await first<ReportSubmission>(connection,
         'SELECT * FROM report_submissions WHERE assignment_id = ? ORDER BY version DESC LIMIT 1 FOR UPDATE',
         [assignmentId]);
+      if (!canWriteSubmissionStatus(existing?.status)) {
+        throw new DomainError('该报表已提交，不能重复保存或提交，请刷新页面查看最新状态', 409);
+      }
       let submissionId: number;
       if (existing?.status === 'draft') {
         submissionId = existing.id;

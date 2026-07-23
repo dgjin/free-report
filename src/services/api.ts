@@ -208,8 +208,8 @@ export const api = {
     return request<ReportSubmissionDetail>(`/api/submissions/${id}`);
   },
 
-  async getSubmissionByAssignment(assignmentId: number): Promise<ReportSubmissionDetail> {
-    return request<ReportSubmissionDetail>(`/api/submissions/by-assignment/${assignmentId}`);
+  async getSubmissionByAssignment(assignmentId: number): Promise<ReportSubmissionDetail | null> {
+    return request<ReportSubmissionDetail | null>(`/api/submissions/by-assignment/${assignmentId}`);
   },
 
   // Approvals

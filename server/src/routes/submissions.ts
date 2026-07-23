@@ -38,12 +38,12 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     );
 
     res.status(201).json({
-      message: isSubmit ? '报表提交成功，已进入复核审批流程' : '草稿保存成功',
+      message: isSubmit ? '报表提交成功，已发送至下发部门等待签收' : '草稿保存成功',
       submission: result.submission,
       approvals: result.approvals,
     });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || '保存或提交报表数据失败' });
+    res.status(err.statusCode || 400).json({ error: err.message || '保存或提交报表数据失败' });
   }
 });
 
@@ -90,11 +90,11 @@ router.post('/:id/submit', authMiddleware, async (req: Request, res: Response) =
     );
 
     res.json({
-      message: '提交成功，已进入复核流程',
+      message: '提交成功，已发送至下发部门等待签收',
       submission: result.submission,
     });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || '提交失败' });
+    res.status(err.statusCode || 400).json({ error: err.message || '提交失败' });
   }
 });
 
@@ -206,7 +206,7 @@ router.get('/by-assignment/:assignmentId', authMiddleware, async (req: Request, 
   const submission = await db.getLatestSubmissionByAssignment(assignmentId);
 
   if (!submission) {
-    return res.status(404).json({ error: '暂无填报数据' });
+    return res.status(200).json(null);
   }
 
   await renderSubmissionDetail(submission.id, req, res);

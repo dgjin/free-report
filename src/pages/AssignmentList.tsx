@@ -45,6 +45,9 @@ export const AssignmentList: React.FC = () => {
     pending: { label: '待填报', bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
     filling: { label: '填报草稿中', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
     submitted: { label: '已提交待审核', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    pending_receipt: { label: '待下发部门签收', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    received: { label: '下发部门已签收', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+    returned: { label: '已退回修改', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
     approved: { label: '审批通过', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
     aggregated: { label: '已自动汇总', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
     rejected: { label: '已退回整改', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
@@ -67,7 +70,7 @@ export const AssignmentList: React.FC = () => {
           <p className="text-xs text-slate-500 mt-1">
             {isHQ
               ? '实时监控各分公司周期报表下发进度，快速查看提交版本与审批流转轨迹。'
-              : '查看总部下发至本分公司的填报任务，在线保存草稿并发起三级审批流。'}
+              : '查看总部部门下发至本分公司的填报任务，在线保存草稿并提交至下发部门签收。'}
           </p>
         </div>
 
@@ -169,7 +172,7 @@ export const AssignmentList: React.FC = () => {
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-colors flex items-center space-x-1.5"
                     >
                       <Edit className="w-3.5 h-3.5" />
-                      <span>{item.status === 'approved' ? '查看已审单据' : '进行报表填报'}</span>
+                      <span>{['pending_receipt', 'received', 'approved', 'aggregated'].includes(item.status) ? '查看已提交报表' : '进行报表填报'}</span>
                     </button>
                   )}
                 </div>

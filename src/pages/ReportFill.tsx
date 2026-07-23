@@ -23,6 +23,7 @@ import {
   ReportSubmissionDetail,
   UserInfo,
 } from '../types';
+import { getSubmissionWorkflowView } from '../utils/submissionWorkflow';
 
 export const ReportFill: React.FC = () => {
   const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -63,6 +64,12 @@ export const ReportFill: React.FC = () => {
       try {
         const subRes = await api.getSubmissionByAssignment(aId);
         setSubmission(subRes);
+        if (!subRes) {
+          setComment('');
+          setSummaryForm({});
+          setDetailRows([{}]);
+          return;
+        }
         setComment(subRes.comment || '');
 
         // Populate Summary Form
@@ -125,7 +132,7 @@ export const ReportFill: React.FC = () => {
     if (!assignment) return;
 
     if (isSubmit) {
-      if (!confirm('确定提交该报表？提交后数据将发送至复核人进行合规审核。')) return;
+      if (!confirm('确定提交该报表？提交后将发送至下发部门签收，签收前不能再次修改。')) return;
       setSubmitting(true);
     } else {
       setSaving(true);
@@ -140,8 +147,9 @@ export const ReportFill: React.FC = () => {
         action: isSubmit ? 'submit' : 'draft',
       });
 
-      alert(res.message);
-      loadData();
+      setSubmission(res.submission);
+      alert(isSubmit ? '提交成功，报表已发送至下发部门等待签收。' : res.message);
+      await loadData();
     } catch (err: any) {
       alert(err.message || '保存或提交失败');
     } finally {
@@ -154,23 +162,10 @@ export const ReportFill: React.FC = () => {
     return <div className="py-12 text-center text-xs text-slate-400">正在加载填报页面数据...</div>;
   }
 
-  const isReadOnly =
-    submission &&
-    (submission.status === 'pending_review' ||
-      submission.status === 'pending_approval' ||
-      submission.status === 'approved');
+  const workflowView = getSubmissionWorkflowView(submission?.status);
+  const isReadOnly = workflowView.isReadOnly;
 
-  const isRejected = submission?.status === 'rejected';
-
-  const statusLabels: Record<string, { label: string; color: string }> = {
-    draft: { label: '草稿保存中', color: 'bg-slate-100 text-slate-700' },
-    pending_review: { label: '已提交 · 待复核人审核', color: 'bg-amber-50 text-amber-700' },
-    pending_approval: { label: '复核通过 · 待审批人终审', color: 'bg-blue-50 text-blue-700' },
-    approved: { label: '终审通过 · 报表归档', color: 'bg-emerald-50 text-emerald-700' },
-    rejected: { label: '被驳回 · 需修正后重新提交', color: 'bg-rose-50 text-rose-700' },
-  };
-
-  const currentStatusInfo = statusLabels[submission?.status || 'draft'] || statusLabels.draft;
+  const isRejected = submission?.status === 'rejected' || submission?.status === 'returned';
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -187,9 +182,9 @@ export const ReportFill: React.FC = () => {
 
           <div className="flex items-center space-x-2">
             <span
-              className={`px-3 py-1 rounded-full text-xs font-bold ${currentStatusInfo.color}`}
+              className={`px-3 py-1 rounded-full text-xs font-bold ${workflowView.color}`}
             >
-              {currentStatusInfo.label}
+              {workflowView.label}
             </span>
             {submission && (
               <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-xs font-mono font-bold rounded">
@@ -228,7 +223,7 @@ export const ReportFill: React.FC = () => {
                 className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md transition-colors flex items-center space-x-1.5 disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
-                <span>{submitting ? '提交审核中...' : '提交三级审批'}</span>
+                <span>{submitting ? '提交中...' : '提交至下发部门'}</span>
               </button>
             </div>
           )}
@@ -240,7 +235,7 @@ export const ReportFill: React.FC = () => {
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start space-x-3 text-xs text-rose-900 shadow-sm">
           <XCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
           <div>
-            <div className="font-bold">您的填报数据已被驳回退回草稿</div>
+            <div className="font-bold">您的填报数据已被退回</div>
             <div className="mt-1">
               请根据审核意见修改下方数据后重新提交（提交后系统将自动升级至版本 v
               {(submission?.version || 1) + 1}）。
