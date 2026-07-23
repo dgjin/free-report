@@ -62,6 +62,10 @@ export class Database {
     if (ownerDepartmentId !== undefined && template.owner_department_id !== undefined && template.owner_department_id !== ownerDepartmentId) {
       throw new DomainError('无权管理该模板', 404);
     }
+    if (template.owner_department_id !== undefined) {
+      const owner = await first<Company>(connection, 'SELECT * FROM companies WHERE id=? FOR UPDATE', [template.owner_department_id]);
+      if (!owner || owner.level !== 'department' || owner.status !== 'active') throw new DomainError('模板所属部门已停用', 409);
+    }
     assertTemplateWritable(template.status);
     return template;
   }
@@ -75,6 +79,8 @@ export class Database {
   }
 
   async createCompany(data: Pick<Company, 'name' | 'code' | 'parent_id' | 'level'>): Promise<Company> {
+    const parent = data.parent_id ? await this.getCompanyById(data.parent_id) : undefined;
+    if (!parent || parent.level !== 'headquarter' || parent.status !== 'active') throw new DomainError('父机构必须是启用中的总部', 400);
     const [result] = await this.pool().execute<ResultSetHeader>(
       "INSERT INTO companies(name,code,parent_id,level,status) VALUES(?,?,?,?,'active')",
       [data.name, data.code, data.parent_id, data.level],
@@ -109,6 +115,9 @@ export class Database {
   }
 
   async updateUserOrganizationRole(id: number, companyId: number, role: User['role']): Promise<User | null> {
+    const existing = await this.getUserById(id);
+    if (!existing) return null;
+    if (existing.role === 'super_admin') throw new DomainError('不能修改超级管理员的机构或角色', 403);
     const company = await this.getCompanyById(companyId);
     if (!company || company.status !== 'active') throw new DomainError('目标机构不存在或已停用', 400);
     if (role === 'department_report_admin' && company.level !== 'department') throw new DomainError('报表管理员必须属于总部部门', 400);
@@ -257,6 +266,13 @@ export class Database {
       const template = await this.lockWritableTemplate(connection, templateId, ownerDepartmentId);
       const created: ReportAssignment[] = [];
       for (const companyId of companyIds) {
+        if (template.owner_department_id !== undefined) {
+          const target = await first<Company>(connection, 'SELECT * FROM companies WHERE id=? FOR UPDATE', [companyId]);
+          if (!target || target.status !== 'active' || !['department','branch'].includes(target.level)) {
+            throw new DomainError('下发目标不存在或已停用', 400);
+          }
+          if (target.id === template.owner_department_id) throw new DomainError('不能向本部门下发报表', 400);
+        }
         const [result] = await connection.execute<ResultSetHeader>(
           `INSERT IGNORE INTO report_assignments
            (template_id,assigned_to_company_id,title,period_label,deadline,status,assigned_by,issuer_department_id)
