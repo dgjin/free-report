@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { selectAggregationTargets } from '../server/src/routes/aggregations';
 
@@ -25,4 +26,14 @@ test('aggregation targets contain only institutions assigned for the template pe
 test('aggregation targets retain inactive institutions with historical assignments', () => {
   const targets = selectAggregationTargets(assignments, companies, 7, '2026-06');
   assert.deepEqual(targets.map(({ company }) => company.id), [30]);
+});
+
+test('aggregation route iterates assignment-scoped targets instead of all institutions', () => {
+  const source = readFileSync(
+    new URL('../server/src/routes/aggregations.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /const targets = selectAggregationTargets\(/);
+  assert.match(source, /for \(const \{ assignment, company \} of targets\)/);
+  assert.doesNotMatch(source, /for \(const branch of branches\)/);
 });

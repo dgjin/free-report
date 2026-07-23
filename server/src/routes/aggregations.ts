@@ -52,8 +52,12 @@ router.get('/by-template/:templateId', authMiddleware, async (req: Request, res:
   const summaryFields = allFields.filter((f) => f.data_type === 'summary');
   const detailFields = allFields.filter((f) => f.data_type === 'detail');
 
-  const branches = (await db.getCompanies()).filter((c) => ['branch','department'].includes(c.level) && c.status === 'active');
-  const assignments = selectAssignmentsForPeriod(await db.getAssignments(), templateId, periodLabel);
+  const targets = selectAggregationTargets(
+    await db.getAssignments(),
+    await db.getCompanies(),
+    templateId,
+    periodLabel,
+  );
 
   const companyDataList: any[] = [];
   const mergedDetailRows: any[] = [];
@@ -72,70 +76,67 @@ router.get('/by-template/:templateId', authMiddleware, async (req: Request, res:
     }
   });
 
-  for (const branch of branches) {
-    const assignment = assignments.find((a) => a.assigned_to_company_id === branch.id);
+  for (const { assignment, company } of targets) {
     const companyItem: any = {
-      company_id: branch.id,
-      company_name: branch.name,
-      company_code: branch.code,
-      has_assignment: !!assignment,
-      assignment_status: assignment ? assignment.status : 'unassigned',
+      company_id: company.id,
+      company_name: company.name,
+      company_code: company.code,
+      has_assignment: true,
+      assignment_status: assignment.status,
       has_submitted: false,
       submission_version: 0,
       values: {},
     };
 
-    if (assignment) {
-      const latestSub = await db.getLatestApprovedSubmissionByAssignment(assignment.id);
-      if (latestSub) {
-        companyItem.has_submitted = true;
-        companyItem.submission_status = latestSub.status;
-        companyItem.submission_version = latestSub.version;
+    const latestSub = await db.getLatestApprovedSubmissionByAssignment(assignment.id);
+    if (latestSub) {
+      companyItem.has_submitted = true;
+      companyItem.submission_status = latestSub.status;
+      companyItem.submission_version = latestSub.version;
 
-        const rawData = await db.getSubmissionData(latestSub.id);
+      const rawData = await db.getSubmissionData(latestSub.id);
 
-        // Parse summary values
-        rawData
-          .filter((d) => d.row_index === 0)
-          .forEach((d) => {
-            const field = summaryFields.find((f) => f.id === d.field_id);
-            if (field) {
-              companyItem.values[field.field_name] = d.value;
+      // Parse summary values
+      rawData
+        .filter((d) => d.row_index === 0)
+        .forEach((d) => {
+          const field = summaryFields.find((f) => f.id === d.field_id);
+          if (field) {
+            companyItem.values[field.field_name] = d.value;
 
-              if (field.field_type === 'number' && d.value !== '' && !isNaN(Number(d.value))) {
-                const val = Number(d.value);
-                summaryStats[field.field_name].total += val;
-                summaryStats[field.field_name].count += 1;
-              }
+            if (field.field_type === 'number' && d.value !== '' && !isNaN(Number(d.value))) {
+              const val = Number(d.value);
+              summaryStats[field.field_name].total += val;
+              summaryStats[field.field_name].count += 1;
             }
-          });
+          }
+        });
 
-        // Group detail rows
-        const detailRowsMap: Record<number, Record<string, any>> = {};
-        rawData
-          .filter((d) => d.row_index > 0)
-          .forEach((d) => {
-            const field = detailFields.find((f) => f.id === d.field_id);
-            if (field) {
-              if (!detailRowsMap[d.row_index]) {
-                detailRowsMap[d.row_index] = {
-                  company_name: branch.name,
-                  company_code: branch.code,
-                  row_index: d.row_index,
-                };
-              }
-              detailRowsMap[d.row_index][field.field_name] = d.value;
-
-              if (field.field_type === 'number' && d.value !== '' && !isNaN(Number(d.value))) {
-                const val = Number(d.value);
-                detailStats[field.field_name].total += val;
-                detailStats[field.field_name].count += 1;
-              }
+      // Group detail rows
+      const detailRowsMap: Record<number, Record<string, any>> = {};
+      rawData
+        .filter((d) => d.row_index > 0)
+        .forEach((d) => {
+          const field = detailFields.find((f) => f.id === d.field_id);
+          if (field) {
+            if (!detailRowsMap[d.row_index]) {
+              detailRowsMap[d.row_index] = {
+                company_name: company.name,
+                company_code: company.code,
+                row_index: d.row_index,
+              };
             }
-          });
+            detailRowsMap[d.row_index][field.field_name] = d.value;
 
-        Object.values(detailRowsMap).forEach((r) => mergedDetailRows.push(r));
-      }
+            if (field.field_type === 'number' && d.value !== '' && !isNaN(Number(d.value))) {
+              const val = Number(d.value);
+              detailStats[field.field_name].total += val;
+              detailStats[field.field_name].count += 1;
+            }
+          }
+        });
+
+      Object.values(detailRowsMap).forEach((r) => mergedDetailRows.push(r));
     }
 
     companyDataList.push(companyItem);
