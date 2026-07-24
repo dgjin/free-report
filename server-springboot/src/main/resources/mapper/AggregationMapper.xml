@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.freereport.mapper.AggregationMapper">
+
+    <!-- 聚合指定任务下所有数值字段 -->
+    <select id="sumNumericFieldsByAssignment" resultType="java.util.Map">
+        SELECT f.field_name, SUM(CAST(d.value AS DECIMAL(30,6))) AS total
+        FROM report_submissions s
+        JOIN report_submission_data d ON d.submission_id = s.id
+        JOIN report_template_fields f ON f.id = d.field_id
+        WHERE s.assignment_id = #{assignmentId}
+          AND s.status IN ('pending_receipt', 'received')
+          AND f.field_type = 'number'
+        GROUP BY f.field_name
+    </select>
+
+    <!-- 统计指定任务下已审批通过的提交数 -->
+    <select id="countApprovedSubmissions" resultType="int">
+        SELECT COUNT(*) AS count
+        FROM report_submissions
+        WHERE assignment_id = #{assignmentId}
+          AND status IN ('pending_receipt', 'received')
+    </select>
+
+    <!-- 插入汇总记录（带 ON DUPLICATE KEY UPDATE） -->
+    <insert id="insertAggregation">
+        INSERT INTO report_aggregations (template_id, assignment_id, aggregated_data, branch_count, submitted_count)
+        VALUES (#{templateId}, #{assignmentId}, #{aggregatedData}, #{branchCount}, #{submittedCount})
+        ON DUPLICATE KEY UPDATE
+            aggregated_data = VALUES(aggregated_data),
+            submitted_count = VALUES(submitted_count),
+            updated_at = CURRENT_TIMESTAMP(3)
+    </insert>
+
+    <!-- 更新汇总记录 -->
+    <update id="updateAggregation">
+        UPDATE report_aggregations
+        SET aggregated_data = #{aggregatedData},
+            submitted_count = #{submittedCount},
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE template_id = #{templateId}
+          AND assignment_id = #{assignmentId}
+    </update>
+
+    <!-- 根据任务 ID 查询汇总记录 -->
+    <select id="findByAssignmentId" resultType="com.freereport.entity.ReportAggregation">
+        SELECT * FROM report_aggregations WHERE assignment_id = #{assignmentId}
+    </select>
+
+    <!-- 插入任务收回审计记录 -->
+    <insert id="insertRecall" parameterType="com.freereport.entity.AssignmentRecall"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO assignment_recalls (assignment_id, recalled_by, issuer_department_id, reason)
+        VALUES (#{assignmentId}, #{recalledBy}, #{issuerDepartmentId}, #{reason})
+    </insert>
+
+</mapper>

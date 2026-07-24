@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.freereport.mapper.ApprovalMapper">
+
+    <!-- 根据提交 ID 查询审批记录 -->
+    <select id="findBySubmissionId" resultType="com.freereport.entity.ApprovalRecord">
+        SELECT * FROM approval_records WHERE submission_id = #{submissionId} ORDER BY id
+    </select>
+
+    <!-- 根据提交 ID 查询待审批记录 -->
+    <select id="findPendingBySubmissionId" resultType="com.freereport.entity.ApprovalRecord">
+        SELECT * FROM approval_records
+        WHERE submission_id = #{submissionId}
+          AND status = 'pending'
+        ORDER BY id
+        LIMIT 1
+    </select>
+
+    <!-- 插入审批记录（返回生成 ID） -->
+    <insert id="insertApproval" parameterType="com.freereport.entity.ApprovalRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO approval_records (submission_id, approval_level, approver_id, status, comment)
+        VALUES (#{submissionId}, #{approvalLevel}, #{approverId}, #{status}, #{comment})
+    </insert>
+
+    <!-- 更新审批状态 -->
+    <update id="updateApprovalStatus">
+        UPDATE approval_records
+        SET status = #{status},
+            comment = #{comment}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 批量拒绝 pending 审批 -->
+    <update id="rejectPendingApprovals">
+        UPDATE approval_records
+        SET status = 'rejected',
+            comment = #{comment}
+        WHERE submission_id = #{submissionId}
+          AND status = 'pending'
+    </update>
+
+    <!-- 查询用户待审批列表 -->
+    <select id="findPendingApprovalsForUser" resultType="java.util.Map">
+        SELECT ar.id AS approval_id,
+               s.id AS submission_id,
+               ar.approval_level,
+               a.title AS assignment_title,
+               a.period_label,
+               t.name AS template_name,
+               c.name AS company_name,
+               u.display_name AS submitted_by_name,
+               COALESCE(s.submitted_at, s.created_at) AS submitted_at,
+               s.version,
+               s.comment
+        FROM approval_records ar
+        JOIN report_submissions s ON s.id = ar.submission_id
+        JOIN report_assignments a ON a.id = s.assignment_id
+        JOIN report_templates t ON t.id = a.template_id
+        JOIN companies c ON c.id = s.submitted_by_company_id
+        JOIN users u ON u.id = s.submitted_by
+        WHERE ar.status = 'pending'
+          AND s.submitted_by_company_id = #{companyId}
+          AND (
+              (#{role} = 'reviewer' AND ar.approval_level = 'reviewer')
+              OR
+              (#{role} = 'approver' AND ar.approval_level = 'approver')
+          )
+        ORDER BY s.submitted_at DESC
+    </select>
+
+    <!-- 查询公司复核人 -->
+    <select id="findReviewer" resultType="com.freereport.entity.User">
+        SELECT * FROM users
+        WHERE company_id = #{companyId}
+          AND role = 'reviewer'
+          AND status = 'active'
+        ORDER BY id
+        LIMIT 1
+    </select>
+
+    <!-- 查询公司审批人 -->
+    <select id="findApprover" resultType="com.freereport.entity.User">
+        SELECT * FROM users
+        WHERE company_id = #{companyId}
+          AND role = 'approver'
+          AND status = 'active'
+        ORDER BY id
+        LIMIT 1
+    </select>
+
+</mapper>

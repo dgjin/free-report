@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.freereport.mapper.SubmissionMapper">
+
+    <!-- 根据 ID 查询提交 -->
+    <select id="findById" resultType="com.freereport.entity.ReportSubmission">
+        SELECT * FROM report_submissions WHERE id = #{id}
+    </select>
+
+    <!-- 根据 ID 查询提交（加行锁） -->
+    <select id="findByIdForUpdate" resultType="com.freereport.entity.ReportSubmission">
+        SELECT * FROM report_submissions WHERE id = #{id} FOR UPDATE
+    </select>
+
+    <!-- 根据下发任务 ID 查询最新版本提交 -->
+    <select id="findLatestByAssignmentId" resultType="com.freereport.entity.ReportSubmission">
+        SELECT * FROM report_submissions
+        WHERE assignment_id = #{assignmentId}
+        ORDER BY version DESC
+        LIMIT 1
+    </select>
+
+    <!-- 根据下发任务 ID 查询最新版本提交（加行锁） -->
+    <select id="findLatestByAssignmentIdForUpdate" resultType="com.freereport.entity.ReportSubmission">
+        SELECT * FROM report_submissions
+        WHERE assignment_id = #{assignmentId}
+        ORDER BY version DESC
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <!-- 根据下发任务 ID 查询最新已审批通过提交 -->
+    <select id="findLatestApprovedByAssignmentId" resultType="com.freereport.entity.ReportSubmission">
+        SELECT * FROM report_submissions
+        WHERE assignment_id = #{assignmentId}
+          AND status IN ('pending_receipt', 'received')
+        ORDER BY version DESC
+        LIMIT 1
+    </select>
+
+    <!-- 根据下发任务 ID 列表查询所有提交 -->
+    <select id="findByAssignmentIds" resultType="com.freereport.entity.ReportSubmission">
+        SELECT * FROM report_submissions WHERE assignment_id IN
+        <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
+            #{assignmentId}
+        </foreach>
+    </select>
+
+    <!-- 根据下发任务 ID 列表查询每个任务的最新版本提交 -->
+    <select id="findLatestByAssignmentIds" resultType="com.freereport.entity.ReportSubmission">
+        SELECT s.*
+        FROM report_submissions s
+        INNER JOIN (
+            SELECT assignment_id, MAX(version) AS max_version
+            FROM report_submissions
+            WHERE assignment_id IN
+            <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
+                #{assignmentId}
+            </foreach>
+            GROUP BY assignment_id
+        ) latest ON s.assignment_id = latest.assignment_id AND s.version = latest.max_version
+    </select>
+
+    <!-- 根据下发任务 ID 列表查询每个任务的最新已审批通过提交 -->
+    <select id="findLatestApprovedByAssignmentIds" resultType="com.freereport.entity.ReportSubmission">
+        SELECT s.*
+        FROM report_submissions s
+        INNER JOIN (
+            SELECT assignment_id, MAX(version) AS max_version
+            FROM report_submissions
+            WHERE assignment_id IN
+            <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
+                #{assignmentId}
+            </foreach>
+              AND status NOT IN ('draft', 'rejected', 'returned')
+            GROUP BY assignment_id
+        ) latest ON s.assignment_id = latest.assignment_id AND s.version = latest.max_version
+    </select>
+
+    <!-- 插入提交（返回生成 ID） -->
+    <insert id="insertSubmission" parameterType="com.freereport.entity.ReportSubmission"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO report_submissions
+            (assignment_id, version, submitted_by_company_id, submitted_by, status, comment, submitted_at)
+        VALUES
+            (#{assignmentId}, #{version}, #{submittedByCompanyId}, #{submittedBy}, #{status}, #{comment}, #{submittedAt})
+    </insert>
+
+    <!-- 更新提交状态 -->
+    <update id="updateSubmissionStatus">
+        UPDATE report_submissions
+        SET submitted_by = #{submittedBy},
+            submitted_by_company_id = #{submittedByCompanyId},
+            status = #{status},
+            comment = #{comment},
+            submitted_at = #{submittedAt}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除提交的明细数据 -->
+    <delete id="deleteSubmissionData">
+        DELETE FROM report_submission_data WHERE submission_id = #{submissionId}
+    </delete>
+
+    <!-- 批量插入提交明细数据 -->
+    <insert id="insertSubmissionDataBatch" parameterType="java.util.List">
+        INSERT INTO report_submission_data (submission_id, field_id, row_index, value)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.submissionId}, #{item.fieldId}, #{item.rowIndex}, #{item.value})
+        </foreach>
+    </insert>
+
+    <!-- 根据提交 ID 查询明细数据 -->
+    <select id="findDataBySubmissionId" resultType="com.freereport.entity.ReportSubmissionData">
+        SELECT * FROM report_submission_data WHERE submission_id = #{submissionId}
+    </select>
+
+    <!-- 根据提交 ID 列表批量查询明细数据 -->
+    <select id="findDataBySubmissionIds" resultType="com.freereport.entity.ReportSubmissionData">
+        SELECT * FROM report_submission_data WHERE submission_id IN
+        <foreach collection="submissionIds" item="submissionId" open="(" separator="," close=")">
+            #{submissionId}
+        </foreach>
+    </select>
+
+</mapper>

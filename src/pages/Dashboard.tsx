@@ -127,36 +127,36 @@ export const Dashboard: React.FC = () => {
     <div className="max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-[clamp(20px,3vw,32px)]">
       {/* Hero — colored CTA with liquid glass */}
       <section
-        className="relative overflow-hidden rounded-[26px] p-[clamp(26px,4vw,40px)]"
+        className="relative overflow-hidden rounded-[22px] p-[clamp(20px,3vw,28px)]"
         style={{ background: 'var(--grad-cta)', boxShadow: 'var(--sh-cta)' }}
       >
         {/* blurred light orbs — glass needs something to refract */}
-        <div className="absolute w-[260px] h-[260px] rounded-full bg-white/20 filter blur-[46px] -top-20 -right-10 pointer-events-none" />
-        <div className="absolute w-[200px] h-[200px] rounded-full bg-[rgba(120,80,255,0.5)] filter blur-[50px] -bottom-24 left-[12%] pointer-events-none" />
+        <div className="absolute w-[220px] h-[220px] rounded-full bg-white/20 filter blur-[46px] -top-16 -right-10 pointer-events-none" />
+        <div className="absolute w-[180px] h-[180px] rounded-full bg-[rgba(120,80,255,0.5)] filter blur-[50px] -bottom-20 left-[12%] pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div
-              className="inline-flex items-center gap-2 h-7 px-3 rounded-full text-[11px] font-semibold tracking-wide text-white"
+              className="inline-flex items-center gap-2 h-6 px-2.5 rounded-full text-[11px] font-medium tracking-wide text-white"
               style={{ background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.22)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
             >
               <Building2 className="w-3 h-3" />
               <span>{user?.company_name} · {isHQ ? '总部层级' : '分公司层级'}</span>
             </div>
-            <h1 className="mt-4 text-white font-bold leading-[1.1] tracking-[-0.03em]" style={{ fontSize: 'clamp(27px,5vw,40px)' }}>
+            <h1 className="mt-3 text-white font-semibold leading-[1.15] tracking-[-0.02em] text-[22px] sm:text-[26px]">
               欢迎回来，{user?.display_name || '使用者'}
             </h1>
-            <p className="mt-3 text-[15px] text-white/80 leading-[1.6] max-w-[460px]">
+            <p className="mt-2 text-[13px] text-white/80 leading-[1.6] max-w-[460px]">
               {isHQ
                 ? '统一管控中心：设计通用模板、按周期下发各分公司、全流程跟进与智能汇总。'
                 : '分公司填报中心：高效完成周期性数据上报、三级穿透审核。'}
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={() => setHelpOpen(true)}
-              className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full text-white/90 hover:text-white text-[13px] font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-full text-white/90 hover:text-white text-[12px] font-medium transition-colors"
               style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
             >
               <HelpCircle className="w-4 h-4" />
@@ -167,7 +167,7 @@ export const Dashboard: React.FC = () => {
             {user?.role === 'department_report_admin' ? (
               <button
                 onClick={() => navigate('/templates')}
-                className="inline-flex items-center gap-2 h-11 px-[22px] rounded-full bg-white text-[#0071e3] text-[15px] font-semibold hover:bg-white/90 transition-colors"
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-white text-[#0071e3] text-[13px] font-semibold hover:bg-white/90 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 <span>新建模板</span>
@@ -175,7 +175,7 @@ export const Dashboard: React.FC = () => {
             ) : user?.role === 'super_admin' ? (
               <button
                 onClick={() => navigate('/global-view')}
-                className="inline-flex items-center h-11 px-[19px] rounded-full bg-white/80 border border-white/20 text-white text-[14px] font-semibold hover:bg-white/90 transition-colors"
+                className="inline-flex items-center h-10 px-4 rounded-full bg-white/80 border border-white/20 text-white text-[13px] font-semibold hover:bg-white/90 transition-colors"
                 style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
               >
                 进入全局只读视图
@@ -183,7 +183,7 @@ export const Dashboard: React.FC = () => {
             ) : (
               <button
                 onClick={() => navigate('/fill')}
-                className="inline-flex items-center gap-2 h-11 px-[22px] rounded-full bg-white text-[#0071e3] text-[15px] font-semibold hover:bg-white/90 transition-colors"
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-white text-[#0071e3] text-[13px] font-semibold hover:bg-white/90 transition-colors"
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span>立即填报</span>

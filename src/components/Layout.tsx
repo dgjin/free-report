@@ -238,14 +238,14 @@ export const Layout: React.FC = () => {
         >
           <div className="p-4 space-y-5">
             {/* View Context Badge */}
-            <div className="p-3 bg-[#f5f5f7] rounded-[12px] flex items-center gap-3">
-              <div className="p-2 rounded-[8px] text-white" style={{ background: 'var(--grad-cta)' }}>
-                <Building2 className="w-4 h-4" />
+            <div className="p-3 bg-[#f5f5f7] rounded-[12px] flex items-center gap-2.5">
+              <div className="p-1.5 rounded-[8px] text-white shrink-0" style={{ background: 'var(--grad-cta)' }}>
+                <Building2 className="w-3.5 h-3.5" />
               </div>
-              <div>
-                <div className="text-[11px] text-[#86868b] font-medium">当前控制视角</div>
-                <div className="text-[13px] font-semibold text-[#1d1d1f]">
-                  {isHQ ? `${user?.company_name || '总部'}工作平台` : `${user?.company_name || '分公司'}平台`}
+              <div className="min-w-0">
+                <div className="text-[10px] text-[#86868b] font-medium">当前控制视角</div>
+                <div className="text-[13px] font-semibold text-[#1d1d1f] truncate">
+                  {isHQ ? `${user?.company_name || '总部'}` : `${user?.company_name || '分公司'}`}
                 </div>
               </div>
             </div>

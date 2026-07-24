@@ -3,6 +3,7 @@ node_modules
 .superpowers/
 build/
 dist/
+target/
 coverage/
 .DS_Store
 *.log

@@ -16,7 +16,6 @@ export default defineConfig(() => {
         output: {
           manualChunks: {
             xlsx: ['xlsx'],
-            genai: ['@google/genai'],
             motion: ['motion'],
             'lucide-react': ['lucide-react'],
             'react-vendor': ['react', 'react-dom', 'react-router-dom'],
@@ -30,7 +29,7 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
-      // Proxy API requests to Express backend in dev mode
+      // Proxy API requests to Spring Boot backend in dev mode
       proxy: {
         '/api': {
           target: 'http://localhost:3001',

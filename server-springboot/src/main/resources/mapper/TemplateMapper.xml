@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.freereport.mapper.TemplateMapper">
+
+    <!-- 查询所有模板 -->
+    <select id="findAll" resultType="com.freereport.entity.ReportTemplate">
+        SELECT * FROM report_templates ORDER BY id DESC
+    </select>
+
+    <!-- 根据 ID 列表批量查询模板 -->
+    <select id="findByIds" resultType="com.freereport.entity.ReportTemplate">
+        SELECT * FROM report_templates WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 根据 ID 查询模板 -->
+    <select id="findById" resultType="com.freereport.entity.ReportTemplate">
+        SELECT * FROM report_templates WHERE id = #{id}
+    </select>
+
+    <!-- 根据 ID 查询模板（加行锁） -->
+    <select id="findByIdForUpdate" resultType="com.freereport.entity.ReportTemplate">
+        SELECT * FROM report_templates WHERE id = #{id} FOR UPDATE
+    </select>
+
+    <!-- 根据归属部门查询模板 -->
+    <select id="findByOwnerDepartment" resultType="com.freereport.entity.ReportTemplate">
+        SELECT * FROM report_templates WHERE owner_department_id = #{departmentId} ORDER BY id DESC
+    </select>
+
+    <!-- 根据用户角色过滤查询模板 -->
+    <select id="findForUser" resultType="com.freereport.entity.ReportTemplate">
+        <choose>
+            <when test="role == 'super_admin'">
+                SELECT * FROM report_templates ORDER BY id DESC
+            </when>
+            <when test="role == 'department_report_admin' and companyLevel == 'department'">
+                SELECT * FROM report_templates WHERE owner_department_id = #{companyId} ORDER BY id DESC
+            </when>
+            <otherwise>
+                SELECT * FROM report_templates WHERE 1 = 0
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 插入模板（返回生成 ID） -->
+    <insert id="insertTemplate" parameterType="com.freereport.entity.ReportTemplate"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO report_templates (name, description, period_type, status, created_by, owner_department_id)
+        VALUES (#{name}, #{description}, #{periodType}, #{status}, #{createdBy}, #{ownerDepartmentId})
+    </insert>
+
+    <!-- 更新模板基本信息 -->
+    <update id="updateTemplate">
+        UPDATE report_templates
+        SET name = #{name},
+            description = #{description},
+            period_type = #{periodType}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 启用/停用模板 -->
+    <update id="setTemplateStatus">
+        UPDATE report_templates
+        SET status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据模板 ID 查询字段 -->
+    <select id="findFieldsByTemplateId" resultType="com.freereport.entity.ReportTemplateField">
+        SELECT * FROM report_template_fields WHERE template_id = #{templateId} ORDER BY sort_order
+    </select>
+
+    <!-- 根据模板 ID 列表批量查询字段 -->
+    <select id="findFieldsByTemplateIds" resultType="com.freereport.entity.ReportTemplateField">
+        SELECT * FROM report_template_fields WHERE template_id IN
+        <foreach collection="templateIds" item="templateId" open="(" separator="," close=")">
+            #{templateId}
+        </foreach>
+        ORDER BY template_id, sort_order
+    </select>
+
+    <!-- 根据模板 ID 和字段名查询字段 -->
+    <select id="findFieldByName" resultType="com.freereport.entity.ReportTemplateField">
+        SELECT * FROM report_template_fields
+        WHERE template_id = #{templateId}
+          AND field_name = #{fieldName}
+    </select>
+
+    <!-- 插入字段（返回生成 ID） -->
+    <insert id="insertField" parameterType="com.freereport.entity.ReportTemplateField"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO report_template_fields (template_id, field_name, field_label, field_type, data_type, field_config, sort_order, status)
+        VALUES (#{templateId}, #{fieldName}, #{fieldLabel}, #{fieldType}, #{dataType}, #{fieldConfig}, #{sortOrder}, #{status})
+    </insert>
+
+    <!-- 批量插入字段 -->
+    <insert id="insertFieldsBatch" parameterType="java.util.List">
+        INSERT INTO report_template_fields (template_id, field_name, field_label, field_type, data_type, field_config, sort_order, status)
+        VALUES
+        <foreach collection="list" item="field" separator=",">
+            (#{field.templateId}, #{field.fieldName}, #{field.fieldLabel}, #{field.fieldType}, #{field.dataType}, #{field.fieldConfig}, #{field.sortOrder}, #{field.status})
+        </foreach>
+    </insert>
+
+    <!-- 停用字段 -->
+    <update id="disableField">
+        UPDATE report_template_fields
+        SET status = 'inactive'
+        WHERE id = #{fieldId}
+          AND template_id = #{templateId}
+    </update>
+
+    <!-- 查询模板下最大 sort_order -->
+    <select id="findMaxSortOrder" resultType="java.lang.Integer">
+        SELECT MAX(sort_order) FROM report_template_fields WHERE template_id = #{templateId}
+    </select>
+
+</mapper>
