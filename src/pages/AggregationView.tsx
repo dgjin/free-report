@@ -222,20 +222,20 @@ export const AggregationView: React.FC = () => {
   }, [aggregationData]);
 
   return (
-    <div className="max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-6">
+    <div className="max-w-[1080px] mx-auto px-4 sm:px-[22px] py-[clamp(16px,3vw,28px)] space-y-4 sm:space-y-6">
       {/* Header — unified white panel */}
-      <div className="bg-white rounded-[22px] p-6 flex flex-col md:flex-row md:items-center justify-between gap-5" style={{ boxShadow: 'var(--sh-panel)' }}>
+      <div className="bg-white rounded-[18px] sm:rounded-[22px] p-4 sm:p-6 flex flex-col gap-4" style={{ boxShadow: 'var(--sh-panel)' }}>
         <div className="min-w-0">
-          <h1 className="text-[26px] font-bold tracking-[-0.03em] text-[#1d1d1f] flex items-center gap-2.5">
-            <BarChart3 className="w-6 h-6 text-[#0071e3]" />
+          <h1 className="text-[22px] sm:text-[26px] font-bold tracking-[-0.03em] text-[#1d1d1f] flex items-center gap-2.5">
+            <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-[#0071e3] shrink-0" />
             <span>总部多维汇总报表</span>
           </h1>
-          <p className="text-[13px] text-[#6e6e73] mt-1.5 leading-relaxed">横向对比各分公司上报数据、计算数值字段合计与平均值。审批中的数据可见但不参与统计。</p>
+          <p className="text-[12px] sm:text-[13px] text-[#6e6e73] mt-1.5 leading-relaxed">横向对比各分公司上报数据、计算数值字段合计与平均值。审批中的数据可见但不参与统计。</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {periods.length > 0 ? (
             <select value={selectedTemplateId} onChange={(e) => { const n = parseInt(e.target.value, 10); setSelectedTemplateId(n); }}
-              className="h-11 px-4 bg-[#f5f5f7] rounded-[12px] text-[13px] font-semibold text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white">
+              className="h-10 sm:h-11 px-3 sm:px-4 bg-[#f5f5f7] rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] font-semibold text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white flex-1 sm:flex-none min-w-0">
               {templates.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
             </select>
           ) : (
@@ -243,7 +243,7 @@ export const AggregationView: React.FC = () => {
           )}
           {periods.length > 0 ? (
             <select value={effectivePeriod} onChange={(e) => setSelectedPeriod(e.target.value)} disabled={periods.length === 1}
-              className="h-11 px-4 bg-[#f5f5f7] rounded-[12px] text-[13px] font-semibold text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white disabled:opacity-50">
+              className="h-10 sm:h-11 px-3 sm:px-4 bg-[#f5f5f7] rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] font-semibold text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white disabled:opacity-50 flex-1 sm:flex-none min-w-0">
               {periods.map((p) => (<option key={p} value={p}>{p}</option>))}
             </select>
           ) : (
@@ -252,15 +252,15 @@ export const AggregationView: React.FC = () => {
           {aggregationData && (
             <>
               <button onClick={copySummaryJSON} title="复制汇总指标 JSON"
-                className="h-11 px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5">
-                <Copy className="w-4 h-4" /><span>{copied ? '已复制' : '复制指标'}</span>
+                className="h-10 sm:h-11 px-4 sm:px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] text-[12px] sm:text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5 shrink-0">
+                <Copy className="w-4 h-4" /><span className="hidden sm:inline">{copied ? '已复制' : '复制指标'}</span>
               </button>
               <button onClick={exportExcel} title="导出 Excel 报表"
-                className="h-11 px-5 bg-[#0071e3] hover:bg-[#0066cc] text-white text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5">
-                <FileDown className="w-4 h-4" /><span>导出 Excel</span>
+                className="h-10 sm:h-11 px-4 sm:px-5 bg-[#0071e3] hover:bg-[#0066cc] text-white text-[12px] sm:text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5 shrink-0">
+                <FileDown className="w-4 h-4" /><span>导出</span>
               </button>
               <button onClick={loadHistory} title="查看填报历史版本"
-                className="h-11 px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5">
+                className="h-10 sm:h-11 px-4 sm:px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] text-[12px] sm:text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5 shrink-0">
                 <History className="w-4 h-4" /><span>历史</span>
               </button>
             </>
@@ -270,9 +270,9 @@ export const AggregationView: React.FC = () => {
 
       {/* Metric Overview — stat cards on white surface with hover lift */}
       {loading && !aggregationData ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white p-5 rounded-[18px] animate-pulse space-y-2" style={{ boxShadow: 'var(--sh-card)' }}>
+            <div key={i} className="bg-white p-4 sm:p-5 rounded-[14px] sm:rounded-[18px] animate-pulse space-y-2" style={{ boxShadow: 'var(--sh-card)' }}>
               <div className="h-3 bg-[#e8e8ed] rounded w-1/2" />
               <div className="h-7 bg-[#e8e8ed] rounded w-2/3" />
               <div className="h-3 bg-[#e8e8ed] rounded w-full" />
@@ -280,16 +280,16 @@ export const AggregationView: React.FC = () => {
           ))}
         </div>
       ) : metricCards.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {metricCards.map((mc) => (
-            <div key={mc.fieldName} className="apple-card bg-white p-5 rounded-[18px] space-y-2" style={{ boxShadow: 'var(--sh-card)' }}>
-              <div className="text-[13px] font-semibold text-[#6e6e73] flex items-center justify-between">
-                <span>{mc.fieldLabel} · 合计</span>
-                <Calculator className="w-4 h-4 text-[#aeaeb2]" />
+            <div key={mc.fieldName} className="apple-card bg-white p-4 sm:p-5 rounded-[14px] sm:rounded-[18px] space-y-2" style={{ boxShadow: 'var(--sh-card)' }}>
+              <div className="text-[12px] sm:text-[13px] font-semibold text-[#6e6e73] flex items-center justify-between">
+                <span className="truncate">{mc.fieldLabel} · 合计</span>
+                <Calculator className="w-4 h-4 text-[#aeaeb2] shrink-0" />
               </div>
-              <div className="text-[28px] font-bold tabular-nums text-[#1d1d1f] tracking-[-0.02em]">{mc.total.toLocaleString()}</div>
-              <div className="text-[12px] text-[#86868b] flex items-center justify-between pt-2 border-t border-[rgba(0,0,0,0.07)]">
-                <span>审批通过 {mc.count} 个</span>
+              <div className="text-[24px] sm:text-[28px] font-bold tabular-nums text-[#1d1d1f] tracking-[-0.02em]">{mc.total.toLocaleString()}</div>
+              <div className="text-[11px] sm:text-[12px] text-[#86868b] flex items-center justify-between pt-2 border-t border-[rgba(0,0,0,0.07)]">
+                <span>通过 {mc.count}</span>
                 <span className="tabular-nums">均值 {mc.average}</span>
               </div>
             </div>
@@ -311,15 +311,15 @@ export const AggregationView: React.FC = () => {
           </button>
         </div>
       ) : aggregationData ? (
-        <div className="space-y-5">
-          {/* Tab buttons — segmented control */}
-          <div className="flex gap-1 bg-[#f5f5f7] rounded-full p-1 w-fit" role="tablist">
+        <div className="space-y-4 sm:space-y-5">
+          {/* Tab buttons — segmented control, scrollable on mobile */}
+          <div className="flex gap-1 bg-[#f5f5f7] rounded-full p-1 w-fit max-w-full overflow-x-auto" role="tablist" style={{ scrollbarWidth: 'none' }}>
             {tabs.map((t) => {
               const Icon = t.icon;
               return (
                 <button key={t.key} role="tab" aria-selected={activeTab === t.key} onClick={() => setActiveTab(t.key)}
-                  className={`flex items-center gap-1.5 px-4 h-9 text-[13px] font-semibold rounded-full transition-all ${activeTab === t.key ? 'bg-white text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.04)]' : 'text-[#6e6e73] hover:text-[#1d1d1f]'}`}>
-                  <Icon className="w-4 h-4" /><span>{t.label}</span>
+                  className={`flex items-center gap-1.5 px-3 sm:px-4 h-9 text-[12px] sm:text-[13px] font-semibold rounded-full transition-all whitespace-nowrap ${activeTab === t.key ? 'bg-white text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.04)]' : 'text-[#6e6e73] hover:text-[#1d1d1f]'}`}>
+                  <Icon className="w-4 h-4 shrink-0" /><span>{t.label}</span>
                 </button>
               );
             })}
@@ -328,33 +328,33 @@ export const AggregationView: React.FC = () => {
           {/* Tab: Institutions */}
           {activeTab === 'institutions' && (
             <div role="tabpanel">
-              <div className="flex items-center justify-between mb-3 gap-3">
+              <div className="flex items-center justify-between mb-3 gap-2 sm:gap-3">
                 <input type="text" placeholder="搜索机构名称 / 编号..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 max-w-sm h-11 px-4 bg-[#f5f5f7] rounded-[12px] text-[13px] text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white" />
-                <span className="text-[12px] text-[#6e6e73] tabular-nums shrink-0">{aggregationData.company_data.length} 个机构 · 未提交 {uncodedCount}</span>
+                  className="flex-1 max-w-sm h-10 sm:h-11 px-3 sm:px-4 bg-[#f5f5f7] rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white" />
+                <span className="text-[11px] sm:text-[12px] text-[#6e6e73] tabular-nums shrink-0">{aggregationData.company_data.length} 个机构 · 未提交 {uncodedCount}</span>
               </div>
-              <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
+              <div className="bg-white rounded-[14px] sm:rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[13px]">
-                    <thead><tr className="bg-[#f5f5f7] text-[#6e6e73] text-[12px] font-semibold">
-                      <th className="p-4 w-40 text-left">机构</th>
-                      <th className="p-4 w-24 text-center">状态</th>
-                      {aggregationData.summary_fields.map((f) => (<th key={f.id} className="p-4 min-w-[110px] text-right font-semibold">{f.field_label}</th>))}
+                  <table className="w-full text-[12px] sm:text-[13px]">
+                    <thead><tr className="bg-[#f5f5f7] text-[#6e6e73] text-[11px] sm:text-[12px] font-semibold">
+                      <th className="p-3 sm:p-4 w-32 sm:w-40 text-left sticky left-0 bg-[#f5f5f7] z-10">机构</th>
+                      <th className="p-3 sm:p-4 w-20 sm:w-24 text-center">状态</th>
+                      {aggregationData.summary_fields.map((f) => (<th key={f.id} className="p-3 sm:p-4 min-w-[90px] sm:min-w-[110px] text-right font-semibold">{f.field_label}</th>))}
                     </tr></thead>
                     <tbody>
                       {filteredInst.length === 0 ? (
-                        <tr><td colSpan={aggregationData.summary_fields.length + 2} className="p-10 text-center text-[13px] text-[#aeaeb2]">无匹配机构</td></tr>
+                        <tr><td colSpan={aggregationData.summary_fields.length + 2} className="p-8 sm:p-10 text-center text-[12px] sm:text-[13px] text-[#aeaeb2]">无匹配机构</td></tr>
                       ) : filteredInst.map((c) => (
                         <tr key={c.company_id} className="hover:bg-[#fbfbfd] transition-colors" style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}>
-                          <td className="p-4">
-                            <div className="font-semibold text-[#1d1d1f]">{c.company_name}</div>
-                            <div className="text-[11px] text-[#86868b] tabular-nums mt-0.5">{c.company_code}</div>
+                          <td className="p-3 sm:p-4 sticky left-0 bg-white z-10 hover:bg-[#fbfbfd]">
+                            <div className="font-semibold text-[#1d1d1f] truncate">{c.company_name}</div>
+                            <div className="text-[10px] sm:text-[11px] text-[#86868b] tabular-nums mt-0.5">{c.company_code}</div>
                           </td>
-                          <td className="p-4 text-center">
-                            {c.has_submitted ? getStatusBadge(c.submission_status) : <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-[#86868b] bg-[#f5f5f7]">未提交</span>}
+                          <td className="p-3 sm:p-4 text-center">
+                            {c.has_submitted ? getStatusBadge(c.submission_status) : <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold text-[#86868b] bg-[#f5f5f7]">未提交</span>}
                           </td>
                           {aggregationData.summary_fields.map((f) => (
-                            <td key={f.id} className="p-4 text-right tabular-nums">
+                            <td key={f.id} className="p-3 sm:p-4 text-right tabular-nums">
                               {c.has_submitted && c.values[f.field_name] ? (
                                 f.field_type === 'number' ? <span className="text-[#1d1d1f]">{Number(c.values[f.field_name]).toLocaleString()}</span> : <span className="text-[#424245]">{c.values[f.field_name]}</span>
                               ) : <span className="text-[#d2d2d7]">—</span>}
@@ -366,15 +366,15 @@ export const AggregationView: React.FC = () => {
                     {metricCards.length > 0 && (
                       <tfoot>
                         <tr className="bg-[#f5f5f7] font-bold text-[#1d1d1f]" style={{ borderTop: '2px solid rgba(0,0,0,0.07)' }}>
-                          <td className="p-4" colSpan={2}>合计 / 均值</td>
+                          <td className="p-3 sm:p-4 sticky left-0 bg-[#f5f5f7] z-10" colSpan={2}>合计 / 均值</td>
                           {aggregationData.summary_fields.map((f) => {
                             const s = aggregationData.summary[f.field_name];
                             return (
-                              <td key={f.id} className="p-4 text-right">
+                              <td key={f.id} className="p-3 sm:p-4 text-right">
                                 {s ? (
                                   <div className="text-right">
-                                    <div className="text-[13px] font-bold text-[#1d1d1f] tabular-nums">合计 {s.total.toLocaleString()}</div>
-                                    <div className="text-[11px] text-[#6e6e73] tabular-nums mt-0.5">均值 {s.average}</div>
+                                    <div className="text-[12px] sm:text-[13px] font-bold text-[#1d1d1f] tabular-nums">合计 {s.total.toLocaleString()}</div>
+                                    <div className="text-[10px] sm:text-[11px] text-[#6e6e73] tabular-nums mt-0.5">均值 {s.average}</div>
                                   </div>
                                 ) : <span className="text-[#d2d2d7]">—</span>}
                               </td>
@@ -392,34 +392,34 @@ export const AggregationView: React.FC = () => {
           {/* Tab: Details */}
           {activeTab === 'details' && (
             <div role="tabpanel">
-              <div className="flex items-center justify-between mb-3 gap-3">
+              <div className="flex items-center justify-between mb-3 gap-2 sm:gap-3">
                 <input type="text" placeholder="搜索明细内容..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 max-w-sm h-11 px-4 bg-[#f5f5f7] rounded-[12px] text-[13px] text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white" />
-                <span className="text-[12px] text-[#6e6e73] tabular-nums shrink-0">{aggregationData.detail_rows.length} 行明细</span>
+                  className="flex-1 max-w-sm h-10 sm:h-11 px-3 sm:px-4 bg-[#f5f5f7] rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white" />
+                <span className="text-[11px] sm:text-[12px] text-[#6e6e73] tabular-nums shrink-0">{aggregationData.detail_rows.length} 行明细</span>
               </div>
               {aggregationData.detail_fields.length === 0 || filteredDet.length === 0 ? (
-                <div className="bg-white p-10 text-center rounded-[22px]" style={{ boxShadow: 'var(--sh-card)' }}>
+                <div className="bg-white p-8 sm:p-10 text-center rounded-[14px] sm:rounded-[22px]" style={{ boxShadow: 'var(--sh-card)' }}>
                   <FileSpreadsheet className="w-10 h-10 text-[#aeaeb2] mx-auto mb-2" />
-                  <div className="text-[13px] font-semibold text-[#424245]">{aggregationData.detail_fields.length === 0 ? '该模板无明细字段' : '无匹配明细行'}</div>
+                  <div className="text-[12px] sm:text-[13px] font-semibold text-[#424245]">{aggregationData.detail_fields.length === 0 ? '该模板无明细字段' : '无匹配明细行'}</div>
                 </div>
               ) : (
-                <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
+                <div className="bg-white rounded-[14px] sm:rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-[13px]">
-                      <thead><tr className="bg-[#f5f5f7] text-[#6e6e73] text-[12px] font-semibold">
-                        <th className="p-4 w-40 text-left">机构</th>
-                        <th className="p-4 w-14 text-center">#</th>
-                        <th className="p-4 w-24 text-center">状态</th>
-                        {aggregationData.detail_fields.map((df) => (<th key={df.id} className="p-4 min-w-[110px] text-right font-semibold">{df.field_label}</th>))}
+                    <table className="w-full text-[12px] sm:text-[13px]">
+                      <thead><tr className="bg-[#f5f5f7] text-[#6e6e73] text-[11px] sm:text-[12px] font-semibold">
+                        <th className="p-3 sm:p-4 w-32 sm:w-40 text-left sticky left-0 bg-[#f5f5f7] z-10">机构</th>
+                        <th className="p-3 sm:p-4 w-12 sm:w-14 text-center">#</th>
+                        <th className="p-3 sm:p-4 w-20 sm:w-24 text-center">状态</th>
+                        {aggregationData.detail_fields.map((df) => (<th key={df.id} className="p-3 sm:p-4 min-w-[90px] sm:min-w-[110px] text-right font-semibold">{df.field_label}</th>))}
                       </tr></thead>
                       <tbody>
                         {filteredDet.map((row, idx) => (
                           <tr key={idx} className="hover:bg-[#fbfbfd] transition-colors" style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}>
-                            <td className="p-4 font-semibold text-[#1d1d1f]">{row.company_name}</td>
-                            <td className="p-4 text-center text-[#86868b] tabular-nums">{row.row_index}</td>
-                            <td className="p-4 text-center">{row.submission_status ? getStatusBadge(row.submission_status) : <span className="text-[#d2d2d7]">—</span>}</td>
+                            <td className="p-3 sm:p-4 font-semibold text-[#1d1d1f] sticky left-0 bg-white z-10 hover:bg-[#fbfbfd] truncate">{row.company_name}</td>
+                            <td className="p-3 sm:p-4 text-center text-[#86868b] tabular-nums">{row.row_index}</td>
+                            <td className="p-3 sm:p-4 text-center">{row.submission_status ? getStatusBadge(row.submission_status) : <span className="text-[#d2d2d7]">—</span>}</td>
                             {aggregationData.detail_fields.map((df) => (
-                              <td key={df.id} className="p-4 text-right tabular-nums">{row[df.field_name] ? (df.field_type === 'number' ? <span className="text-[#1d1d1f]">{Number(row[df.field_name]).toLocaleString()}</span> : <span className="text-[#424245]">{row[df.field_name]}</span>) : <span className="text-[#d2d2d7]">—</span>}</td>
+                              <td key={df.id} className="p-3 sm:p-4 text-right tabular-nums">{row[df.field_name] ? (df.field_type === 'number' ? <span className="text-[#1d1d1f]">{Number(row[df.field_name]).toLocaleString()}</span> : <span className="text-[#424245]">{row[df.field_name]}</span>) : <span className="text-[#d2d2d7]">—</span>}</td>
                             ))}
                           </tr>
                         ))}
@@ -435,48 +435,45 @@ export const AggregationView: React.FC = () => {
           {activeTab === 'matrix' && (
             <div role="tabpanel" className="space-y-4">
               {matrixGroups.length === 0 ? (
-                <div className="bg-white p-10 text-center rounded-[22px]" style={{ boxShadow: 'var(--sh-card)' }}>
+                <div className="bg-white p-8 sm:p-10 text-center rounded-[14px] sm:rounded-[22px]" style={{ boxShadow: 'var(--sh-card)' }}>
                   <Grid3x3 className="w-10 h-10 text-[#aeaeb2] mx-auto mb-2" />
-                  <div className="text-[13px] font-semibold text-[#424245]">该模板暂无交叉表字段</div>
-                  <p className="text-[12px] text-[#86868b] mt-1">在模板编辑器中使用"创建交叉表"功能即可添加</p>
+                  <div className="text-[12px] sm:text-[13px] font-semibold text-[#424245]">该模板暂无交叉表字段</div>
+                  <p className="text-[11px] sm:text-[12px] text-[#86868b] mt-1">在模板编辑器中使用"创建交叉表"功能即可添加</p>
                 </div>
               ) : (
                 matrixGroups.map((group, gIdx) => (
-                  <div key={gIdx} className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
-                    <div className="px-5 py-4 border-b border-[rgba(0,0,0,0.07)]">
-                      <h3 className="text-[15px] font-bold tracking-[-0.01em] text-[#1d1d1f] flex items-center gap-2">
-                        <Grid3x3 className="w-4 h-4 text-[#6e6e73]" />
+                  <div key={gIdx} className="bg-white rounded-[14px] sm:rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
+                    <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[rgba(0,0,0,0.07)]">
+                      <h3 className="text-[14px] sm:text-[15px] font-bold tracking-[-0.01em] text-[#1d1d1f] flex items-center gap-2">
+                        <Grid3x3 className="w-4 h-4 text-[#6e6e73] shrink-0" />
                         <span>{group.rowLabel}交叉表</span>
                       </h3>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-[13px]">
+                      <table className="w-full text-[12px] sm:text-[13px]">
                         <thead>
-                          <tr className="bg-[#f5f5f7] text-[#6e6e73] text-[12px] font-semibold">
-                            <th className="p-4 w-40 text-left">机构</th>
-                            <th className="p-4 w-28 text-left">{group.rowLabel}</th>
+                          <tr className="bg-[#f5f5f7] text-[#6e6e73] text-[11px] sm:text-[12px] font-semibold">
+                            <th className="p-3 sm:p-4 w-32 sm:w-40 text-left sticky left-0 bg-[#f5f5f7] z-10">机构</th>
+                            <th className="p-3 sm:p-4 w-24 sm:w-28 text-left">{group.rowLabel}</th>
                             {group.columns.map((col) => (
-                              <th key={col.id} className="p-4 min-w-[110px] text-center font-semibold">{col.field_label}</th>
+                              <th key={col.id} className="p-3 sm:p-4 min-w-[90px] sm:min-w-[110px] text-center font-semibold">{col.field_label}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {filteredInst.flatMap((c) =>
                             group.rowOptions.map((rowOpt, rowIdx) => {
-                              // For each company, for each row option, get column values
                               return (
                                 <tr key={`${c.company_id}-${rowIdx}`} className="hover:bg-[#fbfbfd] transition-colors" style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}>
-                                  <td className="p-4 font-semibold text-[#1d1d1f]">{c.company_name}</td>
-                                  <td className="p-4 text-[#424245]">{rowOpt}</td>
+                                  <td className="p-3 sm:p-4 font-semibold text-[#1d1d1f] sticky left-0 bg-white z-10 hover:bg-[#fbfbfd] truncate">{c.company_name}</td>
+                                  <td className="p-3 sm:p-4 text-[#424245]">{rowOpt}</td>
                                   {group.columns.map((col) => {
-                                    // Matrix data is stored in detail_rows with row_index = rowIdx+1
-                                    // Find the matching detail row
                                     const detRow = aggregationData.detail_rows.find(
                                       (r) => r.company_name === c.company_name && r.row_index === rowIdx + 1
                                     );
                                     const val = detRow?.[col.field_name];
                                     return (
-                                      <td key={col.id} className="p-4 text-center tabular-nums">
+                                      <td key={col.id} className="p-3 sm:p-4 text-center tabular-nums">
                                         {val ? (
                                           col.field_type === 'number' ? (
                                             <span className="text-[#1d1d1f]">{Number(val).toLocaleString()}</span>
@@ -498,16 +495,16 @@ export const AggregationView: React.FC = () => {
                         {group.columns.some((c) => c.field_type === 'number') && (
                           <tfoot>
                             <tr className="bg-[#f5f5f7] font-bold text-[#1d1d1f]" style={{ borderTop: '2px solid rgba(0,0,0,0.07)' }}>
-                              <td className="p-4" colSpan={2}>合计</td>
+                              <td className="p-3 sm:p-4 sticky left-0 bg-[#f5f5f7] z-10" colSpan={2}>合计</td>
                               {group.columns.map((col) => {
-                                if (col.field_type !== 'number') return <td key={col.id} className="p-4 text-center text-[#d2d2d7]">—</td>;
+                                if (col.field_type !== 'number') return <td key={col.id} className="p-3 sm:p-4 text-center text-[#d2d2d7]">—</td>;
                                 const s = aggregationData.detail_summary[col.field_name];
                                 return (
-                                  <td key={col.id} className="p-4 text-center">
+                                  <td key={col.id} className="p-3 sm:p-4 text-center">
                                     {s ? (
                                       <div>
-                                        <div className="text-[13px] font-bold text-[#1d1d1f] tabular-nums">{s.total.toLocaleString()}</div>
-                                        <div className="text-[11px] text-[#6e6e73] tabular-nums mt-0.5">均值 {s.average}</div>
+                                        <div className="text-[12px] sm:text-[13px] font-bold text-[#1d1d1f] tabular-nums">{s.total.toLocaleString()}</div>
+                                        <div className="text-[10px] sm:text-[11px] text-[#6e6e73] tabular-nums mt-0.5">均值 {s.average}</div>
                                       </div>
                                     ) : <span className="text-[#d2d2d7]">—</span>}
                                   </td>

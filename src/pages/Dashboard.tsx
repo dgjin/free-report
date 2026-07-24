@@ -66,7 +66,7 @@ export const Dashboard: React.FC = () => {
     setReceiptComment('');
     setDetailLoading(true);
     try {
-      const detail = await api.getSubmissionDetail(item.submission_id);
+      const detail = await api.getSubmissionDetail(item.submission_id || item.id);
       setSubmissionDetail(detail);
     } catch (err: any) {
       showToast(err.message || '获取填报详情失败', 'error');

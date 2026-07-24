@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileSpreadsheet,
@@ -18,6 +18,7 @@ import {
 import { api, getStoredUser, removeToken } from '../services/api';
 import { UserInfo } from '../types';
 import { getClientAccess } from '../utils/access';
+import { mutate } from 'swr';
 
 export const Layout: React.FC = () => {
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
@@ -28,6 +29,7 @@ export const Layout: React.FC = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const outlet = useOutlet();
 
   useEffect(() => {
     fetchMe();
@@ -59,6 +61,17 @@ export const Layout: React.FC = () => {
       const data = await api.login(username, '123456');
       setUser(data.user);
       setAccountSwitchOpen(false);
+      // 清除所有 SWR 缓存，确保切换用户后各页面按新权限重新获取数据
+      await mutate(() => true, undefined, { revalidate: false });
+      // 更新待审批计数
+      if (data.user.company_level === 'branch') {
+        try {
+          const pending = await api.getPendingApprovals();
+          setPendingCount(pending.length);
+        } catch { setPendingCount(0); }
+      } else {
+        setPendingCount(0);
+      }
       navigate('/');
     } catch (err: any) {
       alert(err.message || '切换账号失败');
@@ -330,7 +343,7 @@ export const Layout: React.FC = () => {
 
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto">
-          <Outlet />
+          {outlet ? React.cloneElement(outlet, { key: user?.username || 'guest' }) : <Outlet />}
         </main>
       </div>
 

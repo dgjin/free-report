@@ -629,7 +629,7 @@ export class Database {
   }
 
   async getPendingReceipts(departmentId: number): Promise<PendingReceipt[]> {
-    return all<PendingReceipt>(this.pool(), `SELECT s.id,s.assignment_id,s.version,a.period_label,u.display_name submitted_by_name,s.comment,
+    return all<PendingReceipt>(this.pool(), `SELECT s.id,s.id AS submission_id,s.assignment_id,s.version,a.period_label,u.display_name submitted_by_name,s.comment,
       a.title assignment_title,t.name template_name,c.name company_name,s.submitted_at
       FROM report_submissions s JOIN report_assignments a ON a.id=s.assignment_id
       JOIN report_templates t ON t.id=a.template_id JOIN companies c ON c.id=s.submitted_by_company_id
