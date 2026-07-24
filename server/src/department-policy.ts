@@ -21,7 +21,7 @@ export function canReadAssignment(user: AccessUser, assignment: ScopedAssignment
 
 export function canWriteAssignment(user: AccessUser, assignment: ScopedAssignment): boolean {
   if (isSuperAdminReadOnly(user) || user.company_id !== assignment.assigned_to_company_id) return false;
-  return ['handler', 'branch_admin', 'department_report_admin'].includes(user.role);
+  return ['handler', 'branch_admin'].includes(user.role);
 }
 
 export function canReceiveSubmission(user: AccessUser, assignment: ScopedAssignment): boolean {

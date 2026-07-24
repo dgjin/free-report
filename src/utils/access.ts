@@ -7,7 +7,7 @@ export function getClientAccess(user: Pick<UserInfo, 'role' | 'company_level'>) 
     isSuperAdmin,
     isDepartmentAdmin,
     canManageTemplates: isDepartmentAdmin,
-    canFill: !isSuperAdmin && ['handler', 'branch_admin', 'department_report_admin'].includes(user.role),
+    canFill: !isSuperAdmin && ['handler', 'branch_admin'].includes(user.role),
     canReceive: isDepartmentAdmin,
     canManageOrganizations: isSuperAdmin,
   };

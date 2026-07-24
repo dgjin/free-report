@@ -32,8 +32,7 @@ type AccessUser = Pick<User, 'id' | 'company_id' | 'role'> & {
 
 function isHeadquarterUser(user: AccessUser): boolean {
   return user.company_level === 'headquarter' ||
-    user.role === 'super_admin' ||
-    user.role === 'headquarter_admin';
+    user.role === 'super_admin';
 }
 
 export function canReadAssignment(user: AccessUser, assignment: ReportAssignment): boolean {
@@ -86,6 +85,15 @@ async function toAuthenticatedUser(user: User): Promise<AuthenticatedUser> {
   };
 }
 
+// --- Auth cache: avoid 2 DB queries per request (getUserById + getCompanyById) ---
+const AUTH_CACHE_TTL_MS = 30_000; // 30 seconds
+const authCache = new Map<number, { user: User; authenticatedUser: AuthenticatedUser; expiresAt: number }>();
+
+export function invalidateAuthCache(userId?: number): void {
+  if (userId !== undefined) authCache.delete(userId);
+  else authCache.clear();
+}
+
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -95,11 +103,26 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   const token = authHeader.substring(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
+
+    // Check cache first
+    const cached = authCache.get(decoded.id);
+    if (cached && Date.now() < cached.expiresAt && cached.user.status === 'active') {
+      req.user = cached.authenticatedUser;
+      return next();
+    }
+    authCache.delete(decoded.id);
+
     const currentUser = await db.getUserById(decoded.id);
     if (!currentUser || currentUser.status !== 'active') {
       return res.status(401).json({ error: '账号不存在或已停用，请重新登录' });
     }
-    req.user = await toAuthenticatedUser(currentUser);
+    const authenticatedUser = await toAuthenticatedUser(currentUser);
+    authCache.set(decoded.id, {
+      user: currentUser,
+      authenticatedUser,
+      expiresAt: Date.now() + AUTH_CACHE_TTL_MS,
+    });
+    req.user = authenticatedUser;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Token 无效或已过期，请重新登录' });

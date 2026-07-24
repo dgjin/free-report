@@ -235,6 +235,7 @@ export class TransactionalTemplatePool {
         assigned_to_company_id: Number(assigned_to_company_id),
         title,
         period_label,
+        is_one_time: 0,
         deadline,
         status: 'pending',
         assigned_by: Number(assigned_by),

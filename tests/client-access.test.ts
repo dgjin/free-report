@@ -10,5 +10,5 @@ test('client access reflects super admin read-only and department roles', () => 
   const department = getClientAccess({ role: 'department_report_admin', company_level: 'department' } as any);
   assert.equal(department.canManageTemplates, true);
   assert.equal(department.canReceive, true);
-  assert.equal(department.canFill, true);
+  assert.equal(department.canFill, false);
 });

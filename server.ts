@@ -3,8 +3,8 @@ import 'express-async-errors';
 import express, { Request, Response } from 'express';
 import path from 'path';
 import cors from 'cors';
+import compression from 'compression';
 import bcrypt from 'bcryptjs';
-import { createServer as createViteServer } from 'vite';
 
 import companiesRouter from './server/src/routes/companies';
 import templatesRouter from './server/src/routes/templates';
@@ -38,7 +38,8 @@ async function startServer() {
       }
     },
   }));
-  app.use(express.json());
+  app.use(compression());
+  app.use(express.json({ limit: '2mb' }));
 
   // Auth Routes
   app.post('/api/auth/login', async (req: Request, res: Response) => {
@@ -57,7 +58,7 @@ async function startServer() {
       return res.status(403).json({ error: '该账号已被停用' });
     }
 
-    const isValid = bcrypt.compareSync(password, user.password_hash);
+    const isValid = await bcrypt.compare(password, user.password_hash);
     if (!isValid) {
       return res.status(401).json({ error: '用户名或密码错误' });
     }
@@ -110,14 +111,8 @@ async function startServer() {
     });
   });
 
-  // Vite Middleware for SPA development
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
+  // Serve static files in production
+  if (process.env.NODE_ENV === 'production') {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req: Request, res: Response) => {
@@ -125,8 +120,9 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[FreeReport Server] Server running at http://0.0.0.0:${PORT}`);
+  const API_PORT = Number(process.env.API_PORT || 3001);
+  app.listen(API_PORT, '0.0.0.0', () => {
+    console.log(`[FreeReport Server] API server running at http://0.0.0.0:${API_PORT}`);
   });
 }
 

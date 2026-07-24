@@ -13,7 +13,6 @@ import {
   Menu,
   X,
   RefreshCw,
-  Bell,
   Shield,
 } from 'lucide-react';
 import { api, getStoredUser, removeToken } from '../services/api';
@@ -25,12 +24,16 @@ export const Layout: React.FC = () => {
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [accountSwitchOpen, setAccountSwitchOpen] = useState<boolean>(false);
+  const [scrolled, setScrolled] = useState<boolean>(false);
 
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchMe();
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, [location.pathname]);
 
   const fetchMe = async () => {
@@ -67,7 +70,6 @@ export const Layout: React.FC = () => {
 
   const roleLabels: Record<string, string> = {
     super_admin: '超级管理员',
-    headquarter_admin: '总部管理员',
     department_report_admin: '部门报表管理员',
     branch_admin: '分公司管理员',
     handler: '经办人',
@@ -76,111 +78,135 @@ export const Layout: React.FC = () => {
   };
 
   const quickAccounts = import.meta.env.DEV ? [
-    { username: 'admin', label: '总部 - 超级管理员', company: '总部' },
-    { username: 'hq_admin', label: '总部 - 总部管理员', company: '总部' },
-    { username: 'bj_handler', label: '北京 - 经办人', company: '北京分公司' },
-    { username: 'bj_reviewer', label: '北京 - 复核人', company: '北京分公司' },
-    { username: 'bj_approver', label: '北京 - 审批人', company: '北京分公司' },
-    { username: 'sh_handler', label: '上海 - 经办人', company: '上海分公司' },
-    { username: 'sh_reviewer', label: '上海 - 复核人', company: '上海分公司' },
-    { username: 'sh_approver', label: '上海 - 审批人', company: '上海分公司' },
+    { username: 'admin', label: '超级管理员', company: '总部' },
+    { username: 'hq_admin', label: '报表管理员', company: '业务综合管理部' },
+    { username: 'office_admin', label: '报表管理员', company: '办公室' },
+    { username: 'risk_admin', label: '报表管理员', company: '风险管理部' },
+    { username: 'bj_handler', label: '经办人', company: '北京分公司' },
+    { username: 'bj_reviewer', label: '复核人', company: '北京分公司' },
+    { username: 'bj_approver', label: '审批人', company: '北京分公司' },
+    { username: 'sh_handler', label: '经办人', company: '上海分公司' },
+    { username: 'sh_reviewer', label: '复核人', company: '上海分公司' },
+    { username: 'sh_approver', label: '审批人', company: '上海分公司' },
   ] : [];
 
+  const navLinkClass = (active: boolean) =>
+    `flex items-center justify-between px-3.5 py-2.5 rounded-[10px] text-[13px] font-medium transition-colors ${
+      active
+        ? 'bg-[#f5f5f7] text-[#1d1d1f] font-semibold'
+        : 'text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]'
+    }`;
+
+  const navIconClass = (active: boolean) =>
+    `w-4 h-4 ${active ? 'text-[#0071e3]' : 'text-[#86868b]'}`;
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
-      {/* Top Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+      {/* Glass sticky nav — the one place glass is mandatory */}
+      <header
+        className="sticky top-0 z-40"
+        style={{
+          background: 'rgba(245,245,247,0.72)',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          borderBottom: scrolled ? '1px solid var(--hairline)' : '1px solid transparent',
+          boxShadow: scrolled ? '0 1px 12px rgba(0,0,0,0.04)' : 'none',
+          transition: 'border-color .3s, box-shadow .3s',
+        }}
+      >
+        <div className="max-w-[1080px] mx-auto px-[22px] h-[54px] flex items-center justify-between gap-4">
           {/* Logo & Mobile Menu Toggle */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 focus:outline-none"
+              className="md:hidden p-2 rounded-[8px] text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] focus:outline-none"
             >
-              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <div className="flex items-center space-x-2.5 cursor-pointer" onClick={() => navigate('/')}>
-              <div className="w-8 h-8 bg-indigo-600 rounded-lg text-white font-bold flex items-center justify-center shadow-xs">
-                <FileSpreadsheet className="w-5 h-5" />
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+              <div className="w-7 h-7 rounded-[8px] flex items-center justify-center" style={{ background: 'var(--grad-cta)' }}>
+                <FileSpreadsheet className="w-4 h-4 text-white" />
               </div>
-              <div className="flex items-center">
-                <span className="font-bold text-slate-800 text-xl tracking-tight">
-                  自由报表
-                </span>
-                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-semibold uppercase tracking-wider ml-2 border border-slate-200">
-                  FreeReport v0.1
-                </span>
-              </div>
+              <span className="font-semibold text-[15px] text-[#1d1d1f] tracking-[-0.01em]">自由报表</span>
+              <span className="px-1.5 py-0.5 bg-[#e8e8ed] text-[#86868b] rounded-[4px] text-[9px] font-bold uppercase tracking-wider">
+                v0.1
+              </span>
             </div>
           </div>
 
           {/* Right Profile & Quick Switcher */}
-          <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="flex items-center gap-3">
             {/* Quick Switch Demo Button */}
-            {import.meta.env.DEV && <div className="relative">
-              <button
-                onClick={() => setAccountSwitchOpen(!accountSwitchOpen)}
-                className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-xs"
-                title="快速切换测试账号"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
-                <span className="hidden sm:inline">切换视角</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
+            {import.meta.env.DEV && (
+              <div className="relative">
+                <button
+                  onClick={() => setAccountSwitchOpen(!accountSwitchOpen)}
+                  className="flex items-center gap-1.5 h-8 px-3 text-[12px] font-medium text-[#424245] bg-white/60 hover:bg-white border border-[#e8e8ed] rounded-full transition-colors"
+                  style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+                  title="快速切换测试账号"
+                >
+                  <RefreshCw className="w-3 h-3 text-[#0071e3]" />
+                  <span className="hidden sm:inline">切换视角</span>
+                  <ChevronDown className="w-3 h-3 text-[#aeaeb2]" />
+                </button>
 
-              {accountSwitchOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white text-slate-800 rounded-xl shadow-lg border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
-                  <div className="px-3 py-1.5 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                    <span>快捷切换多身份（免密码）</span>
-                    <Shield className="w-3.5 h-3.5 text-indigo-600" />
+                {accountSwitchOpen && (
+                  <div
+                    className="absolute right-0 mt-2 w-64 bg-white rounded-[14px] py-2 z-50"
+                    style={{ boxShadow: 'var(--sh-overlay)', border: '1px solid var(--hairline)' }}
+                  >
+                    <div className="px-3 py-1.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--hairline)' }}>
+                      <span className="text-[11px] font-semibold text-[#86868b] uppercase tracking-wider">快捷切换多身份</span>
+                      <Shield className="w-3.5 h-3.5 text-[#0071e3]" />
+                    </div>
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {quickAccounts.map((acc) => {
+                        const isCurrent = user?.username === acc.username;
+                        return (
+                          <button
+                            key={acc.username}
+                            onClick={() => handleQuickSwitch(acc.username)}
+                            className={`w-full text-left px-3 py-2 text-[12px] flex items-center justify-between hover:bg-[#f5f5f7] transition-colors ${
+                              isCurrent ? 'bg-[#f5f5f7] text-[#0071e3] font-semibold' : 'text-[#424245]'
+                            }`}
+                          >
+                            <div>
+                              <div>{acc.label}</div>
+                              <div className="text-[10px] text-[#aeaeb2]">{acc.company}</div>
+                            </div>
+                            {isCurrent && <UserCheck className="w-4 h-4 text-[#0071e3]" />}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="max-h-64 overflow-y-auto py-1">
-                    {quickAccounts.map((acc) => {
-                      const isCurrent = user?.username === acc.username;
-                      return (
-                        <button
-                          key={acc.username}
-                          onClick={() => handleQuickSwitch(acc.username)}
-                          className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-indigo-50/80 transition-colors ${
-                            isCurrent ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700'
-                          }`}
-                        >
-                          <div>
-                            <div>{acc.label}</div>
-                            <div className="text-[10px] text-slate-400">{acc.company}</div>
-                          </div>
-                          {isCurrent && <UserCheck className="w-4 h-4 text-indigo-600" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>}
+                )}
+              </div>
+            )}
 
-            {/* Current User Info Badge */}
+            {/* Current User Info */}
             {user && (
-              <div className="flex items-center space-x-2.5 pl-3 border-l border-slate-200">
+              <div className="flex items-center gap-2.5 pl-3" style={{ borderLeft: '1px solid var(--hairline)' }}>
                 <div className="hidden sm:block text-right">
-                  <div className="text-xs font-semibold text-slate-800 flex items-center justify-end space-x-1">
-                    <Building2 className="w-3 h-3 text-slate-400" />
+                  <div className="text-[12px] font-semibold text-[#1d1d1f] flex items-center justify-end gap-1">
+                    <Building2 className="w-3 h-3 text-[#aeaeb2]" />
                     <span>{user.company_name}</span>
                   </div>
-                  <div className="text-[11px] text-slate-500">
+                  <div className="text-[11px] text-[#86868b]">
                     {user.display_name} ({roleLabels[user.role] || user.role})
                   </div>
                 </div>
 
-                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[12px] text-white" style={{ background: 'var(--grad-cta)' }}>
                   {user.display_name ? user.display_name.charAt(0) : 'U'}
                 </div>
 
                 <button
                   onClick={handleLogout}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-1.5 text-[#aeaeb2] hover:text-[#ff6b00] hover:bg-[#f5f5f7] rounded-[8px] transition-colors"
                   title="退出登录"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={15} />
                 </button>
               </div>
             )}
@@ -189,49 +215,38 @@ export const Layout: React.FC = () => {
       </header>
 
       {/* Main Container */}
-      <div className="max-w-7xl w-full mx-auto flex-1 flex">
+      <div className="max-w-[1080px] w-full mx-auto flex-1 flex">
         {/* Sidebar Navigation */}
         <aside
           className={`fixed inset-y-0 left-0 transform ${
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          } md:relative md:translate-x-0 transition duration-200 ease-in-out z-30 w-60 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 top-16 md:top-0`}
+          } md:relative md:translate-x-0 transition duration-200 ease-in-out z-30 w-60 bg-white flex flex-col justify-between shrink-0 top-[54px] md:top-0`}
+          style={{ borderRight: '1px solid var(--hairline)' }}
         >
-          <div className="p-4 space-y-6">
+          <div className="p-4 space-y-5">
             {/* View Context Badge */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center space-x-3">
-              <div
-                className={`p-2 rounded-lg text-white ${
-                  isHQ ? 'bg-indigo-600' : 'bg-emerald-600'
-                }`}
-              >
+            <div className="p-3 bg-[#f5f5f7] rounded-[12px] flex items-center gap-3">
+              <div className="p-2 rounded-[8px] text-white" style={{ background: 'var(--grad-cta)' }}>
                 <Building2 className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-[11px] text-slate-500 font-medium">当前控制视角</div>
-                <div className="text-xs font-bold text-slate-800">
-                  {isHQ ? '总部工作平台' : `${user?.company_name || '分公司'}平台`}
+                <div className="text-[11px] text-[#86868b] font-medium">当前控制视角</div>
+                <div className="text-[13px] font-semibold text-[#1d1d1f]">
+                  {isHQ ? `${user?.company_name || '总部'}工作平台` : `${user?.company_name || '分公司'}平台`}
                 </div>
               </div>
             </div>
 
             {/* Navigation Menu */}
-            <nav className="space-y-1">
-              <div className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <nav className="space-y-0.5">
+              <div className="px-3.5 pb-2 text-[10px] font-bold text-[#aeaeb2] uppercase tracking-wider">
                 功能导航
               </div>
 
               {/* Common Dashboard */}
-              <Link
-                to="/"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
-                  location.pathname === '/'
-                    ? 'bg-indigo-50 text-indigo-700 font-bold'
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <LayoutDashboard className={`w-4 h-4 ${location.pathname === '/' ? 'text-indigo-600' : 'text-slate-400'}`} />
+              <Link to="/" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname === '/')}>
+                <div className="flex items-center gap-3">
+                  <LayoutDashboard className={navIconClass(location.pathname === '/')} />
                   <span>工作台</span>
                 </div>
               </Link>
@@ -239,91 +254,64 @@ export const Layout: React.FC = () => {
               {/* Headquarters Specific Routes */}
               {isHQ && (
                 <>
-                  <Link
-                    to="/templates"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
-                      location.pathname.startsWith('/templates')
-                        ? 'bg-indigo-50 text-indigo-700 font-bold'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <FileSpreadsheet className={`w-4 h-4 ${location.pathname.startsWith('/templates') ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  <Link to="/templates" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/templates'))}>
+                    <div className="flex items-center gap-3">
+                      <FileSpreadsheet className={navIconClass(location.pathname.startsWith('/templates'))} />
                       <span>模板管理</span>
                     </div>
                   </Link>
 
-                  <Link
-                    to="/assignments"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
-                      location.pathname.startsWith('/assignments')
-                        ? 'bg-indigo-50 text-indigo-700 font-bold'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Send className={`w-4 h-4 ${location.pathname.startsWith('/assignments') ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  <Link to="/assignments" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/assignments'))}>
+                    <div className="flex items-center gap-3">
+                      <Send className={navIconClass(location.pathname.startsWith('/assignments'))} />
                       <span>下发管理</span>
                     </div>
                   </Link>
 
-                  <Link
-                    to="/aggregation"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
-                      location.pathname.startsWith('/aggregation')
-                        ? 'bg-indigo-50 text-indigo-700 font-bold'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <BarChart3 className={`w-4 h-4 ${location.pathname.startsWith('/aggregation') ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  <Link to="/aggregation" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/aggregation'))}>
+                    <div className="flex items-center gap-3">
+                      <BarChart3 className={navIconClass(location.pathname.startsWith('/aggregation'))} />
                       <span>汇总报表</span>
                     </div>
                   </Link>
                 </>
               )}
 
-              {access?.canReceive && <Link to="/receipts" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><CheckSquare className="w-4 h-4"/><span>签收中心</span></Link>}
-              {isHQ && <Link to="/fill" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><FileSpreadsheet className="w-4 h-4"/><span>收到的任务</span></Link>}
-              {access?.canManageOrganizations && <Link to="/organizations" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><Building2 className="w-4 h-4"/><span>机构管理</span></Link>}
-              {access?.isSuperAdmin && <Link to="/global-view" onClick={() => setMobileMenuOpen(false)} className="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><Shield className="w-4 h-4"/><span>全局查看</span></Link>}
+              {access?.canManageOrganizations && (
+                <Link to="/organizations" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/organizations'))}>
+                  <div className="flex items-center gap-3">
+                    <Building2 className={navIconClass(location.pathname.startsWith('/organizations'))} />
+                    <span>机构管理</span>
+                  </div>
+                </Link>
+              )}
+
+              {access?.isSuperAdmin && (
+                <Link to="/global-view" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/global-view'))}>
+                  <div className="flex items-center gap-3">
+                    <Shield className={navIconClass(location.pathname.startsWith('/global-view'))} />
+                    <span>全局查看</span>
+                  </div>
+                </Link>
+              )}
 
               {/* Branch Specific Routes */}
               {!isHQ && !access?.isSuperAdmin && (
                 <>
-                  <Link
-                    to="/fill"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
-                      location.pathname.startsWith('/fill')
-                        ? 'bg-indigo-50 text-indigo-700 font-bold'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <FileSpreadsheet className={`w-4 h-4 ${location.pathname.startsWith('/fill') ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  <Link to="/fill" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/fill'))}>
+                    <div className="flex items-center gap-3">
+                      <FileSpreadsheet className={navIconClass(location.pathname.startsWith('/fill'))} />
                       <span>报表填报</span>
                     </div>
                   </Link>
 
-                  <Link
-                    to="/approvals"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
-                      location.pathname.startsWith('/approvals')
-                        ? 'bg-indigo-50 text-indigo-700 font-bold'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <CheckSquare className={`w-4 h-4 ${location.pathname.startsWith('/approvals') ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  <Link to="/approvals" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/approvals'))}>
+                    <div className="flex items-center gap-3">
+                      <CheckSquare className={navIconClass(location.pathname.startsWith('/approvals'))} />
                       <span>审批中心</span>
                     </div>
                     {pendingCount > 0 && (
-                      <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+                      <span className="text-[#ff6b00] bg-[rgba(255,107,0,0.1)] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
                         {pendingCount}
                       </span>
                     )}
@@ -334,17 +322,26 @@ export const Layout: React.FC = () => {
           </div>
 
           {/* Quick Info Footer */}
-          <div className="p-4 border-t border-slate-200/80 bg-slate-50/50 text-[11px] text-slate-500 space-y-1">
-            <div className="font-semibold text-slate-700">自由报表 FreeReport v0.1.0</div>
-            <div className="text-slate-400">系统状态: 本地 MySQL 运行正常</div>
+          <div className="p-4 space-y-1" style={{ borderTop: '1px solid var(--hairline)' }}>
+            <div className="text-[11px] font-semibold text-[#1d1d1f]">自由报表 FreeReport v0.1.0</div>
+            <div className="text-[10px] text-[#aeaeb2]">系统状态: 本地 MySQL 运行正常</div>
           </div>
         </aside>
 
         {/* Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>
+
+      {/* Mobile overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-20 md:hidden"
+          style={{ background: 'rgba(0,0,0,0.2)' }}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
     </div>
   );
 };

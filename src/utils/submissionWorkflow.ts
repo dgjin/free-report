@@ -7,7 +7,6 @@ const views: Record<SubmissionStatus, { label: string; color: string; isReadOnly
   pending_receipt: { label: '已提交 · 待发起部门签收', color: 'bg-amber-50 text-amber-700', isReadOnly: true },
   received: { label: '发起部门已签收', color: 'bg-emerald-50 text-emerald-700', isReadOnly: true },
   returned: { label: '已退回 · 请修改后重新提交', color: 'bg-rose-50 text-rose-700', isReadOnly: false },
-  approved: { label: '终审通过 · 报表归档', color: 'bg-emerald-50 text-emerald-700', isReadOnly: true },
   rejected: { label: '被驳回 · 需修正后重新提交', color: 'bg-rose-50 text-rose-700', isReadOnly: false },
 };
 

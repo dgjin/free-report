@@ -28,7 +28,7 @@ export function readMysqlConfig(env: NodeJS.ProcessEnv = process.env): MysqlConf
     password: env.MYSQL_PASSWORD!,
     ssl: env.MYSQL_SSL?.toLowerCase() === 'true' ? { rejectUnauthorized: true } : undefined,
     waitForConnections: true,
-    connectionLimit: Number(env.MYSQL_CONNECTION_LIMIT || 10),
+    connectionLimit: Number(env.MYSQL_CONNECTION_LIMIT || 25),
     queueLimit: 0,
     charset: 'utf8mb4',
     timezone: 'Z',

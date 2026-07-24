@@ -50,14 +50,33 @@ router.get('/by-template/:templateId', authMiddleware, async (req: Request, res:
 
   const allFields = (await db.getTemplateFields(templateId)).filter((f) => f.status === 'active');
   const summaryFields = allFields.filter((f) => f.data_type === 'summary');
-  const detailFields = allFields.filter((f) => f.data_type === 'detail');
+  const detailFields = allFields.filter((f) => f.data_type === 'detail' || f.data_type === 'matrix');
+
+  // Filter assignments and companies at SQL level instead of loading all rows
+  const periodAssignments = await db.getAssignmentsByTemplateAndPeriod(templateId, periodLabel);
+  const companyIds = [...new Set(periodAssignments.map((a) => a.assigned_to_company_id))];
+  const periodCompanies = await db.getCompaniesByIds(companyIds);
 
   const targets = selectAggregationTargets(
-    await db.getAssignments(),
-    await db.getCompanies(),
+    periodAssignments,
+    periodCompanies,
     templateId,
     periodLabel,
   );
+
+  // Batch fetch latest approved submissions and their data (2 queries instead of 2N)
+  const assignmentIds = targets.map((t) => t.assignment.id);
+  const latestApprovedSubs = await db.getLatestApprovedSubmissionsByAssignmentIds(assignmentIds);
+  const latestSubByAssignmentId = new Map(latestApprovedSubs.map((s) => [s.assignment_id, s]));
+  const submissionIds = latestApprovedSubs.map((s) => s.id);
+  const allSubmissionData = await db.getSubmissionDataBySubmissionIds(submissionIds);
+  const submissionDataBySubmissionId = new Map<number, typeof allSubmissionData>();
+  for (const data of allSubmissionData) {
+    if (!submissionDataBySubmissionId.has(data.submission_id)) {
+      submissionDataBySubmissionId.set(data.submission_id, []);
+    }
+    submissionDataBySubmissionId.get(data.submission_id)!.push(data);
+  }
 
   const companyDataList: any[] = [];
   const mergedDetailRows: any[] = [];
@@ -76,6 +95,8 @@ router.get('/by-template/:templateId', authMiddleware, async (req: Request, res:
     }
   });
 
+  const APPROVED_STATUSES = ['pending_receipt', 'received'];
+
   for (const { assignment, company } of targets) {
     const companyItem: any = {
       company_id: company.id,
@@ -88,13 +109,15 @@ router.get('/by-template/:templateId', authMiddleware, async (req: Request, res:
       values: {},
     };
 
-    const latestSub = await db.getLatestApprovedSubmissionByAssignment(assignment.id);
+    const latestSub = latestSubByAssignmentId.get(assignment.id);
     if (latestSub) {
       companyItem.has_submitted = true;
       companyItem.submission_status = latestSub.status;
       companyItem.submission_version = latestSub.version;
 
-      const rawData = await db.getSubmissionData(latestSub.id);
+      // Only approved submissions contribute to numeric statistics
+      const isApproved = APPROVED_STATUSES.includes(latestSub.status);
+      const rawData = submissionDataBySubmissionId.get(latestSub.id) || [];
 
       // Parse summary values
       rawData
@@ -104,7 +127,7 @@ router.get('/by-template/:templateId', authMiddleware, async (req: Request, res:
           if (field) {
             companyItem.values[field.field_name] = d.value;
 
-            if (field.field_type === 'number' && d.value !== '' && !isNaN(Number(d.value))) {
+            if (isApproved && field.field_type === 'number' && d.value !== '' && !isNaN(Number(d.value))) {
               const val = Number(d.value);
               summaryStats[field.field_name].total += val;
               summaryStats[field.field_name].count += 1;
@@ -124,11 +147,12 @@ router.get('/by-template/:templateId', authMiddleware, async (req: Request, res:
                 company_name: company.name,
                 company_code: company.code,
                 row_index: d.row_index,
+                submission_status: latestSub.status,
               };
             }
             detailRowsMap[d.row_index][field.field_name] = d.value;
 
-            if (field.field_type === 'number' && d.value !== '' && !isNaN(Number(d.value))) {
+            if (isApproved && field.field_type === 'number' && d.value !== '' && !isNaN(Number(d.value))) {
               const val = Number(d.value);
               detailStats[field.field_name].total += val;
               detailStats[field.field_name].count += 1;
@@ -184,11 +208,24 @@ router.get('/history/:templateId', authMiddleware, async (req: Request, res: Res
   const templateId = parseInt(req.params.templateId, 10);
   const template = await db.getTemplateById(templateId);
   if (!template || !canReadTemplate(req.user!, { owner_department_id: template.owner_department_id! })) return res.status(404).json({ error: '模板不存在' });
-  const assignments = (await db.getAssignments()).filter((a) => a.template_id === templateId);
-  const allSubmissions = await db.getSubmissions();
 
-  const history = await Promise.all(assignments.map(async (a) => {
-    const company = await db.getCompanyById(a.assigned_to_company_id);
+  // Filter at SQL level instead of loading all assignments + all submissions
+  const assignments = await db.getAssignmentsByTemplateId(templateId);
+  const assignmentIds = assignments.map((a) => a.id);
+  const companyIds = [...new Set(assignments.map((a) => a.assigned_to_company_id))];
+  const allSubmissions = await db.getSubmissionsByAssignmentIds(assignmentIds);
+
+  // Batch fetch companies and submitters (2 queries instead of N+M)
+  const submitterIds = [...new Set(allSubmissions.map((s) => s.submitted_by))];
+  const [companies, submitters] = await Promise.all([
+    db.getCompaniesByIds(companyIds),
+    db.getUsersByIds(submitterIds),
+  ]);
+  const companyMap = new Map(companies.map((c) => [c.id, c]));
+  const submitterMap = new Map(submitters.map((u) => [u.id, u]));
+
+  const history = assignments.map((a) => {
+    const company = companyMap.get(a.assigned_to_company_id);
     const submissions = allSubmissions.filter((s) => s.assignment_id === a.id);
 
     return {
@@ -199,8 +236,8 @@ router.get('/history/:templateId', authMiddleware, async (req: Request, res: Res
       company_code: company ? company.code : '',
       deadline: a.deadline,
       status: a.status,
-      submissions_history: await Promise.all(submissions.map(async (s) => {
-        const submitter = await db.getUserById(s.submitted_by);
+      submissions_history: submissions.map((s) => {
+        const submitter = submitterMap.get(s.submitted_by);
         return {
           submission_id: s.id,
           version: s.version,
@@ -209,9 +246,9 @@ router.get('/history/:templateId', authMiddleware, async (req: Request, res: Res
           submitted_at: s.submitted_at || s.created_at,
           comment: s.comment,
         };
-      })),
+      }),
     };
-  }));
+  });
 
   res.json(history);
 });

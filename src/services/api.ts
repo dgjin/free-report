@@ -1,3 +1,4 @@
+import useSWR from 'swr';
 import {
   UserInfo,
   Company,
@@ -6,6 +7,7 @@ import {
   ReportAssignment,
   ReportSubmissionDetail,
   PendingApprovalTask,
+  PendingReceipt,
   AggregationResponse,
 } from '../types';
 
@@ -100,7 +102,7 @@ export const api = {
   async updateUserOrganizationRole(id: number, company_id: number, role: string): Promise<any> {
     return request(`/api/users/${id}/organization-role`, { method: 'PUT', body: JSON.stringify({ company_id, role }) });
   },
-  async getPendingReceipts(): Promise<any[]> { return request('/api/receipts/pending'); },
+  async getPendingReceipts(): Promise<PendingReceipt[]> { return request('/api/receipts/pending'); },
   async processReceipt(id: number, action: 'received' | 'returned', comment = ''): Promise<any> {
     return request(`/api/receipts/${id}/action`, { method: 'POST', body: JSON.stringify({ action, comment }) });
   },
@@ -158,16 +160,34 @@ export const api = {
     });
   },
 
+  async addMatrixFields(
+    templateId: number,
+    data: { row_label: string; row_options: string[]; columns: Array<{ field_name: string; field_label: string; field_type: string }> },
+  ): Promise<{ message: string; fields: ReportTemplateField[] }> {
+    return request(`/api/templates/${templateId}/matrix-fields`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   async assignTemplate(
     templateId: number,
     company_ids: number[],
     title: string,
     period_label: string,
-    deadline: string
+    deadline: string,
+    is_one_time = false,
   ): Promise<{ message: string; assignments: ReportAssignment[] }> {
     return request(`/api/templates/${templateId}/assign`, {
       method: 'POST',
-      body: JSON.stringify({ company_ids, title, period_label, deadline }),
+      body: JSON.stringify({ company_ids, title, period_label, deadline, is_one_time }),
+    });
+  },
+
+  async recallAssignment(id: number, reason: string): Promise<{ message: string; assignment: ReportAssignment }> {
+    return request(`/api/assignments/${id}/recall`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
     });
   },
 
@@ -245,3 +265,40 @@ export const api = {
     return request<any[]>(`/api/aggregations/history/${templateId}`);
   },
 };
+
+// --- SWR hooks: client-side caching, avoids refetch on route changes ---
+
+export const swrFetcher = <T>(url: string) => request<T>(url);
+
+export const swrKeys = {
+  templates: '/api/templates',
+  assignments: '/api/assignments',
+  branches: '/api/companies/branches',
+  targets: '/api/companies/targets',
+  pendingApprovals: '/api/approvals/pending',
+  pendingReceipts: '/api/receipts/pending',
+};
+
+export function useTemplates() {
+  return useSWR<ReportTemplate[]>(swrKeys.templates, swrFetcher, { revalidateOnFocus: false });
+}
+
+export function useAssignments() {
+  return useSWR<ReportAssignment[]>(swrKeys.assignments, swrFetcher, { revalidateOnFocus: false });
+}
+
+export function useBranches() {
+  return useSWR<Company[]>(swrKeys.branches, swrFetcher, { revalidateOnFocus: false });
+}
+
+export function useAssignmentTargets() {
+  return useSWR<Company[]>(swrKeys.targets, swrFetcher, { revalidateOnFocus: false });
+}
+
+export function usePendingApprovals() {
+  return useSWR<PendingApprovalTask[]>(swrKeys.pendingApprovals, swrFetcher, { revalidateOnFocus: false });
+}
+
+export function usePendingReceipts() {
+  return useSWR<PendingReceipt[]>(swrKeys.pendingReceipts, swrFetcher, { revalidateOnFocus: false });
+}

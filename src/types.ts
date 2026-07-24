@@ -1,7 +1,6 @@
 export type CompanyLevel = 'headquarter' | 'department' | 'branch';
 export type Role =
   | 'super_admin'
-  | 'headquarter_admin'
   | 'department_report_admin'
   | 'branch_admin'
   | 'handler'
@@ -23,8 +22,14 @@ export type PeriodType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 export type TemplateStatus = 'draft' | 'published' | 'archived';
 
 export type FieldType = 'text' | 'number' | 'date' | 'select' | 'textarea';
-export type DataType = 'summary' | 'detail';
+export type DataType = 'summary' | 'detail' | 'matrix';
 export type FieldStatus = 'active' | 'inactive';
+
+export interface MatrixConfig {
+  row_label: string;
+  row_options: string[];
+  column_label: string;
+}
 
 export interface FieldConfig {
   required?: boolean;
@@ -32,6 +37,7 @@ export interface FieldConfig {
   placeholder?: string;
   min?: number;
   max?: number;
+  matrix?: MatrixConfig;
 }
 
 export interface ReportTemplateField {
@@ -82,9 +88,9 @@ export type AssignmentStatus =
   | 'pending_receipt'
   | 'received'
   | 'returned'
-  | 'approved'
   | 'aggregated'
-  | 'rejected';
+  | 'rejected'
+  | 'recalled';
 
 export interface ReportAssignment {
   id: number;
@@ -96,10 +102,12 @@ export interface ReportAssignment {
   company_code?: string;
   title: string;
   period_label: string;
+  is_one_time?: number | boolean;
   deadline: string;
   status: AssignmentStatus;
   assigned_by: number;
   issuer_department_id?: number;
+  issuer_department_name?: string;
   assigned_by_name?: string;
   submission_status?: string;
   submission_version?: number;
@@ -115,7 +123,6 @@ export type SubmissionStatus =
   | 'pending_receipt'
   | 'received'
   | 'returned'
-  | 'approved'
   | 'rejected';
 
 export interface ApprovalRecord {
@@ -167,6 +174,20 @@ export interface ReportSubmissionDetail {
   approvals: ApprovalRecord[];
 }
 
+export interface PendingReceipt {
+  id: number;
+  submission_id: number;
+  assignment_id: number;
+  assignment_title: string;
+  template_name: string;
+  period_label: string;
+  company_name: string;
+  version: number;
+  submitted_by_name: string;
+  submitted_at: string;
+  comment?: string;
+}
+
 export interface PendingApprovalTask {
   approval_id: number;
   submission_id: number;
@@ -199,4 +220,21 @@ export interface AggregationResponse {
   summary: Record<string, { total: number; count: number; average: number }>;
   detail_rows: Array<Record<string, any>>;
   detail_summary: Record<string, { total: number; count: number; average: number }>;
+}
+
+/** Statuses that count as "approved" for aggregation statistics */
+export const APPROVED_SUBMISSION_STATUSES = ['pending_receipt', 'received'];
+
+/** Human-readable label for a submission status */
+export function getSubmissionStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    draft: '草稿',
+    pending_review: '待复核',
+    pending_approval: '待审批',
+    pending_receipt: '待签收',
+    received: '已签收',
+    returned: '已退回',
+    rejected: '已驳回',
+  };
+  return map[status] || status || '未提交';
 }

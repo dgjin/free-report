@@ -2,6 +2,7 @@ import { Router, Request, Response, type RequestHandler } from 'express';
 import { db, type Database } from '../db';
 import { authMiddleware, requireDepartmentReportAdmin } from '../auth';
 import { canReadTemplate } from '../department-policy';
+import type { ReportTemplateField } from '../types';
 
 type TemplateRouterMiddleware = {
   authMiddleware: RequestHandler;
@@ -33,22 +34,35 @@ export function createTemplatesRouter(
 
 // GET /api/templates - Get template list
 router.get('/', authenticate, async (req: Request, res: Response) => {
-  const templates = req.user!.role === 'super_admin'
-    ? await database.getTemplates()
-    : await database.getTemplatesByDepartment(req.user!.company_id);
-  const allAssignments = await database.getAssignments();
-  const result = await Promise.all(templates.map(async (t) => {
-    const fields = (await database.getTemplateFields(t.id)).filter((f) => f.status === 'active');
-    const assignments = allAssignments.filter((a) => a.template_id === t.id);
-    const creator = await database.getUserById(t.created_by);
+  const templates = await database.getTemplatesForUser(req.user! as any);
+  const allAssignments = await database.getAssignmentsForUser(req.user! as any);
 
+  // Batch fetch all fields and creators in 2 queries instead of 2N
+  const templateIds = templates.map((t) => t.id);
+  const creatorIds = [...new Set(templates.map((t) => t.created_by))];
+  const [allFields, creators] = await Promise.all([
+    database.getTemplateFieldsByTemplateIds(templateIds),
+    database.getUsersByIds(creatorIds),
+  ]);
+
+  const fieldsByTemplate = new Map<number, ReportTemplateField[]>();
+  for (const field of allFields) {
+    if (!fieldsByTemplate.has(field.template_id)) fieldsByTemplate.set(field.template_id, []);
+    fieldsByTemplate.get(field.template_id)!.push(field);
+  }
+  const creatorMap = new Map(creators.map((u) => [u.id, u]));
+
+  const result = templates.map((t) => {
+    const fields = (fieldsByTemplate.get(t.id) || []).filter((f) => f.status === 'active');
+    const assignments = allAssignments.filter((a) => a.template_id === t.id);
+    const creator = creatorMap.get(t.created_by);
     return {
       ...t,
       field_count: fields.length,
       assignment_count: assignments.length,
       created_by_name: creator ? creator.display_name : '管理员',
     };
-  }));
+  });
 
   res.json(result);
 });
@@ -157,10 +171,41 @@ router.put('/:id/fields/:fieldId/disable', authenticate, authorizeHeadquarter, a
   res.json({ message: '字段已停用', field: disabled });
 });
 
+// POST /api/templates/:id/matrix-fields - Batch create matrix (cross-tab) field group
+router.post('/:id/matrix-fields', authenticate, authorizeHeadquarter, async (req: Request, res: Response) => {
+  const templateId = parseInt(req.params.id, 10);
+  const { row_label, row_options, columns } = req.body;
+
+  if (!row_label || !Array.isArray(row_options) || row_options.length === 0) {
+    return res.status(400).json({ error: '行维度标签和行选项为必填项' });
+  }
+  if (!Array.isArray(columns) || columns.length === 0) {
+    return res.status(400).json({ error: '至少需要定义一个列字段' });
+  }
+  for (const col of columns) {
+    if (!col.field_name || !col.field_label || !col.field_type) {
+      return res.status(400).json({ error: '每个列字段需包含 field_name、field_label、field_type' });
+    }
+  }
+
+  try {
+    const matrixConfig = { row_label, row_options, column_label: '' };
+    const fields = await database.addMatrixFields(
+      templateId,
+      columns,
+      matrixConfig,
+      req.user!.company_id,
+    );
+    res.status(201).json({ message: `交叉表已创建（${fields.length} 列 × ${row_options.length} 行）`, fields });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || '创建交叉表失败' });
+  }
+});
+
 // POST /api/templates/:id/assign - Assign template to branches
 router.post('/:id/assign', authenticate, authorizeHeadquarter, async (req: Request, res: Response) => {
   const templateId = parseInt(req.params.id, 10);
-  const { company_ids, title, period_label, deadline } = req.body;
+  const { company_ids, title, period_label, deadline, is_one_time } = req.body;
 
   if (!company_ids || !Array.isArray(company_ids) || company_ids.length === 0) {
     return res.status(400).json({ error: '请至少选择一个下发目标分公司' });
@@ -177,7 +222,8 @@ router.post('/:id/assign', authenticate, authorizeHeadquarter, async (req: Reque
     period_label || '本期',
     deadline,
     req.user!.id,
-    req.user!.company_id
+    req.user!.company_id,
+    is_one_time === true,
   );
 
   res.status(201).json({

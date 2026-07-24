@@ -20,7 +20,9 @@ INSERT IGNORE INTO users (id,username,password_hash,display_name,company_id,role
 (9,'gz_handler','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','广州经办人',4,'handler','active'),
 (10,'gz_reviewer','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','广州复核人',4,'reviewer','active'),
 (11,'gz_approver','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','广州审批人',4,'approver','active'),
-(12,'hq_handler','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','业务综合管理部经办人',6,'handler','active');
+(12,'hq_handler','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','业务综合管理部经办人',6,'handler','active'),
+(13,'office_admin','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','办公室报表管理员',5,'department_report_admin','active'),
+(14,'risk_admin','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','风险管理部报表管理员',8,'department_report_admin','active');
 
 INSERT IGNORE INTO report_templates (id,name,description,period_type,status,created_by,owner_department_id) VALUES
 (1,'月度销售与经营报表','汇总各分公司月度销售收入、利润及核心产品销售明细','monthly','published',2,6),

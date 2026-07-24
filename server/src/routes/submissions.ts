@@ -38,7 +38,9 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     );
 
     res.status(201).json({
-      message: isSubmit ? '报表提交成功，已发送至下发部门等待签收' : '草稿保存成功',
+      message: isSubmit
+        ? (result.approvals.length > 0 ? '报表已提交，等待复核人审核' : '报表提交成功，已发送至下发部门等待签收')
+        : '草稿保存成功',
       submission: result.submission,
       approvals: result.approvals,
     });
@@ -90,8 +92,9 @@ router.post('/:id/submit', authMiddleware, async (req: Request, res: Response) =
     );
 
     res.json({
-      message: '提交成功，已发送至下发部门等待签收',
+      message: result.approvals.length > 0 ? '报表已提交，等待复核人审核' : '提交成功，已发送至下发部门等待签收',
       submission: result.submission,
+      approvals: result.approvals,
     });
   } catch (err: any) {
     res.status(err.statusCode || 400).json({ error: err.message || '提交失败' });
@@ -162,25 +165,32 @@ async function renderSubmissionDetail(submissionId: number, req: Request, res: R
 
   const details = Object.values(detailRowsMap);
 
-  const formattedApprovals = await Promise.all(approvals.map(async (app) => {
-    const approverUser = await db.getUserById(app.approver_id);
+  // Batch fetch approver users, submitter, and company (1 query instead of N+2)
+  const approverIds = approvals.map((app) => app.approver_id);
+  const relatedUserIds = [...new Set([...approverIds, submission.submitted_by])];
+  const [relatedUsers, relatedCompany] = await Promise.all([
+    db.getUsersByIds(relatedUserIds),
+    db.getCompanyById(submission.submitted_by_company_id),
+  ]);
+  const userMap = new Map(relatedUsers.map((u) => [u.id, u]));
+
+  const formattedApprovals = approvals.map((app) => {
+    const approverUser = userMap.get(app.approver_id);
     return {
       ...app,
       approver_name: approverUser ? approverUser.display_name : '未指定',
       approver_role: approverUser ? approverUser.role : '',
     };
-  }));
+  });
 
-  const [submitter, company] = await Promise.all([
-    db.getUserById(submission.submitted_by), db.getCompanyById(submission.submitted_by_company_id),
-  ]);
+  const submitter = userMap.get(submission.submitted_by);
 
   res.json({
     ...submission,
     assignment_title: assignment ? assignment.title : '',
     template_name: template ? template.name : '',
     submitted_by_name: submitter ? submitter.display_name : '经办人',
-    company_name: company ? company.name : '',
+    company_name: relatedCompany ? relatedCompany.name : '',
     summary,
     details,
     approvals: formattedApprovals,

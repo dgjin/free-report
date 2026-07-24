@@ -17,7 +17,7 @@ const testAuth: RequestHandler = (req, _res, next) => {
     company_name: isBranch ? '测试分公司' : '测试总部',
     company_code: isBranch ? 'BRANCH' : 'HQ',
     company_level: isBranch ? 'branch' : 'headquarter',
-    role: isBranch ? 'branch_admin' : 'headquarter_admin',
+    role: isBranch ? 'branch_admin' : 'super_admin',
   };
   next();
 };

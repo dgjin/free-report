@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileSpreadsheet,
@@ -15,15 +15,15 @@ import {
   Power,
   RotateCcw,
 } from 'lucide-react';
-import { api } from '../services/api';
-import { ReportTemplate, Company } from '../types';
+import { api, useTemplates, useAssignmentTargets } from '../services/api';
+import { ReportTemplate } from '../types';
 import { getInitialTemplateFields } from '../utils/templateFields';
 import { getTemplateLifecycleView } from '../utils/templateLifecycle';
+import { mutate } from 'swr';
 
 export const TemplateList: React.FC = () => {
-  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
-  const [branches, setBranches] = useState<Company[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { data: templates = [], isLoading: loading, mutate: reloadTemplates } = useTemplates();
+  const { data: branches = [] } = useAssignmentTargets();
 
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
@@ -40,28 +40,12 @@ export const TemplateList: React.FC = () => {
   const [periodLabel, setPeriodLabel] = useState('');
   const [deadline, setDeadline] = useState('');
   const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>([]);
+  const [isOneTime, setIsOneTime] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [lifecycleActionId, setLifecycleActionId] = useState<number | null>(null);
   const lifecycleActionIdRef = useRef<number | null>(null);
 
   const navigate = useNavigate();
-
-  useEffect(() => {
-    loadTemplates();
-  }, []);
-
-  const loadTemplates = async () => {
-    setLoading(true);
-    try {
-      const [tList, bList] = await Promise.all([api.getTemplates(), api.getAssignmentTargets()]);
-      setTemplates(tList);
-      setBranches(bList);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +71,8 @@ export const TemplateList: React.FC = () => {
     setSelectedTemplate(t);
     setAssignTitle(`${new Date().getFullYear()}年${new Date().getMonth() + 1}月${t.name}`);
     setPeriodLabel(`${new Date().getFullYear()}年${String(new Date().getMonth() + 1).padStart(2, '0')}月`);
-    
+    setIsOneTime(false);
+
     // Default deadline 7 days from today
     const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     setDeadline(d);
@@ -108,11 +93,13 @@ export const TemplateList: React.FC = () => {
         selectedBranchIds,
         assignTitle,
         periodLabel,
-        deadline
+        deadline,
+        isOneTime,
       );
       alert(res.message);
       setAssignModalOpen(false);
-      loadTemplates();
+      await reloadTemplates();
+      await mutate('/api/assignments');
     } catch (err: any) {
       alert(err.message || '下发失败');
     } finally {
@@ -140,7 +127,7 @@ export const TemplateList: React.FC = () => {
     try {
       const res = await (lifecycle.isArchived ? api.enableTemplate(t.id) : api.disableTemplate(t.id));
       alert(res.message);
-      await loadTemplates();
+      await reloadTemplates();
     } catch (err: any) {
       alert(err.message || (lifecycle.isArchived ? '重新启用失败' : '停用失败'));
     } finally {
@@ -159,121 +146,111 @@ export const TemplateList: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+    <div className="max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center space-x-2">
-            <FileSpreadsheet className="w-5 h-5 text-blue-600" />
-            <span>报表模板库</span>
+          <h1 className="text-[28px] font-semibold text-[#1d1d1f] tracking-[-0.03em]">
+            报表模板库
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-sm text-[#6e6e73] mt-1.5 tracking-[-0.01em] max-w-xl">
             定义汇总与明细字段结构，设置只增不减字段设计规则，下发至各分公司。
           </p>
         </div>
 
         <button
           onClick={() => setCreateModalOpen(true)}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md transition-all flex items-center space-x-2 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          className="h-11 px-5 bg-[#0071e3] hover:bg-[#0066cc] text-white font-medium text-sm rounded-full transition-colors flex items-center gap-2 shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>新建报表模板</span>
         </button>
       </div>
 
-      {/* Templates List */}
+      {/* Templates List — unified panel with hairline dividers */}
       {loading ? (
-        <div className="py-12 text-center text-xs text-slate-400">加载模板数据中...</div>
+        <div className="py-16 text-center text-sm text-[#86868b]">加载模板数据中...</div>
       ) : templates.length === 0 ? (
-        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200">
-          <FileSpreadsheet className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <div className="text-sm font-bold text-slate-700">暂无报表模板</div>
-          <p className="text-xs text-slate-400 mt-1">请点击右上角新建首个模板</p>
+        <div className="bg-white rounded-[22px] py-16 text-center" style={{ boxShadow: 'var(--sh-card)' }}>
+          <FileSpreadsheet className="w-10 h-10 text-[#d2d2d7] mx-auto mb-3" />
+          <div className="text-sm font-medium text-[#1d1d1f]">暂无报表模板</div>
+          <p className="text-xs text-[#86868b] mt-1">请点击右上角新建首个模板</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
           {templates.map((t) => {
             const lifecycle = getTemplateLifecycleView(t.status);
             return (
-              <div
-                key={t.id}
-                className={`rounded-2xl border p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 ${
-                  lifecycle.isArchived ? 'bg-slate-50 border-slate-300' : 'bg-white border-slate-200/80'
-                }`}
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg border border-blue-100">
+              <div key={t.id} className="apple-row px-6 py-5">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-1 bg-[#f5f5f7] text-[#424245] text-[11px] font-medium rounded-full">
                         {periodLabels[t.period_type] || t.period_type}
                       </span>
                       <span
-                        className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border ${
+                        className={`px-2.5 py-1 text-[11px] font-medium rounded-full ${
                           lifecycle.isArchived
-                            ? 'bg-slate-100 text-slate-600 border-slate-200'
+                            ? 'text-[#6e6e73] bg-[#e8e8ed]'
                             : lifecycle.canWrite
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                              ? 'text-[#1d1d1f] bg-[#e8e8ed]'
+                              : 'text-[#6e6e73] bg-[#e8e8ed]'
                         }`}
                       >
                         {lifecycle.statusLabel}
                       </span>
+                      <span className="text-[11px] text-[#aeaeb2] tabular-nums">ID #{t.id}</span>
                     </div>
-                    <span className="text-[11px] text-slate-400">ID: #{t.id}</span>
+
+                    <h3 className="text-base font-semibold text-[#1d1d1f] tracking-[-0.01em]">{t.name}</h3>
+                    <p className="text-xs text-[#6e6e73] line-clamp-2">{t.description || '暂无描述信息'}</p>
+
+                    <div className="flex items-center gap-4 pt-1 text-xs text-[#86868b]">
+                      <div className="flex items-center gap-1.5">
+                        <Sliders className="w-3.5 h-3.5 text-[#aeaeb2]" />
+                        <span className="tabular-nums">{t.field_count || 0} 个表单字段</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Send className="w-3.5 h-3.5 text-[#aeaeb2]" />
+                        <span className="tabular-nums">{t.assignment_count || 0} 次历史下发</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <h3 className="text-base font-bold text-slate-900">{t.name}</h3>
-                  <p className="text-xs text-slate-500 line-clamp-2">{t.description || '暂无描述信息'}</p>
-
-                  <div className="pt-2 flex items-center space-x-4 text-xs text-slate-500">
-                    <div className="flex items-center space-x-1">
-                      <Sliders className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{t.field_count || 0} 个表单字段</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Send className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{t.assignment_count || 0} 次历史下发</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => navigate(`/templates/${t.id}`)}
-                    className="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 transition-colors flex items-center justify-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
-                  >
-                    <Sliders className="w-3.5 h-3.5 text-slate-500" />
-                    <span>设计字段</span>
-                  </button>
-
-                  <button
-                    onClick={() => openAssignModal(t)}
-                    disabled={!lifecycle.canWrite}
-                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl transition-colors shadow-sm flex items-center justify-center space-x-1.5 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 disabled:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>按周期下发</span>
-                  </button>
-
-                  {lifecycle.canTransition && (
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     <button
-                      onClick={() => handleTemplateLifecycle(t)}
-                      disabled={lifecycleActionId !== null}
-                      aria-busy={lifecycleActionId === t.id}
-                      className={`flex-1 py-2 font-semibold text-xs rounded-xl border transition-colors flex items-center justify-center space-x-1.5 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
-                        lifecycle.isArchived
-                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 focus-visible:ring-emerald-500'
-                          : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 focus-visible:ring-amber-500'
-                      }`}
+                      onClick={() => navigate(`/templates/${t.id}`)}
+                      className="h-9 px-4 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-medium text-xs rounded-full transition-colors flex items-center gap-1.5"
                     >
-                      {lifecycle.isArchived ? (
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      ) : (
-                        <Power className="w-3.5 h-3.5" />
-                      )}
-                      <span>{lifecycle.actionLabel}</span>
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>设计字段</span>
                     </button>
-                  )}
+
+                    <button
+                      onClick={() => openAssignModal(t)}
+                      disabled={!lifecycle.canWrite}
+                      className="h-9 px-4 bg-[#0071e3] hover:bg-[#0066cc] text-white font-medium text-xs rounded-full transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>按周期下发</span>
+                    </button>
+
+                    {lifecycle.canTransition && (
+                      <button
+                        onClick={() => handleTemplateLifecycle(t)}
+                        disabled={lifecycleActionId !== null}
+                        aria-busy={lifecycleActionId === t.id}
+                        className="h-9 px-4 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#424245] font-medium text-xs rounded-full transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-wait focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:outline-none"
+                      >
+                        {lifecycle.isArchived ? (
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        ) : (
+                          <Power className="w-3.5 h-3.5" />
+                        )}
+                        <span>{lifecycle.actionLabel}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -283,16 +260,22 @@ export const TemplateList: React.FC = () => {
 
       {/* Create Template Modal */}
       {createModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                <Plus className="w-4 h-4 text-blue-600" />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+        >
+          <div
+            className="bg-white rounded-[22px] max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150"
+            style={{ boxShadow: 'var(--sh-overlay)' }}
+          >
+            <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.07)] pb-3">
+              <h2 className="text-base font-semibold text-[#1d1d1f] tracking-[-0.01em] flex items-center gap-2">
+                <Plus className="w-4 h-4 text-[#0071e3]" />
                 <span>创建全新报表模板</span>
               </h2>
               <button
                 onClick={() => setCreateModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-[#86868b] hover:text-[#1d1d1f] transition-colors"
               >
                 <X size={18} />
               </button>
@@ -300,8 +283,8 @@ export const TemplateList: React.FC = () => {
 
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  模板名称 <span className="text-red-500">*</span>
+                <label className="block text-xs font-medium text-[#424245] mb-1.5">
+                  模板名称 <span className="text-[#ff6b00]">*</span>
                 </label>
                 <input
                   type="text"
@@ -309,27 +292,27 @@ export const TemplateList: React.FC = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="例如: 2026年季度财务运营与资产核查表"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[rgba(0,0,0,0.1)] rounded-[12px] text-sm text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[rgba(0,113,227,0.15)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">模板说明描述</label>
+                <label className="block text-xs font-medium text-[#424245] mb-1.5">模板说明描述</label>
                 <textarea
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="简要说明本报表各分公司需要填报的重点指标及依据"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[rgba(0,0,0,0.1)] rounded-[12px] text-sm text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[rgba(0,113,227,0.15)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">填报周期类别</label>
+                <label className="block text-xs font-medium text-[#424245] mb-1.5">填报周期类别</label>
                 <select
                   value={periodType}
                   onChange={(e) => setPeriodType(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[rgba(0,0,0,0.1)] rounded-[12px] text-sm text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[rgba(0,113,227,0.15)]"
                 >
                   <option value="daily">日度报表 (Daily)</option>
                   <option value="weekly">周度报表 (Weekly)</option>
@@ -340,17 +323,17 @@ export const TemplateList: React.FC = () => {
                 </select>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end space-x-3">
+              <div className="pt-3 border-t border-[rgba(0,0,0,0.07)] flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-600 font-semibold text-xs rounded-xl hover:bg-slate-200"
+                  className="h-10 px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-medium text-sm rounded-full transition-colors"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white font-semibold text-xs rounded-xl hover:bg-blue-700 shadow-sm"
+                  className="h-10 px-5 bg-[#0071e3] hover:bg-[#0066cc] text-white font-medium text-sm rounded-full transition-colors"
                 >
                   确认并进入字段构建器
                 </button>
@@ -362,19 +345,25 @@ export const TemplateList: React.FC = () => {
 
       {/* Assign Template Modal */}
       {assignModalOpen && selectedTemplate && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+        >
+          <div
+            className="bg-white rounded-[22px] max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto"
+            style={{ boxShadow: 'var(--sh-overlay)' }}
+          >
+            <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.07)] pb-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                  <Send className="w-4 h-4 text-blue-600" />
+                <h2 className="text-base font-semibold text-[#1d1d1f] tracking-[-0.01em] flex items-center gap-2">
+                  <Send className="w-4 h-4 text-[#0071e3]" />
                   <span>下发报表任务</span>
                 </h2>
-                <div className="text-xs text-slate-500 mt-0.5">模板: {selectedTemplate.name}</div>
+                <div className="text-xs text-[#6e6e73] mt-0.5">模板: {selectedTemplate.name}</div>
               </div>
               <button
                 onClick={() => setAssignModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-[#86868b] hover:text-[#1d1d1f] transition-colors"
               >
                 <X size={18} />
               </button>
@@ -382,79 +371,105 @@ export const TemplateList: React.FC = () => {
 
             <form onSubmit={handleAssignSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">下发标题</label>
+                <label className="block text-xs font-medium text-[#424245] mb-1.5">下发标题</label>
                 <input
                   type="text"
                   required
                   value={assignTitle}
                   onChange={(e) => setAssignTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[rgba(0,0,0,0.1)] rounded-[12px] text-sm text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[rgba(0,113,227,0.15)]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">周期标签</label>
+                  <label className="block text-xs font-medium text-[#424245] mb-1.5">周期标签</label>
                   <input
                     type="text"
                     required
                     value={periodLabel}
                     onChange={(e) => setPeriodLabel(e.target.value)}
                     placeholder="如: 2026年07月"
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-white border border-[rgba(0,0,0,0.1)] rounded-[12px] text-sm text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[rgba(0,113,227,0.15)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">填报截止时间</label>
+                  <label className="block text-xs font-medium text-[#424245] mb-1.5">填报截止时间</label>
                   <input
                     type="date"
                     required
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-white border border-[rgba(0,0,0,0.1)] rounded-[12px] text-sm text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[rgba(0,113,227,0.15)]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2">选择接收分公司</label>
-                <div className="space-y-2 max-h-40 overflow-y-auto p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <label
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-[12px] cursor-pointer border transition-colors ${
+                    isOneTime
+                      ? 'bg-[rgba(0,113,227,0.06)] border-[rgba(0,113,227,0.25)]'
+                      : 'bg-[#f5f5f7] border-[rgba(0,0,0,0.07)] hover:bg-[#fbfbfd]'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isOneTime}
+                    onChange={(e) => setIsOneTime(e.target.checked)}
+                    className="w-4 h-4 accent-[#0071e3] cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-[#1d1d1f] flex items-center gap-1.5">
+                      一次性下发
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold text-[#0071e3] bg-[rgba(0,113,227,0.08)]">不受周期约束</span>
+                    </div>
+                    <div className="text-xs text-[#86868b] mt-0.5">
+                      勾选后可对同一分公司、同一周期重复下发，适用于补充调查或临时加报场景
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#424245] mb-2">选择接收分公司</label>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto p-3 bg-[#f5f5f7] rounded-[14px] border border-[rgba(0,0,0,0.07)]">
                   {branches.map((b) => {
                     const checked = selectedBranchIds.includes(b.id);
                     return (
                       <div
                         key={b.id}
                         onClick={() => toggleBranchSelect(b.id)}
-                        className={`p-2 rounded-lg text-xs flex items-center justify-between cursor-pointer border transition-colors ${
+                        className={`px-3 py-2 rounded-[10px] text-xs flex items-center justify-between cursor-pointer border transition-colors ${
                           checked
-                            ? 'bg-blue-50 border-blue-200 text-blue-800 font-semibold'
-                            : 'bg-white border-slate-200 text-slate-600'
+                            ? 'bg-[rgba(0,113,227,0.08)] border-[rgba(0,113,227,0.25)] text-[#1d1d1f] font-medium'
+                            : 'bg-white border-[rgba(0,0,0,0.07)] text-[#424245] hover:bg-[#fbfbfd]'
                         }`}
                       >
-                        <div className="flex items-center space-x-2">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-3.5 h-3.5 text-[#86868b]" />
                           <span>{b.name} ({b.code})</span>
                         </div>
-                        {checked && <CheckCircle className="w-4 h-4 text-blue-600" />}
+                        {checked && <CheckCircle className="w-4 h-4 text-[#0071e3]" />}
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end space-x-3">
+              <div className="pt-3 border-t border-[rgba(0,0,0,0.07)] flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setAssignModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-600 font-semibold text-xs rounded-xl hover:bg-slate-200"
+                  className="h-10 px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-medium text-sm rounded-full transition-colors"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
                   disabled={assigning}
-                  className="px-4 py-2 bg-blue-600 text-white font-semibold text-xs rounded-xl hover:bg-blue-700 shadow-sm disabled:opacity-50"
+                  className="h-10 px-5 bg-[#0071e3] hover:bg-[#0066cc] text-white font-medium text-sm rounded-full transition-colors disabled:opacity-50"
                 >
                   {assigning ? '下发处理中...' : '确认下发任务'}
                 </button>
