@@ -93,18 +93,18 @@ return (
             <button
               key={b}
               onClick={() => setBucket(bucket === b ? 'all' : b)}
-              className={`p-5 text-center transition-colors ${borderCls} ${
+              className={`p-4 sm:p-5 text-center transition-colors ${borderCls} ${
                 isActive ? 'bg-[#f5f5f7]' : 'bg-white hover:bg-[#fbfbfd]'
               }`}
             >
               <div
-                className={`text-2xl font-semibold tabular-nums tracking-[-0.01em] ${
+                className={`text-xl sm:text-2xl font-semibold tabular-nums tracking-[-0.01em] ${
                   b === 'abnormal' ? 'text-[#ff6b00]' : 'text-[#1d1d1f]'
                 }`}
               >
                 {count}
               </div>
-              <div className="text-xs mt-1 text-[#6e6e73]">{label}</div>
+              <div className="text-xs mt-1 text-[#6e6e73] whitespace-nowrap">{label}</div>
             </button>
           );
         })}
@@ -162,8 +162,8 @@ return (
         <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
           {/* Desktop Header */}
           <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 text-[11px] font-medium text-[#86868b] border-b border-[rgba(0,0,0,0.07)]">
-            <div className="col-span-1">状态</div>
-            <div className="col-span-3">机构</div>
+            <div className="col-span-2">状态</div>
+            <div className="col-span-2">机构</div>
             <div className="col-span-2">报表/周期</div>
             <div className="col-span-2">截止日期</div>
             <div className="col-span-2">下发标题</div>
@@ -178,18 +178,18 @@ return (
                 key={item.id}
                 className={`apple-row md:grid md:grid-cols-12 md:gap-4 md:px-6 md:py-4 flex flex-col gap-2 ${isAbnormal ? 'bg-[rgba(255,107,0,0.04)]' : ''}`}
               >
-                <div className="hidden md:block col-span-1">
-                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${item.status === 'recalled' ? 'text-[#ff6b00] bg-[rgba(255,107,0,0.1)]' : bucketConfig[bucket].colorClass}`}>
+                <div className="hidden md:block col-span-2">
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${item.status === 'recalled' ? 'text-[#ff6b00] bg-[rgba(255,107,0,0.1)]' : bucketConfig[bucket].colorClass}`}>
                     {item.status === 'recalled' ? '已收回' : bucketConfig[bucket].label}
                   </span>
-                  {item.is_one_time && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-[#0071e3] bg-[rgba(0,113,227,0.08)] inline-flex items-center gap-0.5">
+                  {!!item.is_one_time && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-[#0071e3] bg-[rgba(0,113,227,0.08)] inline-flex items-center gap-0.5 whitespace-nowrap">
                       <Zap className="w-2 h-2" />
                       一次性
                     </span>
                   )}
                 </div>
-                <div className="hidden md:block col-span-3">
+                <div className="hidden md:block col-span-2">
                   <div className="text-sm font-medium text-[#1d1d1f]">{item.company_name}</div>
                   <div className="text-xs text-[#86868b] tabular-nums">{item.company_code}</div>
                 </div>
@@ -254,8 +254,8 @@ return (
                 <div className="md:hidden flex flex-col gap-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-[#1d1d1f] truncate">{item.title}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 ${bucketConfig[bucket].colorClass}`}>
-                      {bucketConfig[bucket].label}
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 whitespace-nowrap ${item.status === 'recalled' ? 'text-[#ff6b00] bg-[rgba(255,107,0,0.1)]' : bucketConfig[bucket].colorClass}`}>
+                      {item.status === 'recalled' ? '已收回' : bucketConfig[bucket].label}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-[#86868b]">
