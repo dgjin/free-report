@@ -1,9 +1,11 @@
 package com.freereport.exception;
 
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.ResponseEntity;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -12,12 +14,14 @@ import lombok.extern.slf4j.Slf4j;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /** 业务异常：按 DomainException 携带的 statusCode 返回 */
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<Map<String, String>> handleDomainException(DomainException e) {
         return ResponseEntity.status(e.getStatusCode())
                 .body(Map.of("error", e.getMessage()));
     }
 
+    /** 参数校验失败（@Valid Bean Validation）→ 400 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationException(MethodArgumentNotValidException e) {
         String errors = e.getBindingResult().getFieldErrors().stream()
@@ -27,6 +31,21 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "参数校验失败: " + errors));
     }
 
+    /** 请求体不可读（JSON 格式错误/缺失）→ 400 */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> handleHttpMessageNotReadable(HttpMessageNotReadableException e) {
+        return ResponseEntity.status(400)
+                .body(Map.of("error", "请求体格式错误或缺失"));
+    }
+
+    /** 路径参数类型不匹配（如 id 传入非数字）→ 400 */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        return ResponseEntity.status(400)
+                .body(Map.of("error", "参数类型不匹配: " + e.getName()));
+    }
+
+    /** 兜底：未预期的系统异常 → 500，记录完整堆栈便于排查 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleException(Exception e) {
         log.error("未处理异常", e);

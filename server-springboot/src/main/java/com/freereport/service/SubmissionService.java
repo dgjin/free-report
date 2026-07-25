@@ -16,6 +16,8 @@ import com.freereport.mapper.TemplateMapper;
 import com.freereport.mapper.UserMapper;
 import com.freereport.security.AuthUser;
 import com.freereport.security.SecurityUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,10 +45,11 @@ public class SubmissionService {
     private final UserMapper userMapper;
     private final CompanyMapper companyMapper;
     private final SecurityUtils securityUtils;
+    private final ObjectMapper objectMapper;
 
     public SubmissionService(SubmissionMapper submissionMapper, AssignmentMapper assignmentMapper,
                              TemplateMapper templateMapper, ApprovalMapper approvalMapper, UserMapper userMapper,
-                             CompanyMapper companyMapper, SecurityUtils securityUtils) {
+                             CompanyMapper companyMapper, SecurityUtils securityUtils, ObjectMapper objectMapper) {
         this.submissionMapper = submissionMapper;
         this.assignmentMapper = assignmentMapper;
         this.templateMapper = templateMapper;
@@ -54,6 +57,7 @@ public class SubmissionService {
         this.userMapper = userMapper;
         this.companyMapper = companyMapper;
         this.securityUtils = securityUtils;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -175,6 +179,7 @@ public class SubmissionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", isSubmit ? "提交成功，报表已发送至下发部门等待签收。" : "草稿已保存");
         result.put("submission", submissionToMap(submissionMapper.findById(submissionId)));
         result.put("approvals", approvals);
         return result;
@@ -198,7 +203,7 @@ public class SubmissionService {
 
         List<ReportSubmissionData> dataList = submissionMapper.findDataBySubmissionId(id);
         Map<String, String> summary = new LinkedHashMap<>();
-        Map<Integer, Map<String, String>> detailRows = new TreeMap<>();
+        TreeMap<Integer, Map<String, String>> detailRows = new TreeMap<>();
         for (ReportSubmissionData d : dataList) {
             String key = String.valueOf(d.getFieldId());
             int row = d.getRowIndex() == null ? 0 : d.getRowIndex();
@@ -208,7 +213,14 @@ public class SubmissionService {
                 detailRows.computeIfAbsent(row, k -> new LinkedHashMap<>()).put(key, d.getValue());
             }
         }
-        List<Map<String, String>> details = new ArrayList<>(detailRows.values());
+        // 保留行位置：中间空行补空 Map，避免回显时行错位（如交叉表只填部分行）
+        List<Map<String, String>> details = new ArrayList<>();
+        if (!detailRows.isEmpty()) {
+            int maxRow = detailRows.lastKey();
+            for (int r = 1; r <= maxRow; r++) {
+                details.add(detailRows.getOrDefault(r, new LinkedHashMap<>()));
+            }
+        }
 
         // 查询字段元数据（field_name, field_label, field_type）
         ReportAssignment assignment = assignmentMapper.findById(s.getAssignmentId());
@@ -228,6 +240,7 @@ public class SubmissionService {
             item.put("field_name", field != null ? field.getFieldName() : null);
             item.put("field_label", field != null ? field.getFieldLabel() : null);
             item.put("field_type", field != null ? field.getFieldType() : null);
+            item.put("data_type", field != null ? field.getDataType() : null);
             item.put("value", e.getValue());
             item.put("row_index", 0);
             enrichedSummary.add(item);
@@ -245,6 +258,7 @@ public class SubmissionService {
                 item.put("field_id", fieldId);
                 item.put("field_name", field != null ? field.getFieldName() : null);
                 item.put("field_label", field != null ? field.getFieldLabel() : null);
+                item.put("data_type", field != null ? field.getDataType() : null);
                 item.put("value", e.getValue());
                 item.put("row_index", rowIdx + 1);
                 enrichedRow.add(item);
@@ -273,6 +287,7 @@ public class SubmissionService {
         result.put("summary", enrichedSummary);
         result.put("details", enrichedDetails);
         result.put("approvals", approvalMaps);
+        result.put("matrix_groups", buildMatrixGroups(templateFields));
         // 附加任务与模板信息
         if (assignment != null) {
             result.put("assignment_title", assignment.getTitle());
@@ -283,7 +298,8 @@ public class SubmissionService {
     }
 
     /**
-     * 返回指定任务的最新填报，无则返回 null。
+     * 返回指定任务的最新填报完整详情（含 summary/details/approvals），无则返回 null。
+     * 复用 getSubmissionDetail 保证回显数据完整。
      */
     public Map<String, Object> getSubmissionByAssignment(Long assignmentId, AuthUser user) {
         ReportAssignment a = assignmentMapper.findById(assignmentId);
@@ -294,7 +310,7 @@ public class SubmissionService {
             throw new DomainException("无权查看该填报", 403);
         }
         ReportSubmission s = submissionMapper.findLatestByAssignmentId(assignmentId);
-        return s == null ? null : submissionToMap(s);
+        return s == null ? null : getSubmissionDetail(s.getId(), user);
     }
 
     /**
@@ -326,6 +342,58 @@ public class SubmissionService {
     }
 
     // ---- helpers ----
+
+    /**
+     * 组装矩阵分组：按 field_config.matrix.row_label 分组 active 的 matrix 字段，
+     * 供复核/签收视图重建交叉表结构（行表头 = row_label + row_options）。
+     */
+    private List<Map<String, Object>> buildMatrixGroups(List<ReportTemplateField> templateFields) {
+        Map<String, Map<String, Object>> groupMap = new LinkedHashMap<>();
+        for (ReportTemplateField f : templateFields) {
+            if (!"matrix".equals(f.getDataType()) || !"active".equals(f.getStatus())) {
+                continue;
+            }
+            Map<String, Object> config = parseJsonMap(f.getFieldConfig());
+            Object matrixObj = config.get("matrix");
+            if (!(matrixObj instanceof Map)) {
+                continue;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> matrix = (Map<String, Object>) matrixObj;
+            Object rowLabel = matrix.get("row_label");
+            if (rowLabel == null) {
+                continue;
+            }
+            String key = String.valueOf(rowLabel);
+            Map<String, Object> group = groupMap.computeIfAbsent(key, k -> {
+                Map<String, Object> g = new LinkedHashMap<>();
+                g.put("row_label", key);
+                Object rowOptions = matrix.get("row_options");
+                g.put("row_options", rowOptions != null ? rowOptions : Collections.emptyList());
+                g.put("columns", new ArrayList<Map<String, Object>>());
+                return g;
+            });
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> columns = (List<Map<String, Object>>) group.get("columns");
+            Map<String, Object> col = new LinkedHashMap<>();
+            col.put("field_id", f.getId());
+            col.put("field_label", f.getFieldLabel());
+            col.put("field_type", f.getFieldType());
+            columns.add(col);
+        }
+        return new ArrayList<>(groupMap.values());
+    }
+
+    private Map<String, Object> parseJsonMap(String json) {
+        if (json == null || json.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            return Collections.emptyMap();
+        }
+    }
 
     private boolean canWriteSubmissionStatus(ReportSubmission s) {
         if (s == null) {

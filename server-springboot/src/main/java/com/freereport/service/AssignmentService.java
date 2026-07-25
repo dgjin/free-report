@@ -204,7 +204,11 @@ public class AssignmentService {
             approvalMapper.rejectPendingApprovals(s.getId(), "任务被发起部门强制收回");
         }
 
-        return assignmentToMap(assignmentMapper.findById(id));
+        // 返回结构与前端契约匹配：{ message, assignment }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "任务已强制收回");
+        result.put("assignment", assignmentToMap(assignmentMapper.findById(id)));
+        return result;
     }
 
     // ---- helpers ----

@@ -41,41 +41,62 @@
 
     <!-- 根据下发任务 ID 列表查询所有提交 -->
     <select id="findByAssignmentIds" resultType="com.freereport.entity.ReportSubmission">
-        SELECT * FROM report_submissions WHERE assignment_id IN
-        <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
-            #{assignmentId}
-        </foreach>
+        <choose>
+            <when test="assignmentIds != null and assignmentIds.size() > 0">
+                SELECT * FROM report_submissions WHERE assignment_id IN
+                <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
+                    #{assignmentId}
+                </foreach>
+            </when>
+            <otherwise>
+                SELECT * FROM report_submissions WHERE 1 = 0
+            </otherwise>
+        </choose>
     </select>
 
     <!-- 根据下发任务 ID 列表查询每个任务的最新版本提交 -->
     <select id="findLatestByAssignmentIds" resultType="com.freereport.entity.ReportSubmission">
-        SELECT s.*
-        FROM report_submissions s
-        INNER JOIN (
-            SELECT assignment_id, MAX(version) AS max_version
-            FROM report_submissions
-            WHERE assignment_id IN
-            <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
-                #{assignmentId}
-            </foreach>
-            GROUP BY assignment_id
-        ) latest ON s.assignment_id = latest.assignment_id AND s.version = latest.max_version
+        <choose>
+            <when test="assignmentIds != null and assignmentIds.size() > 0">
+                SELECT s.*
+                FROM report_submissions s
+                INNER JOIN (
+                    SELECT assignment_id, MAX(version) AS max_version
+                    FROM report_submissions
+                    WHERE assignment_id IN
+                    <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
+                        #{assignmentId}
+                    </foreach>
+                    GROUP BY assignment_id
+                ) latest ON s.assignment_id = latest.assignment_id AND s.version = latest.max_version
+            </when>
+            <otherwise>
+                SELECT * FROM report_submissions WHERE 1 = 0
+            </otherwise>
+        </choose>
     </select>
 
-    <!-- 根据下发任务 ID 列表查询每个任务的最新已审批通过提交 -->
+    <!-- 根据下发任务 ID 列表查询每个任务的最新已审批通过提交（仅 pending_receipt/received 参与汇总） -->
     <select id="findLatestApprovedByAssignmentIds" resultType="com.freereport.entity.ReportSubmission">
-        SELECT s.*
-        FROM report_submissions s
-        INNER JOIN (
-            SELECT assignment_id, MAX(version) AS max_version
-            FROM report_submissions
-            WHERE assignment_id IN
-            <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
-                #{assignmentId}
-            </foreach>
-              AND status NOT IN ('draft', 'rejected', 'returned')
-            GROUP BY assignment_id
-        ) latest ON s.assignment_id = latest.assignment_id AND s.version = latest.max_version
+        <choose>
+            <when test="assignmentIds != null and assignmentIds.size() > 0">
+                SELECT s.*
+                FROM report_submissions s
+                INNER JOIN (
+                    SELECT assignment_id, MAX(version) AS max_version
+                    FROM report_submissions
+                    WHERE assignment_id IN
+                    <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
+                        #{assignmentId}
+                    </foreach>
+                      AND status IN ('pending_receipt', 'received')
+                    GROUP BY assignment_id
+                ) latest ON s.assignment_id = latest.assignment_id AND s.version = latest.max_version
+            </when>
+            <otherwise>
+                SELECT * FROM report_submissions WHERE 1 = 0
+            </otherwise>
+        </choose>
     </select>
 
     <!-- 插入提交（返回生成 ID） -->
@@ -119,10 +140,17 @@
 
     <!-- 根据提交 ID 列表批量查询明细数据 -->
     <select id="findDataBySubmissionIds" resultType="com.freereport.entity.ReportSubmissionData">
-        SELECT * FROM report_submission_data WHERE submission_id IN
-        <foreach collection="submissionIds" item="submissionId" open="(" separator="," close=")">
-            #{submissionId}
-        </foreach>
+        <choose>
+            <when test="submissionIds != null and submissionIds.size() > 0">
+                SELECT * FROM report_submission_data WHERE submission_id IN
+                <foreach collection="submissionIds" item="submissionId" open="(" separator="," close=")">
+                    #{submissionId}
+                </foreach>
+            </when>
+            <otherwise>
+                SELECT * FROM report_submission_data WHERE 1 = 0
+            </otherwise>
+        </choose>
     </select>
 
 </mapper>

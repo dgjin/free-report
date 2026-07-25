@@ -83,8 +83,10 @@ public class AggregationService {
         List<ReportTemplateField> detailFields = allFields.stream()
                 .filter(f -> "detail".equals(f.getDataType()) && "active".equals(f.getStatus()))
                 .collect(Collectors.toList());
+        // 汇总指标仅统计 summary 区的数值字段（detail/matrix 的数值字段不混入汇总区）
         List<ReportTemplateField> numericFields = allFields.stream()
-                .filter(f -> "number".equals(f.getFieldType()) && "active".equals(f.getStatus()))
+                .filter(f -> "summary".equals(f.getDataType()) && "number".equals(f.getFieldType())
+                        && "active".equals(f.getStatus()))
                 .collect(Collectors.toList());
     
         // 每个任务的最新已审批提交
@@ -98,14 +100,24 @@ public class AggregationService {
         List<Long> submissionIds = subMap.values().stream()
                 .map(ReportSubmission::getId).collect(Collectors.toList());
     
-        // 批量查询明细数据
-        Map<Long, Map<Long, String>> valueBySubmission = new HashMap<>();
+        // 批量查询提交数据，按 row_index 拆分为汇总值与明细行，避免多行明细同字段互相覆盖
+        // summaryBySubmission: submissionId -> (fieldId -> value)，row_index = 0
+        Map<Long, Map<Long, String>> summaryBySubmission = new HashMap<>();
+        // detailBySubmission: submissionId -> (rowIndex -> (fieldId -> value))，row_index > 0，TreeMap 保留行序
+        Map<Long, Map<Integer, Map<Long, String>>> detailBySubmission = new HashMap<>();
         if (!submissionIds.isEmpty()) {
             List<ReportSubmissionData> allData = submissionMapper.findDataBySubmissionIds(submissionIds);
             for (ReportSubmissionData d : allData) {
-                valueBySubmission
-                        .computeIfAbsent(d.getSubmissionId(), k -> new HashMap<>())
-                        .put(d.getFieldId(), d.getValue());
+                if (d.getRowIndex() != null && d.getRowIndex() > 0) {
+                    detailBySubmission
+                            .computeIfAbsent(d.getSubmissionId(), k -> new java.util.TreeMap<>())
+                            .computeIfAbsent(d.getRowIndex(), k -> new LinkedHashMap<>())
+                            .put(d.getFieldId(), d.getValue());
+                } else {
+                    summaryBySubmission
+                            .computeIfAbsent(d.getSubmissionId(), k -> new HashMap<>())
+                            .put(d.getFieldId(), d.getValue());
+                }
             }
         }
     
@@ -141,7 +153,7 @@ public class AggregationService {
             Map<String, String> values = new LinkedHashMap<>();
             if (hasSubmitted) {
                 submittedCount++;
-                Map<Long, String> submissionValues = valueBySubmission.getOrDefault(s.getId(), Collections.emptyMap());
+                Map<Long, String> submissionValues = summaryBySubmission.getOrDefault(s.getId(), Collections.emptyMap());
                 for (ReportTemplateField nf : numericFields) {
                     double num = parseDouble(submissionValues.get(nf.getId()));
                     values.put(nf.getFieldName(), String.valueOf(num));
@@ -168,10 +180,52 @@ public class AggregationService {
             ));
         }
     
-        // detail_rows 和 detail_summary（简化，从明细字段的提交数据构建）
+        // 明细数据行：按提交逐行展开（row_index > 0 的每一行都输出），数值列逐行累计
         List<Map<String, Object>> detailRows = new ArrayList<>();
+        Map<String, Double> detailSumMap = new LinkedHashMap<>();
+        for (ReportTemplateField nf : detailFields) {
+            if ("number".equals(nf.getFieldType())) {
+                detailSumMap.put(nf.getFieldName(), 0.0);
+            }
+        }
+        int detailRowCount = 0;
+        for (ReportAssignment a : assignments) {
+            ReportSubmission s = subMap.get(a.getId());
+            if (s == null) continue;
+            boolean hasSubmitted = "pending_receipt".equals(s.getStatus()) || "received".equals(s.getStatus());
+            if (!hasSubmitted) continue;
+            Map<Integer, Map<Long, String>> rowMap = detailBySubmission.getOrDefault(s.getId(), Collections.emptyMap());
+            Company c = companyMap.get(a.getAssignedToCompanyId());
+            for (Map.Entry<Integer, Map<Long, String>> entry : rowMap.entrySet()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("company_id", a.getAssignedToCompanyId());
+                row.put("company_name", c != null ? c.getName() : null);
+                row.put("submission_status", s.getStatus());
+                row.put("row_index", ++detailRowCount);
+                for (ReportTemplateField df : detailFields) {
+                    String val = entry.getValue().getOrDefault(df.getId(), "");
+                    row.put(df.getFieldName(), val);
+                    if ("number".equals(df.getFieldType())) {
+                        detailSumMap.merge(df.getFieldName(), parseDouble(val), Double::sum);
+                    }
+                }
+                detailRows.add(row);
+            }
+        }
+        // 明细汇总
         Map<String, Object> detailSummary = new LinkedHashMap<>();
-    
+        for (ReportTemplateField df : detailFields) {
+            if ("number".equals(df.getFieldType())) {
+                double total = detailSumMap.getOrDefault(df.getFieldName(), 0.0);
+                int count = Math.max(detailRowCount, 1);
+                detailSummary.put(df.getFieldName(), Map.of(
+                        "total", total,
+                        "count", detailRowCount,
+                        "average", total / count
+                ));
+            }
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("template", templateToMap(t));
         result.put("summary_fields", summaryFields.stream().map(this::fieldToMap).collect(Collectors.toList()));
@@ -215,7 +269,10 @@ public class AggregationService {
         aggregationMapper.insertAggregation(t.getId(), assignmentId, toJson(data), 1, submittedCount);
         assignmentMapper.updateStatus(assignmentId, "aggregated");
 
-        return aggregationToMap(aggregationMapper.findByAssignmentId(assignmentId));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "汇总完成");
+        result.put("aggregation", aggregationToMap(aggregationMapper.findByAssignmentId(assignmentId)));
+        return result;
     }
 
     /**

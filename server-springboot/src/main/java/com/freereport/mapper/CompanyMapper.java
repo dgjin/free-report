@@ -38,12 +38,12 @@ public interface CompanyMapper {
     List<Company> findAssignmentTargets(@Param("excludeId") Long excludeId);
 
     /**
-     * 创建机构，返回包含生成的 ID。
+     * 创建机构，返回受影响行数（生成的主键通过 useGeneratedKeys 回填到参数 map，但 @Param 场景下无法取回，需重新查询）。
      */
-    Company createCompany(@Param("name") String name,
-                          @Param("code") String code,
-                          @Param("parentId") Long parentId,
-                          @Param("level") String level);
+    int createCompany(@Param("name") String name,
+                      @Param("code") String code,
+                      @Param("parentId") Long parentId,
+                      @Param("level") String level);
 
     /**
      * 查询该机构未完成任务数（用于停用前检查）。

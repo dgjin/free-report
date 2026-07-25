@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -16,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class JwtAuthFilter implements Filter {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserMapper userMapper;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     // Auth cache: 30s TTL to avoid DB queries on every request
     private static final long CACHE_TTL_MS = 30_000;
@@ -25,9 +26,10 @@ public class JwtAuthFilter implements Filter {
 
     record CacheEntry(AuthUser authUser, long expiresAt) {}
 
-    public JwtAuthFilter(JwtTokenProvider jwtTokenProvider, UserMapper userMapper) {
+    public JwtAuthFilter(JwtTokenProvider jwtTokenProvider, UserMapper userMapper, ObjectMapper objectMapper) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userMapper = userMapper;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -101,5 +103,16 @@ public class JwtAuthFilter implements Filter {
     public void invalidateCache(Long userId) {
         if (userId != null) cache.remove(userId);
         else cache.clear();
+    }
+
+    /**
+     * 失效指定机构下所有用户的认证缓存（用于机构停用等场景）。
+     */
+    public void invalidateCacheByCompanyId(Long companyId) {
+        if (companyId == null) return;
+        List<Long> userIds = userMapper.findIdsByCompanyId(companyId);
+        for (Long uid : userIds) {
+            cache.remove(uid);
+        }
     }
 }

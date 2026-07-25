@@ -106,6 +106,7 @@ public class ApprovalService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "rejected".equals(action) ? "已驳回" : "审批通过");
         result.put("submission", submissionToMap(submissionMapper.findById(submissionId)));
         result.put("approval", approvalToMap(approvalMapper.findBySubmissionId(submissionId).stream()
                 .filter(x -> x.getId().equals(pending.getId())).findFirst().orElse(null)));

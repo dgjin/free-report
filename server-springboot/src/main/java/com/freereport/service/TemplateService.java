@@ -114,9 +114,10 @@ public class TemplateService {
                                                String periodType, List<Map<String, Object>> fields) {
         ReportTemplate t = new ReportTemplate();
         t.setName(name);
-        t.setDescription(description);
+        t.setDescription(description != null ? description : "");
         t.setPeriodType(periodType);
-        t.setStatus("draft");
+        // 创建即为已发布状态：当前无“发布草稿”入口，draft 无生命周期出口
+        t.setStatus("published");
         t.setCreatedBy(user.getId());
         t.setOwnerDepartmentId(user.getCompanyId());
         templateMapper.insertTemplate(t);
@@ -131,7 +132,14 @@ public class TemplateService {
             }
             templateMapper.insertFieldsBatch(fieldList);
         }
-        return getTemplateDetail(templateId);
+        // 返回结构与前端契约匹配：{ template, fields }
+        Map<String, Object> detail = getTemplateDetail(templateId);
+        Map<String, Object> template = new LinkedHashMap<>(detail);
+        template.remove("fields");
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("template", template);
+        result.put("fields", detail.get("fields"));
+        return result;
     }
 
     /**
@@ -175,7 +183,11 @@ public class TemplateService {
         if (!status.equals(t.getStatus())) {
             templateMapper.setTemplateStatus(id, status);
         }
-        return getTemplateDetail(id);
+        // 返回结构与前端契约匹配：{ message, template }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", enabled ? "报表模板已启用" : "报表模板已停用");
+        result.put("template", getTemplateDetail(id));
+        return result;
     }
 
     /**
@@ -199,8 +211,8 @@ public class TemplateService {
      * 批量新增矩阵字段：检查字段名冲突，按列生成 matrix 类型字段。
      */
     @Transactional
-    public List<Map<String, Object>> addMatrixFields(AuthUser user, Long templateId,
-                                                     List<Map<String, Object>> columns, Map<String, Object> matrixConfig) {
+    public Map<String, Object> addMatrixFields(AuthUser user, Long templateId,
+                                               List<Map<String, Object>> columns, Map<String, Object> matrixConfig) {
         lockWritableTemplate(user, templateId);
 
         List<ReportTemplateField> existingFields = templateMapper.findFieldsByTemplateId(templateId);
@@ -235,7 +247,7 @@ public class TemplateService {
                 if (matrixConfig != null) {
                     matrix.putAll(matrixConfig);
                 }
-                matrix.put("columnLabel", col.get("field_label"));
+                matrix.put("column_label", col.get("field_label"));
                 config.put("matrix", matrix);
                 field.setFieldConfig(toJson(config));
                 field.setSortOrder(sortOrder);
@@ -245,21 +257,31 @@ public class TemplateService {
                 sortOrder++;
             }
         }
-        return created;
+        // 返回结构与前端契约匹配：{ message, fields }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "已添加 " + created.size() + " 个矩阵字段");
+        result.put("fields", created);
+        return result;
     }
 
     /**
-     * 停用模板字段。
+     * 停用模板字段：返回 { message, field } 与前端契约匹配。
      */
     @Transactional
-    public void disableTemplateField(AuthUser user, Long templateId, Long fieldId) {
+    public Map<String, Object> disableTemplateField(AuthUser user, Long templateId, Long fieldId) {
         lockWritableTemplate(user, templateId);
         List<ReportTemplateField> fields = templateMapper.findFieldsByTemplateId(templateId);
-        boolean exists = fields.stream().anyMatch(f -> f.getId() != null && f.getId().equals(fieldId));
-        if (!exists) {
+        ReportTemplateField target = fields.stream()
+                .filter(f -> f.getId() != null && f.getId().equals(fieldId))
+                .findFirst().orElse(null);
+        if (target == null) {
             throw new DomainException("字段不存在", 404);
         }
         templateMapper.disableField(templateId, fieldId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "字段已停用");
+        result.put("field", fieldToMap(target));
+        return result;
     }
 
     /**
@@ -269,13 +291,13 @@ public class TemplateService {
      * - 常规下发：用 INSERT IGNORE 去重
      */
     @Transactional
-    public List<Map<String, Object>> assignTemplate(AuthUser user, Long templateId, List<Long> companyIds,
-                                                    String title, String periodLabel, LocalDate deadline,
-                                                    boolean isOneTime) {
+    public Map<String, Object> assignTemplate(AuthUser user, Long templateId, List<Long> companyIds,
+                                              String title, String periodLabel, LocalDate deadline,
+                                              boolean isOneTime) {
         ReportTemplate t = lockWritableTemplate(user, templateId);
         List<Map<String, Object>> created = new ArrayList<>();
         if (companyIds == null) {
-            return created;
+            companyIds = Collections.emptyList();
         }
         for (Long companyId : companyIds) {
             Company target = companyMapper.findById(companyId);
@@ -309,7 +331,11 @@ public class TemplateService {
                 }
             }
         }
-        return created;
+        // 返回结构与前端契约匹配：{ message, assignments }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "成功下发 " + created.size() + " 家机构");
+        result.put("assignments", created);
+        return result;
     }
 
     // ---- helpers ----

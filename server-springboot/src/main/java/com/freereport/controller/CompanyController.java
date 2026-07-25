@@ -45,8 +45,8 @@ public class CompanyController {
     }
 
     @PutMapping("/{id}/disable")
-    public void disableCompany(@PathVariable Long id) {
+    public Map<String, Object> disableCompany(@PathVariable Long id) {
         securityUtils.requireSuperAdmin();
-        companyService.disableCompany(id);
+        return companyService.disableCompany(id);
     }
 }

@@ -4,6 +4,7 @@ import com.freereport.entity.Company;
 import com.freereport.exception.DomainException;
 import com.freereport.mapper.CompanyMapper;
 import com.freereport.security.AuthUser;
+import com.freereport.security.JwtAuthFilter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,9 +21,11 @@ import java.util.stream.Collectors;
 public class CompanyService {
 
     private final CompanyMapper companyMapper;
+    private final JwtAuthFilter jwtAuthFilter;
 
-    public CompanyService(CompanyMapper companyMapper) {
+    public CompanyService(CompanyMapper companyMapper, JwtAuthFilter jwtAuthFilter) {
         this.companyMapper = companyMapper;
+        this.jwtAuthFilter = jwtAuthFilter;
     }
 
     /**
@@ -78,7 +81,19 @@ public class CompanyService {
         if (parent == null || !"headquarter".equals(parent.getLevel()) || !"active".equals(parent.getStatus())) {
             throw new DomainException("父机构必须是启用中的总部", 400);
         }
-        Company created = companyMapper.createCompany(name, code, parentId, level);
+        // createCompany 使用 @Param 注解，无法将生成的 id 回填到实体，
+        // 需通过 useGeneratedKeys 返回的行数判断成功后重新查询完整记录
+        int affected = companyMapper.createCompany(name, code, parentId, level);
+        if (affected == 0) {
+            throw new DomainException("机构创建失败", 500);
+        }
+        // 通过 name + parentId 定位刚创建的机构，避免依赖回填的 id
+        Company created = companyMapper.findAll().stream()
+                .filter(c -> name.equals(c.getName())
+                        && (parentId == null ? c.getParentId() == null : parentId.equals(c.getParentId()))
+                        && level.equals(c.getLevel()))
+                .findFirst()
+                .orElseThrow(() -> new DomainException("机构创建后查询失败", 500));
         return toMap(created);
     }
 
@@ -86,12 +101,18 @@ public class CompanyService {
      * 停用机构：先检查是否有未完成任务。
      */
     @Transactional
-    public void disableCompany(Long id) {
+    public Map<String, Object> disableCompany(Long id) {
         int active = companyMapper.countActiveAssignments(id);
         if (active > 0) {
             throw new DomainException("该机构仍有未完成任务，暂不能停用", 409);
         }
         companyMapper.disableCompany(id);
+        // 失效该机构下所有用户的认证缓存，确保下次请求重新加载机构状态
+        jwtAuthFilter.invalidateCacheByCompanyId(id);
+        // 返回非空 body，避免前端解析空响应报错
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "机构已停用");
+        return result;
     }
 
     private Map<String, Object> toMap(Company c) {

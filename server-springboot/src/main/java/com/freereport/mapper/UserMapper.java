@@ -39,6 +39,11 @@ public interface UserMapper {
     Company findCompanyById(@Param("id") Long id);
 
     /**
+     * 根据机构 ID 查询该机构下所有用户 ID（用于缓存失效）。
+     */
+    List<Long> findIdsByCompanyId(@Param("companyId") Long companyId);
+
+    /**
      * 更新用户机构和角色。
      */
     void updateUserOrganizationRole(@Param("id") Long id,
