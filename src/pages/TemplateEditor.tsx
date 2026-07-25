@@ -21,6 +21,7 @@ import {
   Trash,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { toast, confirmDialog } from '../utils/toast';
 import { ReportTemplate, ReportTemplateField, FieldType } from '../types';
 import { DEFAULT_FIELD_DATA_TYPE } from '../utils/templateFields';
 import { getTemplateLifecycleView } from '../utils/templateLifecycle';
@@ -110,7 +111,7 @@ export const TemplateEditor: React.FC = () => {
   const handleAddFieldSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!template) return;
-    if (!fieldLabel.trim()) return alert('请填写字段显示名称');
+    if (!fieldLabel.trim()) return toast('请填写字段显示名称', 'error');
 
     // Generate or clean field_name
     let cleanFieldName = fieldName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
@@ -155,7 +156,7 @@ export const TemplateEditor: React.FC = () => {
       setOptionsStr('');
       loadTemplateDetail();
     } catch (err: any) {
-      alert(err.message || '添加字段失败');
+      toast(err.message || '添加字段失败', 'error');
     } finally {
       setAddingField(false);
     }
@@ -164,11 +165,11 @@ export const TemplateEditor: React.FC = () => {
   const handleAddMatrixSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!template) return;
-    if (!matrixRowLabel.trim()) return alert('请填写行维度标签');
+    if (!matrixRowLabel.trim()) return toast('请填写行维度标签', 'error');
     const rowOptions = matrixRowOptions.split('\n').map((s) => s.trim()).filter(Boolean);
-    if (rowOptions.length === 0) return alert('请至少输入一个行选项');
+    if (rowOptions.length === 0) return toast('请至少输入一个行选项', 'error');
     const validCols = matrixColumns.filter((c) => c.field_label.trim());
-    if (validCols.length === 0) return alert('请至少定义一个列字段');
+    if (validCols.length === 0) return toast('请至少定义一个列字段', 'error');
 
     setAddingMatrix(true);
     try {
@@ -187,7 +188,7 @@ export const TemplateEditor: React.FC = () => {
       setMatrixColumns([{ field_label: '', field_type: 'number' }]);
       loadTemplateDetail();
     } catch (err: any) {
-      alert(err.message || '创建交叉表失败');
+      toast(err.message || '创建交叉表失败', 'error');
     } finally {
       setAddingMatrix(false);
     }
@@ -195,13 +196,13 @@ export const TemplateEditor: React.FC = () => {
 
   const handleDisableField = async (fieldId: number) => {
     if (!template) return;
-    if (!confirm('根据报表只增不减设计规范，停用字段后历史数据仍将保留，但新填报不再要求填写。确认停用？')) return;
+    if (!(await confirmDialog('根据报表只增不减设计规范，停用字段后历史数据仍将保留，但新填报不再要求填写。确认停用？'))) return;
 
     try {
       await api.disableField(template.id, fieldId);
       loadTemplateDetail();
     } catch (err: any) {
-      alert(err.message || '停用字段失败');
+      toast(err.message || '停用字段失败', 'error');
     }
   };
 
@@ -308,7 +309,7 @@ export const TemplateEditor: React.FC = () => {
         <div className="space-y-0.5">
           <div className="font-bold text-[#1d1d1f]">只增不减设计规范（Ensure Backward Compatibility）</div>
           <div className="text-[#6e6e73] leading-relaxed">
-            自由报表采用字段安全兼容策略：发布后的字段不可物理删除，仅可"停用"。已停用字段会在历史版本中安全呈现，保证历史数据完整性与合规可溯。
+            随手报采用字段安全兼容策略：发布后的字段不可物理删除，仅可"停用"。已停用字段会在历史版本中安全呈现，保证历史数据完整性与合规可溯。
           </div>
         </div>
       </div>

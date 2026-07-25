@@ -16,6 +16,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { api, getStoredUser, removeToken } from '../services/api';
+import { toast } from '../utils/toast';
 import { UserInfo } from '../types';
 import { getClientAccess } from '../utils/access';
 import { mutate } from 'swr';
@@ -74,7 +75,7 @@ export const Layout: React.FC = () => {
       }
       navigate('/');
     } catch (err: any) {
-      alert(err.message || '切换账号失败');
+      toast(err.message || '切换账号失败', 'error');
     }
   };
 
@@ -140,7 +141,7 @@ export const Layout: React.FC = () => {
               <div className="w-7 h-7 rounded-[8px] flex items-center justify-center" style={{ background: 'var(--grad-cta)' }}>
                 <FileSpreadsheet className="w-4 h-4 text-white" />
               </div>
-              <span className="font-semibold text-[15px] text-[#1d1d1f] tracking-[-0.01em]">自由报表</span>
+              <span className="font-semibold text-[15px] text-[#1d1d1f] tracking-[-0.01em]">随手报</span>
               <span className="px-1.5 py-0.5 bg-[#e8e8ed] text-[#86868b] rounded-[4px] text-[9px] font-bold uppercase tracking-wider">
                 v0.1
               </span>
@@ -336,7 +337,7 @@ export const Layout: React.FC = () => {
 
           {/* Quick Info Footer */}
           <div className="p-4 space-y-1" style={{ borderTop: '1px solid var(--hairline)' }}>
-            <div className="text-[11px] font-semibold text-[#1d1d1f]">自由报表 FreeReport v0.1.0</div>
+            <div className="text-[11px] font-semibold text-[#1d1d1f]">随手报 ReportNow v0.1.0</div>
             <div className="text-[10px] text-[#aeaeb2]">系统状态: 本地 MySQL 运行正常</div>
           </div>
         </aside>

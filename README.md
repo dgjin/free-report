@@ -1,6 +1,6 @@
-# FreeReport 私有化部署
+# 随手报 ReportNow 私有化部署
 
-FreeReport 是面向企业私有化部署的报表填报、审批和汇总系统，采用 React + Spring Boot + MySQL 技术栈。
+随手报（ReportNow）是面向企业私有化部署的报表填报、审批和汇总系统，采用 React + Spring Boot + MySQL 技术栈。
 
 ## 技术架构
 

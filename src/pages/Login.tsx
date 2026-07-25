@@ -54,7 +54,7 @@ export const Login: React.FC = () => {
           >
             <FileSpreadsheet className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-[28px] font-bold text-[#1d1d1f] tracking-[-0.03em]">自由报表</h1>
+          <h1 className="text-[28px] font-bold text-[#1d1d1f] tracking-[-0.03em]">随手报</h1>
           <p className="text-[13px] text-[#6e6e73] mt-1.5 leading-[1.6]">
             企业级下发填报、三级在线审批与数据多维汇总平台
           </p>
@@ -152,7 +152,7 @@ export const Login: React.FC = () => {
         </div>
 
         <p className="text-center text-[11px] text-[#aeaeb2] mt-6">
-          自由报表 FreeReport v0.1.0 · 安全连接
+          随手报 ReportNow v0.1.0 · 安全连接
         </p>
       </div>
     </div>
