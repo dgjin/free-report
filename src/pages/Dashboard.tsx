@@ -27,6 +27,7 @@ import {
 import { api, getStoredUser, swrKeys, swrFetcher } from '../services/api';
 import { UserInfo, ReportTemplate, ReportAssignment, PendingApprovalTask, Company, PendingReceipt, ReportSubmissionDetail } from '../types';
 import { getClientAccess } from '../utils/access';
+import { SubmissionDetailTables } from '../components/SubmissionDetailTables';
 
 export const Dashboard: React.FC = () => {
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
@@ -588,28 +589,7 @@ export const Dashboard: React.FC = () => {
                     <div className="text-[13px] font-semibold text-[#1d1d1f]">
                       二、填报明细 (共 <span className="tabular-nums">{submissionDetail.details.length}</span> 行)
                     </div>
-                    <div className="overflow-x-auto rounded-[12px]" style={{ border: '1px solid var(--hairline)' }}>
-                      <table className="w-full text-left text-[12px] border-collapse">
-                        <thead>
-                          <tr className="bg-[#f5f5f7] text-[#1d1d1f] font-semibold" style={{ borderBottom: '1px solid var(--hairline)' }}>
-                            <th className="p-2.5 w-10 text-center text-[#86868b] tabular-nums">#</th>
-                            {submissionDetail.details[0].map((item) => (
-                              <th key={item.field_id} className="p-2.5">{item.field_label}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {submissionDetail.details.map((rowItems, idx) => (
-                            <tr key={idx} style={{ borderTop: '1px solid var(--hairline)' }}>
-                              <td className="p-2.5 text-center text-[#aeaeb2] font-mono tabular-nums">{idx + 1}</td>
-                              {rowItems.map((item) => (
-                                <td key={item.field_id} className="p-2.5 text-[#1d1d1f] font-medium tabular-nums">{item.value || '-'}</td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <SubmissionDetailTables detail={submissionDetail} />
                   </div>
                 ) : null}
 

@@ -21,6 +21,7 @@ import {
   Grid3x3,
 } from 'lucide-react';
 import { api, getStoredUser } from '../services/api';
+import { toast, confirmDialog } from '../utils/toast';
 import {
   ReportAssignment,
   ReportTemplateField,
@@ -137,7 +138,8 @@ export const ReportFill: React.FC = () => {
         ? JSON.parse(field.field_config || '{}')
         : field.field_config || {};
       const matrix = config.matrix;
-      if (!matrix) return;
+      // 容错：跳过配置残缺的矩阵字段（缺少行维度定义）
+      if (!matrix || !matrix.row_label) return;
 
       const key = matrix.row_label;
       if (!groupMap.has(key)) {
@@ -199,7 +201,7 @@ export const ReportFill: React.FC = () => {
     if (!assignment) return;
 
     if (isSubmit) {
-      if (!confirm('确定提交该报表？提交后将发送至下发部门签收，签收前不能再次修改。')) return;
+      if (!(await confirmDialog('确定提交该报表？提交后将发送至下发部门签收，签收前不能再次修改。'))) return;
       setSubmitting(true);
     } else {
       setSaving(true);
@@ -215,10 +217,10 @@ export const ReportFill: React.FC = () => {
       });
 
       setSubmission(res.submission);
-      alert(isSubmit ? '提交成功，报表已发送至下发部门等待签收。' : res.message);
+      toast(isSubmit ? '提交成功，报表已发送至下发部门等待签收。' : res.message, 'success');
       await loadData();
     } catch (err: any) {
-      alert(err.message || '保存或提交失败');
+      toast(err.message || '保存或提交失败', 'error');
     } finally {
       setSaving(false);
       setSubmitting(false);
@@ -242,7 +244,7 @@ export const ReportFill: React.FC = () => {
       });
 
       if (rawRows.length < 2) {
-        alert('Excel 文件数据不足，至少需要包含表头和一行数据');
+        toast('Excel 文件数据不足，至少需要包含表头和一行数据', 'error');
         return;
       }
 
@@ -252,7 +254,7 @@ export const ReportFill: React.FC = () => {
       );
 
       if (dataRows.length === 0) {
-        alert('Excel 文件中未找到有效数据行');
+        toast('Excel 文件中未找到有效数据行', 'error');
         return;
       }
 
@@ -287,7 +289,7 @@ export const ReportFill: React.FC = () => {
       setImportPreviewRows(allRows.slice(0, 5));
       setImportModalOpen(true);
     } catch (err: any) {
-      alert(err.message || 'Excel 解析失败');
+      toast(err.message || 'Excel 解析失败', 'error');
     } finally {
       setImporting(false);
       // reset file input
@@ -298,7 +300,7 @@ export const ReportFill: React.FC = () => {
   const confirmImport = () => {
     const matchedCount = importMapping.filter((m) => m.matchedFieldId !== null).length;
     if (matchedCount === 0) {
-      alert('未找到匹配的字段，请检查 Excel 表头是否与字段名称一致');
+      toast('未找到匹配的字段，请检查 Excel 表头是否与字段名称一致', 'error');
       return;
     }
 
@@ -312,12 +314,12 @@ export const ReportFill: React.FC = () => {
     setImportAllRows([]);
     setImportPreviewRows([]);
     setImportMapping([]);
-    alert(`成功导入 ${importAllRows.length} 行数据`);
+    toast(`成功导入 ${importAllRows.length} 行数据`, 'success');
   };
 
   const downloadTemplate = async () => {
     if (detailFields.length === 0) {
-      alert('当前模板暂无明细字段，无法生成导入模板');
+      toast('当前模板暂无明细字段，无法生成导入模板', 'error');
       return;
     }
     try {
@@ -343,7 +345,7 @@ export const ReportFill: React.FC = () => {
       const safeName = (assignment?.title || '报表').replace(/[\\/:*?"<>|]/g, '_');
       writeFile(workbook, `${safeName}_导入模板.xlsx`);
     } catch (err: any) {
-      alert(err.message || '模板下载失败');
+      toast(err.message || '模板下载失败', 'error');
     }
   };
 

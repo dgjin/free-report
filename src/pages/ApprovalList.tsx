@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { api, getStoredUser } from '../services/api';
 import { PendingApprovalTask, ReportSubmissionDetail, UserInfo } from '../types';
+import { SubmissionDetailTables } from '../components/SubmissionDetailTables';
 
 export const ApprovalList: React.FC = () => {
   const [pendingTasks, setPendingTasks] = useState<PendingApprovalTask[]>([]);
@@ -214,38 +215,13 @@ export const ApprovalList: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. Detail Items */}
+                {/* 2. Detail Items + Matrix Cross-Tabs */}
                 {submissionDetail.details && submissionDetail.details.length > 0 && (
                   <div className="p-4 bg-[#f5f5f7] rounded-[16px] space-y-3">
                     <div className="text-xs font-semibold text-[#1d1d1f] tracking-[-0.01em] pb-2 border-b border-[rgba(0,0,0,0.07)]">
                       二、填报明细清单 (共 {submissionDetail.details.length} 行)
                     </div>
-                    <div className="overflow-x-auto rounded-[12px] border border-[rgba(0,0,0,0.07)] bg-white">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-[#f5f5f7] text-[#6e6e73] font-medium border-b border-[rgba(0,0,0,0.07)]">
-                            <th className="p-2.5 w-10 text-center">#</th>
-                            {submissionDetail.details[0].map((item) => (
-                              <th key={item.field_id} className="p-2.5 font-medium">
-                                {item.field_label}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[rgba(0,0,0,0.07)]">
-                          {submissionDetail.details.map((rowItems, idx) => (
-                            <tr key={idx}>
-                              <td className="p-2.5 text-center text-[#aeaeb2] tabular-nums">{idx + 1}</td>
-                              {rowItems.map((item) => (
-                                <td key={item.field_id} className="p-2.5 text-[#1d1d1f] font-medium tabular-nums">
-                                  {item.value || '-'}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <SubmissionDetailTables detail={submissionDetail} />
                   </div>
                 )}
 

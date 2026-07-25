@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { getToken } from './services/api';
+import { ToastHost } from './utils/toast';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const TemplateList = lazy(() => import('./pages/TemplateList').then((m) => ({ default: m.TemplateList })));
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      <ToastHost />
     </BrowserRouter>
   );
 }

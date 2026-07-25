@@ -151,8 +151,15 @@ export interface SubmissionDetailItem {
   field_id: number;
   field_name: string;
   field_label: string;
+  data_type?: DataType;
   value: string;
   row_index: number;
+}
+
+export interface SubmissionMatrixGroup {
+  row_label: string;
+  row_options: string[];
+  columns: Array<{ field_id: number; field_label: string; field_type: FieldType }>;
 }
 
 export interface ReportSubmissionDetail {
@@ -172,6 +179,7 @@ export interface ReportSubmissionDetail {
   summary: SubmissionSummaryItem[];
   details: SubmissionDetailItem[][];
   approvals: ApprovalRecord[];
+  matrix_groups?: SubmissionMatrixGroup[];
 }
 
 export interface PendingReceipt {

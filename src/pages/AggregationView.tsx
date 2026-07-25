@@ -208,7 +208,8 @@ export const AggregationView: React.FC = () => {
         ? JSON.parse(field.field_config || '{}')
         : field.field_config || {};
       const matrix = config.matrix;
-      if (!matrix) return;
+      // 容错：跳过配置残缺的矩阵字段（缺少行维度定义）
+      if (!matrix || !matrix.row_label) return;
 
       const key = matrix.row_label;
       if (!groupMap.has(key)) {

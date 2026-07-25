@@ -55,14 +55,16 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   }
 
   const res = await fetch(url, { ...options, headers });
-  const data = await res.json();
+  // 兼容空响应体（void/204/null 返回），避免 res.json() 抛出 Unexpected end of JSON input
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
 
   if (!res.ok) {
     if (res.status === 401) {
       removeToken();
       window.location.href = '/login';
     }
-    throw new Error(data.error || '请求服务出现异常');
+    throw new Error(data?.error || '请求服务出现异常');
   }
 
   return data as T;

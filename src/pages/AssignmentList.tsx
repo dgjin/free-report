@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send, Calendar, Search, X, Building2, RotateCcw, Zap } from 'lucide-react';
 import { getStoredUser, useAssignments, api } from '../services/api';
+import { toast } from '../utils/toast';
 import { UserInfo } from '../types';
 import { getClientAccess } from '../utils/access';
 import {
@@ -29,16 +30,16 @@ export const AssignmentList: React.FC = () => {
 
   const handleRecall = async () => {
     if (!recallId) return;
-    if (!recallReason.trim()) return alert('请填写收回原因');
+    if (!recallReason.trim()) return toast('请填写收回原因', 'error');
     setRecalling(true);
     try {
       await api.recallAssignment(recallId, recallReason);
-      alert('任务已强制收回');
+      toast('任务已强制收回', 'success');
       setRecallId(null);
       setRecallReason('');
       await mutate('/api/assignments');
     } catch (err: any) {
-      alert(err.message || '收回失败');
+      toast(err.message || '收回失败', 'error');
     } finally {
       setRecalling(false);
     }

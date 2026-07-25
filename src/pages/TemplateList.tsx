@@ -16,6 +16,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { api, useTemplates, useAssignmentTargets } from '../services/api';
+import { toast, confirmDialog } from '../utils/toast';
 import { ReportTemplate } from '../types';
 import { getInitialTemplateFields } from '../utils/templateFields';
 import { getTemplateLifecycleView } from '../utils/templateLifecycle';
@@ -49,7 +50,7 @@ export const TemplateList: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return alert('请输入模板名称');
+    if (!name.trim()) return toast('请输入模板名称', 'error');
 
     try {
       const res = await api.createTemplate({
@@ -63,7 +64,7 @@ export const TemplateList: React.FC = () => {
       setDescription('');
       navigate(`/templates/${res.template.id}`);
     } catch (err: any) {
-      alert(err.message || '创建失败');
+      toast(err.message || '创建失败', 'error');
     }
   };
 
@@ -83,8 +84,8 @@ export const TemplateList: React.FC = () => {
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTemplate) return;
-    if (selectedBranchIds.length === 0) return alert('请至少选择一个目标分公司');
-    if (!assignTitle || !deadline) return alert('请填写下发标题和截止日期');
+    if (selectedBranchIds.length === 0) return toast('请至少选择一个目标分公司', 'error');
+    if (!assignTitle || !deadline) return toast('请填写下发标题和截止日期', 'error');
 
     setAssigning(true);
     try {
@@ -96,12 +97,12 @@ export const TemplateList: React.FC = () => {
         deadline,
         isOneTime,
       );
-      alert(res.message);
+      toast(res.message, 'success');
       setAssignModalOpen(false);
       await reloadTemplates();
       await mutate('/api/assignments');
     } catch (err: any) {
-      alert(err.message || '下发失败');
+      toast(err.message || '下发失败', 'error');
     } finally {
       setAssigning(false);
     }
@@ -118,7 +119,7 @@ export const TemplateList: React.FC = () => {
   const handleTemplateLifecycle = async (t: ReportTemplate) => {
     const lifecycle = getTemplateLifecycleView(t.status);
     if (lifecycleActionIdRef.current !== null || !lifecycle.canTransition) return;
-    if (!lifecycle.isArchived && !confirm('停用后不能编辑或新下发，历史任务和数据不受影响。确认停用？')) {
+    if (!lifecycle.isArchived && !(await confirmDialog('停用后不能编辑或新下发，历史任务和数据不受影响。确认停用？'))) {
       return;
     }
 
@@ -126,10 +127,10 @@ export const TemplateList: React.FC = () => {
     setLifecycleActionId(t.id);
     try {
       const res = await (lifecycle.isArchived ? api.enableTemplate(t.id) : api.disableTemplate(t.id));
-      alert(res.message);
+      toast(res.message, 'success');
       await reloadTemplates();
     } catch (err: any) {
-      alert(err.message || (lifecycle.isArchived ? '重新启用失败' : '停用失败'));
+      toast(err.message || (lifecycle.isArchived ? '重新启用失败' : '停用失败'), 'error');
     } finally {
       lifecycleActionIdRef.current = null;
       setLifecycleActionId(null);

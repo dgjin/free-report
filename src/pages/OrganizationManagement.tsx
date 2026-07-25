@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { toast, confirmDialog, promptDialog } from '../utils/toast';
 import type { Company } from '../types';
 
 export const OrganizationManagement: React.FC = () => {
@@ -8,10 +9,10 @@ export const OrganizationManagement: React.FC = () => {
   const load = () => Promise.all([api.getAssignmentTargets(), api.getUsers()]).then(([c, u]) => { setTargets(c); setUsers(u); });
   useEffect(() => { load(); }, []);
   const createDepartment = async () => {
-    const name = prompt('请输入总部部门名称')?.trim(); if (!name) return;
-    const code = prompt('请输入唯一部门编码（例如 HQ-AUDIT）')?.trim(); if (!code) return;
+    const name = (await promptDialog('请输入总部部门名称'))?.trim(); if (!name) return;
+    const code = (await promptDialog('请输入唯一部门编码（例如 HQ-AUDIT）'))?.trim(); if (!code) return;
     const parent_id = targets.find(item => item.level === 'department')?.parent_id;
-    if (!parent_id) return alert('未找到总部根机构');
+    if (!parent_id) return toast('未找到总部根机构', 'error');
     await api.createCompany({ name, code, parent_id, level: 'department' }); await load();
   };
   const updateUser = async (user: any, companyId: number, role: string) => {
@@ -44,7 +45,7 @@ export const OrganizationManagement: React.FC = () => {
               </div>
               <button
                 disabled={c.status !== 'active'}
-                onClick={async () => { if (confirm(`确认停用 ${c.name}？`)) { await api.disableCompany(c.id); await load(); } }}
+                onClick={async () => { if (await confirmDialog(`确认停用 ${c.name}？`)) { await api.disableCompany(c.id); await load(); } }}
                 className={`text-[12px] font-semibold px-3 h-8 rounded-full transition-colors ${c.status === 'active' ? 'text-[#ff6b00] hover:bg-[rgba(255,107,0,0.1)]' : 'text-[#aeaeb2] cursor-not-allowed'}`}>
                 {c.status === 'active' ? '停用' : '已停用'}
               </button>
