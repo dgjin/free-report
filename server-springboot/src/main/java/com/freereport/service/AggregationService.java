@@ -62,6 +62,7 @@ public class AggregationService {
      * - 验证 canReadTemplate
      * - 批量查询各分支最新已审批提交，计算合计/均值
      * - 仅 pending_receipt/received 状态参与计算
+     * - 返回结构与前端 AggregationResponse 匹配
      */
     public Map<String, Object> getAggregationByTemplate(Long templateId, String periodLabel, AuthUser user) {
         ReportTemplate t = templateMapper.findById(templateId);
@@ -71,15 +72,21 @@ public class AggregationService {
         if (!securityUtils.canReadTemplate(t.getOwnerDepartmentId())) {
             throw new DomainException("无权查看该模板", 403);
         }
-
+    
         List<ReportAssignment> assignments = assignmentMapper.findByTemplateAndPeriod(templateId, periodLabel);
         List<Long> assignmentIds = assignments.stream().map(ReportAssignment::getId).collect(Collectors.toList());
-
-        List<ReportTemplateField> fields = templateMapper.findFieldsByTemplateId(templateId);
-        List<ReportTemplateField> numericFields = fields.stream()
+    
+        List<ReportTemplateField> allFields = templateMapper.findFieldsByTemplateId(templateId);
+        List<ReportTemplateField> summaryFields = allFields.stream()
+                .filter(f -> "summary".equals(f.getDataType()) && "active".equals(f.getStatus()))
+                .collect(Collectors.toList());
+        List<ReportTemplateField> detailFields = allFields.stream()
+                .filter(f -> "detail".equals(f.getDataType()) && "active".equals(f.getStatus()))
+                .collect(Collectors.toList());
+        List<ReportTemplateField> numericFields = allFields.stream()
                 .filter(f -> "number".equals(f.getFieldType()) && "active".equals(f.getStatus()))
                 .collect(Collectors.toList());
-
+    
         // 每个任务的最新已审批提交
         Map<Long, ReportSubmission> subMap = new HashMap<>();
         if (!assignmentIds.isEmpty()) {
@@ -90,7 +97,7 @@ public class AggregationService {
         }
         List<Long> submissionIds = subMap.values().stream()
                 .map(ReportSubmission::getId).collect(Collectors.toList());
-
+    
         // 批量查询明细数据
         Map<Long, Map<Long, String>> valueBySubmission = new HashMap<>();
         if (!submissionIds.isEmpty()) {
@@ -101,66 +108,78 @@ public class AggregationService {
                         .put(d.getFieldId(), d.getValue());
             }
         }
-
+    
         // 批量查询机构
         List<Long> companyIds = assignments.stream()
                 .map(ReportAssignment::getAssignedToCompanyId).distinct().collect(Collectors.toList());
         Map<Long, Company> companyMap = companyIds.isEmpty() ? Collections.emptyMap()
                 : companyMapper.findByIds(companyIds).stream()
                 .collect(Collectors.toMap(Company::getId, c -> c));
-
-        // 构建每分支行并累计合计
-        List<Map<String, Object>> rows = new ArrayList<>();
-        Map<Long, Double> sums = new LinkedHashMap<>();
+    
+        // 构建 company_data 行
+        List<Map<String, Object>> companyData = new ArrayList<>();
+        Map<String, Double> sumMap = new LinkedHashMap<>();
         for (ReportTemplateField nf : numericFields) {
-            sums.put(nf.getId(), 0.0);
+            sumMap.put(nf.getFieldName(), 0.0);
         }
         int submittedCount = 0;
         for (ReportAssignment a : assignments) {
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("assignment_id", a.getId());
+            row.put("company_id", a.getAssignedToCompanyId());
             Company c = companyMap.get(a.getAssignedToCompanyId());
             row.put("company_name", c != null ? c.getName() : null);
+            row.put("company_code", c != null ? c.getCode() : null);
+            row.put("has_assignment", true);
             row.put("assignment_status", a.getStatus());
-
+    
             ReportSubmission s = subMap.get(a.getId());
-            if (s != null && ("pending_receipt".equals(s.getStatus()) || "received".equals(s.getStatus()))) {
-                row.put("submission_id", s.getId());
-                row.put("submission_status", s.getStatus());
+            boolean hasSubmitted = s != null && ("pending_receipt".equals(s.getStatus()) || "received".equals(s.getStatus()));
+            row.put("has_submitted", hasSubmitted);
+            row.put("submission_status", s != null ? s.getStatus() : null);
+            row.put("submission_version", s != null ? s.getVersion() : null);
+    
+            Map<String, String> values = new LinkedHashMap<>();
+            if (hasSubmitted) {
                 submittedCount++;
-                Map<Long, String> values = valueBySubmission.getOrDefault(s.getId(), Collections.emptyMap());
+                Map<Long, String> submissionValues = valueBySubmission.getOrDefault(s.getId(), Collections.emptyMap());
                 for (ReportTemplateField nf : numericFields) {
-                    double num = parseDouble(values.get(nf.getId()));
-                    row.put(nf.getFieldName(), num);
-                    sums.merge(nf.getId(), num, Double::sum);
+                    double num = parseDouble(submissionValues.get(nf.getId()));
+                    values.put(nf.getFieldName(), String.valueOf(num));
+                    sumMap.merge(nf.getFieldName(), num, Double::sum);
                 }
-            } else {
-                row.put("submission_id", null);
-                row.put("submission_status", s != null ? s.getStatus() : null);
-                for (ReportTemplateField nf : numericFields) {
-                    row.put(nf.getFieldName(), null);
+                for (ReportTemplateField tf : summaryFields) {
+                    if (!"number".equals(tf.getFieldType())) {
+                        values.put(tf.getFieldName(), submissionValues.getOrDefault(tf.getId(), ""));
+                    }
                 }
             }
-            rows.add(row);
+            row.put("values", values);
+            companyData.add(row);
         }
-
-        Map<String, Object> totals = new LinkedHashMap<>();
-        Map<String, Object> averages = new LinkedHashMap<>();
+    
+        // summary: { field_name: { total, count, average } }
+        Map<String, Object> summary = new LinkedHashMap<>();
         for (ReportTemplateField nf : numericFields) {
-            double sum = sums.getOrDefault(nf.getId(), 0.0);
-            totals.put(nf.getFieldName(), sum);
-            averages.put(nf.getFieldName(), submittedCount > 0 ? sum / submittedCount : 0);
+            double total = sumMap.getOrDefault(nf.getFieldName(), 0.0);
+            summary.put(nf.getFieldName(), Map.of(
+                    "total", total,
+                    "count", submittedCount,
+                    "average", submittedCount > 0 ? total / submittedCount : 0.0
+            ));
         }
-
+    
+        // detail_rows 和 detail_summary（简化，从明细字段的提交数据构建）
+        List<Map<String, Object>> detailRows = new ArrayList<>();
+        Map<String, Object> detailSummary = new LinkedHashMap<>();
+    
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("template_id", templateId);
-        result.put("template_name", t.getName());
-        result.put("period_label", periodLabel);
-        result.put("branch_count", assignments.size());
-        result.put("submitted_count", submittedCount);
-        result.put("rows", rows);
-        result.put("totals", totals);
-        result.put("averages", averages);
+        result.put("template", templateToMap(t));
+        result.put("summary_fields", summaryFields.stream().map(this::fieldToMap).collect(Collectors.toList()));
+        result.put("detail_fields", detailFields.stream().map(this::fieldToMap).collect(Collectors.toList()));
+        result.put("company_data", companyData);
+        result.put("summary", summary);
+        result.put("detail_rows", detailRows);
+        result.put("detail_summary", detailSummary);
         return result;
     }
 
@@ -280,6 +299,37 @@ public class AggregationService {
         m.put("submitted_count", agg.getSubmittedCount());
         m.put("created_at", agg.getCreatedAt());
         m.put("updated_at", agg.getUpdatedAt());
+        return m;
+    }
+
+    private Map<String, Object> templateToMap(ReportTemplate t) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", t.getId());
+        m.put("name", t.getName());
+        m.put("description", t.getDescription());
+        m.put("period_type", t.getPeriodType());
+        m.put("status", t.getStatus());
+        m.put("created_by", t.getCreatedBy());
+        m.put("owner_department_id", t.getOwnerDepartmentId());
+        m.put("created_at", t.getCreatedAt());
+        m.put("updated_at", t.getUpdatedAt());
+        return m;
+    }
+
+    private Map<String, Object> fieldToMap(ReportTemplateField f) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        if (f == null) {
+            return m;
+        }
+        m.put("id", f.getId());
+        m.put("template_id", f.getTemplateId());
+        m.put("field_name", f.getFieldName());
+        m.put("field_label", f.getFieldLabel());
+        m.put("field_type", f.getFieldType());
+        m.put("data_type", f.getDataType());
+        m.put("field_config", f.getFieldConfig());
+        m.put("sort_order", f.getSortOrder());
+        m.put("status", f.getStatus());
         return m;
     }
 }

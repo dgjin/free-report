@@ -216,7 +216,7 @@ public class SubmissionService {
                 ? templateMapper.findFieldsByTemplateId(assignment.getTemplateId())
                 : Collections.emptyList();
         Map<Long, ReportTemplateField> fieldMetaMap = templateFields.stream()
-                .collect(Collectors.toMap(ReportTemplateField::getId, f -> f, (a, b) -> a));
+                .collect(Collectors.toMap(ReportTemplateField::getId, f -> f, (x, y) -> x));
 
         // 将 summary 从 fieldId->value 转换为带元数据的列表
         List<Map<String, Object>> enrichedSummary = new ArrayList<>();
