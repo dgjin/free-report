@@ -1,64 +1,168 @@
 @import "tailwindcss";
 
-/* Apple Liquid Glass — design tokens */
+/* Premium Utilitarian Minimalism — design tokens */
+/* 双主题：默认暖单色；<html data-theme="blue"> 切换冷蓝系 */
 :root {
-  --bg:        #f5f5f7;
-  --surface:   #ffffff;
-  --hover:     #fbfbfd;
-  --text:      #1d1d1f;
-  --text-body: #424245;
-  --text-2:    #6e6e73;
-  --text-3:    #86868b;
-  --text-4:    #aeaeb2;
-  --faint:     #d2d2d7;
-  --hairline:  rgba(0,0,0,0.07);
+  /* Warm monochrome */
+  --bg:        #F7F6F3;
+  --surface:   #FFFFFF;
+  --hover:     #F9F9F8;
+  --text:      #111111;
+  --text-body: #2F3437;
+  --text-2:    #787774;
+  --text-3:    #9B9A97;
+  --text-4:    #B4B3B0;
+  --faint:     #EAEAEA;
+  --hairline:  #EAEAEA;
 
-  --accent:    #0071e3;
-  --indigo:    #5e5ce6;
-  --live:      #30d158;
-  --heat:      #ff6b00;
+  /* Accent: scarce, near-black */
+  --accent:    #111111;
+  --indigo:    #111111;
+  --ink-hover: #333333;
+  --live:      #346538;
+  --heat:      #9F2F2D;
 
-  --grad-cta:  linear-gradient(135deg, #0071e3 0%, #5e5ce6 100%);
+  /* CTA: solid ink, no gradient */
+  --grad-cta:  #111111;
 
-  --r-card:    18px;
-  --r-panel:   22px;
-  --r-hero:    26px;
+  /* Themed chrome (selection / focus / scrollbar) */
+  --sel:             rgba(17,17,17,0.08);
+  --focus:           rgba(17,17,17,0.35);
+  --scrollbar:       rgba(0,0,0,0.12);
+  --scrollbar-hover: rgba(0,0,0,0.2);
 
-  --sh-card:    0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
-  --sh-panel:   0 1px 3px rgba(0,0,0,0.05), 0 14px 40px rgba(0,0,0,0.05);
-  --sh-lift:    0 12px 32px rgba(0,0,0,0.1);
-  --sh-cta:     0 20px 54px rgba(0,113,227,0.24);
-  --sh-overlay: 0 2px 8px rgba(0,0,0,0.10), 0 30px 80px rgba(0,0,0,0.24);
+  /* Crisp radii */
+  --r-card:    12px;
+  --r-panel:   12px;
+  --r-hero:    12px;
+
+  /* Shadows: hairline ring + whisper lift (per spec: 1px hairline borders) */
+  --sh-card:    0 0 0 1px var(--hairline);
+  --sh-panel:   0 0 0 1px var(--hairline);
+  --sh-lift:    0 0 0 1px var(--hairline), 0 2px 8px rgba(0,0,0,0.04);
+  --sh-cta:     none;
+  --sh-overlay: 0 8px 32px rgba(0,0,0,0.10);
+
+  /* Muted pastel accents (semantic, constant across themes) */
+  --pastel-red-bg:    #FDEBEC;  --pastel-red-text:    #9F2F2D;
+  --pastel-blue-bg:   #E1F3FE;  --pastel-blue-text:   #1F6C9F;
+  --pastel-green-bg:  #EDF3EC;  --pastel-green-text:  #346538;
+  --pastel-yellow-bg: #FBF3DB;  --pastel-yellow-text: #956400;
 
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-reveal:    cubic-bezier(0.16, 1, 0.3, 1);
 
-  --font-apple: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
-                'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  /* Typography */
+  --font-apple: 'SF Pro Display', 'Geist Sans', 'Helvetica Neue', 'Switzer',
+                'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-serif: 'Lyon Text', 'Newsreader', 'Playfair Display', 'Instrument Serif',
+                'Songti SC', 'Noto Serif SC', serif;
+  --font-mono:  'Geist Mono', 'SF Mono', 'JetBrains Mono', 'Menlo', monospace;
+}
+
+/* Cool blue theme — same structure, cool-tinted neutrals + deep sea-blue ink */
+[data-theme='blue'] {
+  --bg:        #F3F6FA;
+  --surface:   #FFFFFF;
+  --hover:     #F6F9FC;
+  --text:      #123E5F;
+  --text-body: #32434F;
+  --text-2:    #647A8C;
+  --text-3:    #94A7B5;
+  --text-4:    #B8C5CF;
+  --faint:     #DFE7EF;
+  --hairline:  #DFE7EF;
+
+  --accent:    #123E5F;
+  --indigo:    #123E5F;
+  --ink-hover: #1E5B85;
+  --grad-cta:  #123E5F;
+
+  --sel:             rgba(18,62,95,0.10);
+  --focus:           rgba(18,62,95,0.40);
+  --scrollbar:       rgba(18,62,95,0.16);
+  --scrollbar-hover: rgba(18,62,95,0.28);
+}
+
+/* 语义色映射进 Tailwind 主题（inline 保持 var() 引用，支持运行时切主题）
+   用法：bg-ink / text-mute / border-line / bg-canvas / hover:bg-inkhover / bg-hoverbg */
+@theme inline {
+  --color-ink:      var(--text);
+  --color-inkhover: var(--ink-hover);
+  --color-body:     var(--text-body);
+  --color-mute:     var(--text-2);
+  --color-faint:    var(--text-3);
+  --color-line:     var(--hairline);
+  --color-canvas:   var(--bg);
+  --color-hoverbg:  var(--hover);
+  --color-surface:  var(--surface);
 }
 
 html, body, #root {
   background: var(--bg);
   font-family: var(--font-apple);
+  color: var(--text-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
 }
 
-.tabular-nums { font-variant-numeric: tabular-nums; }
+::selection { background: var(--sel); }
 
-/* Hairline divider between adjacent rows — the anti-fragmentation pattern */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.t-serif { font-family: var(--font-serif); letter-spacing: -0.02em; }
+.t-mono  { font-family: var(--font-mono); }
+
+/* Physical key micro-UI */
+kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid var(--faint);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-2);
+}
+
+/* Hairline divider between adjacent rows */
 .apple-row + .apple-row { border-top: 1px solid var(--hairline); }
 .apple-row:hover { background: var(--hover); transition: background .15s; }
 
-/* Card hover lift */
-.apple-card { transition: transform .2s var(--ease-out-quart), box-shadow .2s var(--ease-out-quart); }
-.apple-card:hover { transform: translateY(-3px); box-shadow: var(--sh-lift); }
+/* Card hover: whisper-quiet shadow shift, no lift */
+.apple-card { transition: box-shadow .2s var(--ease-out-quart); }
+.apple-card:hover { box-shadow: var(--sh-lift) !important; }
+
+/* Quiet focus rings */
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Primary buttons: micro-press feedback */
+button { transition-timing-function: var(--ease-out-quart); }
+button:active { transform: scale(0.98); }
+
+/* Scroll-entry reveal (IntersectionObserver driven) */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity .6s var(--ease-reveal), transform .6s var(--ease-reveal);
+  transition-delay: calc(var(--reveal-index, 0) * 80ms);
+}
+.reveal.reveal-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Mount animation for standalone pages (Login 等无 observer 场景) */
+@keyframes mount-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.mount-rise { animation: mount-rise .6s var(--ease-reveal) both; }
 
 /* Live pulsing dot */
 @keyframes pulse-dot {
-  0%   { box-shadow: 0 0 0 0 rgba(48,209,88,0.5); }
-  70%  { box-shadow: 0 0 0 7px rgba(48,209,88,0); }
-  100% { box-shadow: 0 0 0 0 rgba(48,209,88,0); }
+  0%   { box-shadow: 0 0 0 0 rgba(52,101,56,0.35); }
+  70%  { box-shadow: 0 0 0 7px rgba(52,101,56,0); }
+  100% { box-shadow: 0 0 0 0 rgba(52,101,56,0); }
 }
 .live-dot { animation: pulse-dot 2.2s infinite; }
 
@@ -68,8 +172,14 @@ html, body, #root {
   to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes toast-pop-in {
-  from { opacity: 0; transform: scale(0.94) translateY(8px); }
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
-.toast-slide-in { animation: toast-slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
-.toast-pop-in { animation: toast-pop-in 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+.toast-slide-in { animation: toast-slide-in 0.28s var(--ease-reveal); }
+.toast-pop-in { animation: toast-pop-in 0.22s var(--ease-reveal); }
+
+/* Quiet scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+::-webkit-scrollbar-track { background: transparent; }

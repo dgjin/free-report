@@ -149,10 +149,10 @@ export default function ExcelFieldImportModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col mx-4">
+      <div className="bg-white rounded-[12px] w-full max-w-4xl max-h-[85vh] flex flex-col mx-4" style={{ boxShadow: 'var(--sh-overlay)', border: '1px solid var(--hairline)' }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+          <h3 className="text-lg font-semibold text-ink">
             {step === 'upload'
               ? '从 Excel 导入表头'
               : step === 'preview'
@@ -162,7 +162,7 @@ export default function ExcelFieldImportModal({
           <button
             onClick={handleClose}
             disabled={importing}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+            className="text-faint hover:text-mute text-xl leading-none"
           >
             ✕
           </button>
@@ -171,7 +171,7 @@ export default function ExcelFieldImportModal({
         {/* Body */}
         <div className="flex-1 overflow-auto px-6 py-4">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+            <div className="mb-4 p-3 bg-[#FDEBEC] text-[#9F2F2D] rounded-md text-sm">
               {error}
             </div>
           )}
@@ -179,7 +179,7 @@ export default function ExcelFieldImportModal({
           {step === 'upload' && (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="mb-4 text-5xl">📊</div>
-              <p className="text-gray-600 mb-6 text-center">
+              <p className="text-mute mb-6 text-center">
                 上传 Excel 文件，系统将自动识别第一行作为表头字段
               </p>
               <input
@@ -191,14 +191,14 @@ export default function ExcelFieldImportModal({
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="px-6 py-2.5 bg-ink text-white rounded-md hover:bg-inkhover transition-colors font-medium"
               >
                 选择 Excel 文件
               </button>
-              <p className="mt-4 text-xs text-gray-400">
+              <p className="mt-4 text-xs text-faint">
                 支持 .xlsx、.xls、.csv 格式
               </p>
-              <div className="mt-6 w-full max-w-md bg-gray-50 rounded-lg p-4 text-sm text-gray-500">
+              <div className="mt-6 w-full max-w-md bg-canvas rounded-lg p-4 text-sm text-mute">
                 <p className="font-medium mb-2">Excel 格式要求：</p>
                 <ul className="list-disc pl-4 space-y-1">
                   <li>第一行：字段名称（表头）</li>
@@ -212,29 +212,29 @@ export default function ExcelFieldImportModal({
           {step === 'preview' && (
             <div className="space-y-4">
               {/* 批量操作 */}
-              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                <span className="text-sm text-gray-700 font-medium">批量设置数据类型：</span>
+              <div className="flex items-center gap-3 p-3 bg-[#E1F3FE] rounded-lg">
+                <span className="text-sm text-body font-medium">批量设置数据类型：</span>
                 <button
                   onClick={() => handleBulkDataType('detail')}
-                  className="px-3 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                  className="px-3 py-1 text-xs bg-white border border-[#E1F3FE] text-[#1F6C9F] rounded-md hover:bg-[#FDEBEC] transition-colors"
                 >
                   全部设为明细数据
                 </button>
                 <button
                   onClick={() => handleBulkDataType('summary')}
-                  className="px-3 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                  className="px-3 py-1 text-xs bg-white border border-[#E1F3FE] text-[#1F6C9F] rounded-md hover:bg-[#FDEBEC] transition-colors"
                 >
                   全部设为摘要数据
                 </button>
-                <span className="text-xs text-gray-400 ml-auto">
+                <span className="text-xs text-faint ml-auto">
                   共 {parsedFields.length} 个字段
                 </span>
               </div>
 
               {/* Excel 原始数据预览 */}
               {previewRows.length > 0 && (
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-600">
+                <div className="border border-line rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-canvas border-b border-line text-xs font-medium text-mute">
                     Excel 原始数据预览（前 {previewRows.length} 行）
                   </div>
                   <div className="overflow-x-auto">
@@ -244,7 +244,7 @@ export default function ExcelFieldImportModal({
                           {previewRows[0]?.map((cell, i) => (
                             <th
                               key={i}
-                              className="px-3 py-1.5 bg-blue-50 border-b border-gray-200 text-left font-medium text-blue-700 whitespace-nowrap"
+                              className="px-3 py-1.5 bg-[#E1F3FE] border-b border-line text-left font-medium text-blue-700 whitespace-nowrap"
                             >
                               {cell || `列${i + 1}`}
                             </th>
@@ -257,7 +257,7 @@ export default function ExcelFieldImportModal({
                             {row.map((cell, ci) => (
                               <td
                                 key={ci}
-                                className="px-3 py-1 border-b border-gray-100 text-gray-600 whitespace-nowrap"
+                                className="px-3 py-1 border-b border-gray-100 text-mute whitespace-nowrap"
                               >
                                 {cell || '-'}
                               </td>
@@ -271,30 +271,30 @@ export default function ExcelFieldImportModal({
               )}
 
               {/* 字段配置预览 */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-600">
+              <div className="border border-line rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-canvas border-b border-line text-xs font-medium text-mute">
                   字段配置预览
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 w-12">
+                      <tr className="bg-canvas">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-mute w-12">
                           #
                         </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-mute">
                           字段标签
                         </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-mute">
                           字段名 (Field Name)
                         </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 w-28">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-mute w-28">
                           字段类型
                         </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 w-28">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-mute w-28">
                           数据类型
                         </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 w-48">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-mute w-48">
                           数据样本
                         </th>
                       </tr>
@@ -303,16 +303,16 @@ export default function ExcelFieldImportModal({
                       {parsedFields.map((field, index) => (
                         <tr
                           key={index}
-                          className="border-t border-gray-100 hover:bg-gray-50"
+                          className="border-t border-gray-100 hover:bg-canvas"
                         >
-                          <td className="px-3 py-2 text-gray-400 text-xs">
+                          <td className="px-3 py-2 text-faint text-xs">
                             {field.sort_order}
                           </td>
                           <td className="px-3 py-2">
                             <input
                               type="text"
                               value={field.field_label}
-                              className="w-full px-2 py-1 border border-gray-200 rounded text-sm bg-gray-50 text-gray-600"
+                              className="w-full px-2 py-1 border border-line rounded text-sm bg-canvas text-mute"
                               disabled
                             />
                           </td>
@@ -365,7 +365,7 @@ export default function ExcelFieldImportModal({
                                 field.sample_values.map((v, vi) => (
                                   <span
                                     key={vi}
-                                    className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-500 max-w-32 truncate"
+                                    className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs text-mute max-w-32 truncate"
                                     title={v}
                                   >
                                     {v}
@@ -390,11 +390,11 @@ export default function ExcelFieldImportModal({
 
         {/* Footer */}
         {step === 'preview' && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-line">
             <button
               onClick={reset}
               disabled={importing}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              className="px-4 py-2 text-sm text-mute hover:text-gray-800 transition-colors"
             >
               重新上传
             </button>
@@ -402,14 +402,14 @@ export default function ExcelFieldImportModal({
               <button
                 onClick={handleClose}
                 disabled={importing}
-                className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-sm border border-gray-300 text-body rounded-lg hover:bg-canvas transition-colors"
               >
                 取消
               </button>
               <button
                 onClick={handleImport}
                 disabled={importing || parsedFields.length === 0}
-                className="px-6 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 text-sm bg-ink text-white rounded-md hover:bg-inkhover transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {importing ? '导入中...' : `导入 ${parsedFields.length} 个字段`}
               </button>

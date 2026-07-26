@@ -14,9 +14,11 @@ import {
   X,
   RefreshCw,
   Shield,
-} from 'lucide-react';
+} from './icons';
 import { api, getStoredUser, removeToken } from '../services/api';
 import { toast } from '../utils/toast';
+import { useRevealObserver } from '../utils/reveal';
+import { ThemeSwitcher } from './ThemeSwitcher';
 import { UserInfo } from '../types';
 import { getClientAccess } from '../utils/access';
 import { mutate } from 'swr';
@@ -31,6 +33,7 @@ export const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const outlet = useOutlet();
+  useRevealObserver();
 
   useEffect(() => {
     fetchMe();
@@ -107,25 +110,22 @@ export const Layout: React.FC = () => {
   const navLinkClass = (active: boolean) =>
     `flex items-center justify-between px-3.5 py-2.5 rounded-[10px] text-[13px] font-medium transition-colors ${
       active
-        ? 'bg-[#f5f5f7] text-[#1d1d1f] font-semibold'
-        : 'text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]'
+        ? 'bg-canvas text-ink font-semibold'
+        : 'text-mute hover:bg-canvas hover:text-ink'
     }`;
 
   const navIconClass = (active: boolean) =>
-    `w-4 h-4 ${active ? 'text-[#0071e3]' : 'text-[#86868b]'}`;
+    `w-4 h-4 ${active ? 'text-ink' : 'text-mute'}`;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
-      {/* Glass sticky nav — the one place glass is mandatory */}
+      {/* Sticky top bar — solid surface, hairline on scroll */}
       <header
         className="sticky top-0 z-40"
         style={{
-          background: 'rgba(245,245,247,0.72)',
-          backdropFilter: 'saturate(180%) blur(20px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          background: 'var(--surface)',
           borderBottom: scrolled ? '1px solid var(--hairline)' : '1px solid transparent',
-          boxShadow: scrolled ? '0 1px 12px rgba(0,0,0,0.04)' : 'none',
-          transition: 'border-color .3s, box-shadow .3s',
+          transition: 'border-color .3s',
         }}
       >
         <div className="max-w-[1080px] mx-auto px-[22px] h-[54px] flex items-center justify-between gap-4">
@@ -133,7 +133,7 @@ export const Layout: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-[8px] text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] focus:outline-none"
+              className="md:hidden p-2 rounded-[8px] text-mute hover:text-ink hover:bg-canvas focus:outline-none"
             >
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -141,8 +141,8 @@ export const Layout: React.FC = () => {
               <div className="w-7 h-7 rounded-[8px] flex items-center justify-center" style={{ background: 'var(--grad-cta)' }}>
                 <FileSpreadsheet className="w-4 h-4 text-white" />
               </div>
-              <span className="font-semibold text-[15px] text-[#1d1d1f] tracking-[-0.01em]">随手报</span>
-              <span className="px-1.5 py-0.5 bg-[#e8e8ed] text-[#86868b] rounded-[4px] text-[9px] font-bold uppercase tracking-wider">
+              <span className="font-semibold text-[15px] text-ink tracking-[-0.01em]">随手报</span>
+              <span className="px-1.5 py-0.5 bg-line text-mute rounded-[4px] text-[9px] font-bold uppercase tracking-wider">
                 v0.1
               </span>
             </div>
@@ -150,28 +150,28 @@ export const Layout: React.FC = () => {
 
           {/* Right Profile & Quick Switcher */}
           <div className="flex items-center gap-3">
+            <ThemeSwitcher />
             {/* Quick Switch Demo Button */}
             {import.meta.env.DEV && (
               <div className="relative">
                 <button
                   onClick={() => setAccountSwitchOpen(!accountSwitchOpen)}
-                  className="flex items-center gap-1.5 h-8 px-3 text-[12px] font-medium text-[#424245] bg-white/60 hover:bg-white border border-[#e8e8ed] rounded-full transition-colors"
-                  style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+                  className="flex items-center gap-1.5 h-8 px-3 text-[12px] font-medium text-body bg-white hover:bg-hoverbg border border-line rounded-full transition-colors"
                   title="快速切换测试账号"
                 >
-                  <RefreshCw className="w-3 h-3 text-[#0071e3]" />
+                  <RefreshCw className="w-3 h-3 text-ink" />
                   <span className="hidden sm:inline">切换视角</span>
-                  <ChevronDown className="w-3 h-3 text-[#aeaeb2]" />
+                  <ChevronDown className="w-3 h-3 text-faint" />
                 </button>
 
                 {accountSwitchOpen && (
                   <div
-                    className="absolute right-0 mt-2 w-64 bg-white rounded-[14px] py-2 z-50"
+                    className="absolute right-0 mt-2 w-64 bg-white rounded-[12px] py-2 z-50"
                     style={{ boxShadow: 'var(--sh-overlay)', border: '1px solid var(--hairline)' }}
                   >
                     <div className="px-3 py-1.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--hairline)' }}>
-                      <span className="text-[11px] font-semibold text-[#86868b] uppercase tracking-wider">快捷切换多身份</span>
-                      <Shield className="w-3.5 h-3.5 text-[#0071e3]" />
+                      <span className="text-[11px] font-semibold text-mute uppercase tracking-wider">快捷切换多身份</span>
+                      <Shield className="w-3.5 h-3.5 text-ink" />
                     </div>
                     <div className="max-h-64 overflow-y-auto py-1">
                       {quickAccounts.map((acc) => {
@@ -180,15 +180,15 @@ export const Layout: React.FC = () => {
                           <button
                             key={acc.username}
                             onClick={() => handleQuickSwitch(acc.username)}
-                            className={`w-full text-left px-3 py-2 text-[12px] flex items-center justify-between hover:bg-[#f5f5f7] transition-colors ${
-                              isCurrent ? 'bg-[#f5f5f7] text-[#0071e3] font-semibold' : 'text-[#424245]'
+                            className={`w-full text-left px-3 py-2 text-[12px] flex items-center justify-between hover:bg-canvas transition-colors ${
+                              isCurrent ? 'bg-canvas text-ink font-semibold' : 'text-body'
                             }`}
                           >
                             <div>
                               <div>{acc.label}</div>
-                              <div className="text-[10px] text-[#aeaeb2]">{acc.company}</div>
+                              <div className="text-[10px] text-faint">{acc.company}</div>
                             </div>
-                            {isCurrent && <UserCheck className="w-4 h-4 text-[#0071e3]" />}
+                            {isCurrent && <UserCheck className="w-4 h-4 text-ink" />}
                           </button>
                         );
                       })}
@@ -202,11 +202,11 @@ export const Layout: React.FC = () => {
             {user && (
               <div className="flex items-center gap-2.5 pl-3" style={{ borderLeft: '1px solid var(--hairline)' }}>
                 <div className="hidden sm:block text-right">
-                  <div className="text-[12px] font-semibold text-[#1d1d1f] flex items-center justify-end gap-1">
-                    <Building2 className="w-3 h-3 text-[#aeaeb2]" />
+                  <div className="text-[12px] font-semibold text-ink flex items-center justify-end gap-1">
+                    <Building2 className="w-3 h-3 text-faint" />
                     <span>{user.company_name}</span>
                   </div>
-                  <div className="text-[11px] text-[#86868b]">
+                  <div className="text-[11px] text-mute">
                     {user.display_name} ({roleLabels[user.role] || user.role})
                   </div>
                 </div>
@@ -217,7 +217,7 @@ export const Layout: React.FC = () => {
 
                 <button
                   onClick={handleLogout}
-                  className="p-1.5 text-[#aeaeb2] hover:text-[#ff6b00] hover:bg-[#f5f5f7] rounded-[8px] transition-colors"
+                  className="p-1.5 text-faint hover:text-[#9F2F2D] hover:bg-canvas rounded-[8px] transition-colors"
                   title="退出登录"
                 >
                   <LogOut size={15} />
@@ -239,13 +239,13 @@ export const Layout: React.FC = () => {
         >
           <div className="p-4 space-y-5">
             {/* View Context Badge */}
-            <div className="p-3 bg-[#f5f5f7] rounded-[12px] flex items-center gap-2.5">
+            <div className="p-3 bg-canvas rounded-[12px] flex items-center gap-2.5">
               <div className="p-1.5 rounded-[8px] text-white shrink-0" style={{ background: 'var(--grad-cta)' }}>
                 <Building2 className="w-3.5 h-3.5" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] text-[#86868b] font-medium">当前控制视角</div>
-                <div className="text-[13px] font-semibold text-[#1d1d1f] truncate">
+                <div className="text-[10px] text-mute font-medium">当前控制视角</div>
+                <div className="text-[13px] font-semibold text-ink truncate">
                   {isHQ ? `${user?.company_name || '总部'}` : `${user?.company_name || '分公司'}`}
                 </div>
               </div>
@@ -253,7 +253,7 @@ export const Layout: React.FC = () => {
 
             {/* Navigation Menu */}
             <nav className="space-y-0.5">
-              <div className="px-3.5 pb-2 text-[10px] font-bold text-[#aeaeb2] uppercase tracking-wider">
+              <div className="px-3.5 pb-2 text-[10px] font-bold text-faint uppercase tracking-wider">
                 功能导航
               </div>
 
@@ -325,7 +325,7 @@ export const Layout: React.FC = () => {
                       <span>审批中心</span>
                     </div>
                     {pendingCount > 0 && (
-                      <span className="text-[#ff6b00] bg-[rgba(255,107,0,0.1)] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
+                      <span className="text-[#9F2F2D] bg-[#FDEBEC] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
                         {pendingCount}
                       </span>
                     )}
@@ -337,8 +337,8 @@ export const Layout: React.FC = () => {
 
           {/* Quick Info Footer */}
           <div className="p-4 space-y-1" style={{ borderTop: '1px solid var(--hairline)' }}>
-            <div className="text-[11px] font-semibold text-[#1d1d1f]">随手报 ReportNow v0.1.0</div>
-            <div className="text-[10px] text-[#aeaeb2]">系统状态: 本地 MySQL 运行正常</div>
+            <div className="text-[11px] font-semibold text-ink">随手报 ReportNow v0.1.0</div>
+            <div className="text-[10px] text-faint">系统状态: 本地 MySQL 运行正常</div>
           </div>
         </aside>
 

@@ -1,25 +1,25 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { BarChart3, Building2, FileSpreadsheet, Download, Copy, RefreshCw, Calculator, TrendingUp, History, X, Clock, UserCheck, AlertCircle, CheckCircle2, FileDown, Grid3x3 } from 'lucide-react';
+import { BarChart3, Building2, FileSpreadsheet, Download, Copy, RefreshCw, Calculator, TrendingUp, History, X, Clock, UserCheck, AlertCircle, CheckCircle2, FileDown, Grid3x3 } from '../components/icons';
 import * as XLSX from 'xlsx';
 import { api } from '../services/api';
 import { AggregationResponse, ReportAssignment, ReportTemplate, ReportTemplateField, getSubmissionStatusLabel, APPROVED_SUBMISSION_STATUSES } from '../types';
 import { AggregationTab, filterInstitutionRows, filterDetailRows, buildMetricCards, getUncountedInstitutionCount, buildProgressData } from '../utils/aggregationView';
 
-// Status style mapping — grayscale + accent/heat only
+// Status style mapping — muted pastels for semantic states
 const STATUS_STYLES: Record<string, string> = {
-  received: 'text-[#1d1d1f] bg-[#e8e8ed]',
-  pending_receipt: 'text-[#0071e3] bg-[rgba(0,113,227,0.08)]',
-  pending_approval: 'text-[#0071e3] bg-[rgba(0,113,227,0.08)]',
-  pending_review: 'text-[#0071e3] bg-[rgba(0,113,227,0.08)]',
-  submitted: 'text-[#0071e3] bg-[rgba(0,113,227,0.08)]',
-  draft: 'text-[#86868b] bg-[#f5f5f7]',
-  returned: 'text-[#ff6b00] bg-[rgba(255,107,0,0.1)]',
-  rejected: 'text-[#ff6b00] bg-[rgba(255,107,0,0.1)]',
+  received: 'text-[#346538] bg-[#EDF3EC]',
+  pending_receipt: 'text-[#1F6C9F] bg-[#E1F3FE]',
+  pending_approval: 'text-[#1F6C9F] bg-[#E1F3FE]',
+  pending_review: 'text-[#1F6C9F] bg-[#E1F3FE]',
+  submitted: 'text-[#1F6C9F] bg-[#E1F3FE]',
+  draft: 'text-mute bg-canvas',
+  returned: 'text-[#9F2F2D] bg-[#FDEBEC]',
+  rejected: 'text-[#9F2F2D] bg-[#FDEBEC]',
 };
 
 const getStatusBadge = (status: string) => {
-  const cls = STATUS_STYLES[status] || 'text-[#86868b] bg-[#f5f5f7]';
+  const cls = STATUS_STYLES[status] || 'text-mute bg-canvas';
   return <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold tabular-nums ${cls}`}>{getSubmissionStatusLabel(status)}</span>;
 };
 
@@ -32,7 +32,7 @@ export const AggregationView: React.FC = () => {
   const [assignments, setAssignments] = useState<ReportAssignment[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>(templateIdParam ? parseInt(templateIdParam, 10) : 1);
   const [aggregationData, setAggregationData] = useState<AggregationResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AggregationTab>('institutions');
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,14 +57,21 @@ export const AggregationView: React.FC = () => {
   };
 
   useEffect(() => { loadInitialData(); }, []);
-  useEffect(() => { if (selectedTemplateId && effectivePeriod) loadAggregation(selectedTemplateId, effectivePeriod); }, [selectedTemplateId, effectivePeriod]);
+  useEffect(() => {
+    if (selectedTemplateId && effectivePeriod) loadAggregation(selectedTemplateId, effectivePeriod);
+    else setAggregationData(null);
+  }, [selectedTemplateId, effectivePeriod]);
 
   const loadInitialData = async () => {
     try {
       const [tList, al] = await Promise.all([api.getTemplates(), api.getAssignments()]);
       setTemplates(tList);
       setAssignments(al);
-      if (tList.length > 0 && !templateIdParam) setSelectedTemplateId(tList[0].id);
+      // 默认选中「有下发任务的第一个模板」，避免选中无任务模板导致周期为空、汇总永不加载
+      if (tList.length > 0 && !templateIdParam) {
+        const firstWithTasks = tList.find((t) => al.some((a) => a.template_id === t.id));
+        setSelectedTemplateId((firstWithTasks || tList[0]).id);
+      }
     } catch { /* ignore */ }
   };
 
@@ -223,45 +230,45 @@ export const AggregationView: React.FC = () => {
   }, [aggregationData]);
 
   return (
-    <div className="max-w-[1080px] mx-auto px-4 sm:px-[22px] py-[clamp(16px,3vw,28px)] space-y-4 sm:space-y-6">
+    <div className="reveal max-w-[1080px] mx-auto px-4 sm:px-[22px] py-[clamp(16px,3vw,28px)] space-y-4 sm:space-y-6">
       {/* Header — unified white panel */}
-      <div className="bg-white rounded-[18px] sm:rounded-[22px] p-4 sm:p-6 flex flex-col gap-4" style={{ boxShadow: 'var(--sh-panel)' }}>
+      <div className="bg-white rounded-[12px] sm:rounded-[12px] p-4 sm:p-6 flex flex-col gap-4" style={{ boxShadow: 'var(--sh-panel)' }}>
         <div className="min-w-0">
-          <h1 className="text-[22px] sm:text-[26px] font-bold tracking-[-0.03em] text-[#1d1d1f] flex items-center gap-2.5">
-            <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-[#0071e3] shrink-0" />
+          <h1 className="t-serif text-[26px] sm:text-[32px] text-ink flex items-center gap-2.5">
+            <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-ink shrink-0" />
             <span>总部多维汇总报表</span>
           </h1>
-          <p className="text-[12px] sm:text-[13px] text-[#6e6e73] mt-1.5 leading-relaxed">横向对比各分公司上报数据、计算数值字段合计与平均值。审批中的数据可见但不参与统计。</p>
+          <p className="text-[12px] sm:text-[13px] text-mute mt-1.5 leading-relaxed">横向对比各分公司上报数据、计算数值字段合计与平均值。审批中的数据可见但不参与统计。</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {periods.length > 0 ? (
+          {templates.length > 0 ? (
             <select value={selectedTemplateId} onChange={(e) => { const n = parseInt(e.target.value, 10); setSelectedTemplateId(n); }}
-              className="h-10 sm:h-11 px-3 sm:px-4 bg-[#f5f5f7] rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] font-semibold text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white flex-1 sm:flex-none min-w-0">
+              className="h-10 sm:h-11 px-3 sm:px-4 bg-canvas rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] font-semibold text-ink focus:outline-none focus:ring-1 focus:ring-ink focus:bg-white flex-1 sm:flex-none min-w-0">
               {templates.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
             </select>
           ) : (
-            <span className="text-[12px] text-[#aeaeb2]">暂无模板</span>
+            <span className="text-[12px] text-faint">暂无模板</span>
           )}
           {periods.length > 0 ? (
             <select value={effectivePeriod} onChange={(e) => setSelectedPeriod(e.target.value)} disabled={periods.length === 1}
-              className="h-10 sm:h-11 px-3 sm:px-4 bg-[#f5f5f7] rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] font-semibold text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white disabled:opacity-50 flex-1 sm:flex-none min-w-0">
+              className="h-10 sm:h-11 px-3 sm:px-4 bg-canvas rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] font-semibold text-ink focus:outline-none focus:ring-1 focus:ring-ink focus:bg-white disabled:opacity-50 flex-1 sm:flex-none min-w-0">
               {periods.map((p) => (<option key={p} value={p}>{p}</option>))}
             </select>
           ) : (
-            <span className="text-[12px] text-[#aeaeb2]">暂无下发周期</span>
+            <span className="text-[12px] text-faint">暂无下发周期</span>
           )}
           {aggregationData && (
             <>
               <button onClick={copySummaryJSON} title="复制汇总指标 JSON"
-                className="h-10 sm:h-11 px-4 sm:px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] text-[12px] sm:text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5 shrink-0">
+                className="h-10 sm:h-11 px-4 sm:px-5 bg-canvas hover:bg-line text-ink text-[12px] sm:text-[13px] font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0">
                 <Copy className="w-4 h-4" /><span className="hidden sm:inline">{copied ? '已复制' : '复制指标'}</span>
               </button>
               <button onClick={exportExcel} title="导出 Excel 报表"
-                className="h-10 sm:h-11 px-4 sm:px-5 bg-[#0071e3] hover:bg-[#0066cc] text-white text-[12px] sm:text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5 shrink-0">
+                className="h-10 sm:h-11 px-4 sm:px-5 bg-ink hover:bg-inkhover text-white text-[12px] sm:text-[13px] font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0">
                 <FileDown className="w-4 h-4" /><span>导出</span>
               </button>
               <button onClick={loadHistory} title="查看填报历史版本"
-                className="h-10 sm:h-11 px-4 sm:px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] text-[12px] sm:text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5 shrink-0">
+                className="h-10 sm:h-11 px-4 sm:px-5 bg-canvas hover:bg-line text-ink text-[12px] sm:text-[13px] font-semibold rounded-md transition-colors flex items-center gap-1.5 shrink-0">
                 <History className="w-4 h-4" /><span>历史</span>
               </button>
             </>
@@ -273,23 +280,23 @@ export const AggregationView: React.FC = () => {
       {loading && !aggregationData ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white p-4 sm:p-5 rounded-[14px] sm:rounded-[18px] animate-pulse space-y-2" style={{ boxShadow: 'var(--sh-card)' }}>
-              <div className="h-3 bg-[#e8e8ed] rounded w-1/2" />
-              <div className="h-7 bg-[#e8e8ed] rounded w-2/3" />
-              <div className="h-3 bg-[#e8e8ed] rounded w-full" />
+            <div key={i} className="bg-white p-4 sm:p-5 rounded-[12px] sm:rounded-[12px] animate-pulse space-y-2" style={{ boxShadow: 'var(--sh-card)' }}>
+              <div className="h-3 bg-line rounded w-1/2" />
+              <div className="h-7 bg-line rounded w-2/3" />
+              <div className="h-3 bg-line rounded w-full" />
             </div>
           ))}
         </div>
       ) : metricCards.length > 0 ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {metricCards.map((mc) => (
-            <div key={mc.fieldName} className="apple-card bg-white p-4 sm:p-5 rounded-[14px] sm:rounded-[18px] space-y-2" style={{ boxShadow: 'var(--sh-card)' }}>
-              <div className="text-[12px] sm:text-[13px] font-semibold text-[#6e6e73] flex items-center justify-between">
+            <div key={mc.fieldName} className="apple-card bg-white p-4 sm:p-5 rounded-[12px] sm:rounded-[12px] space-y-2" style={{ boxShadow: 'var(--sh-card)' }}>
+              <div className="text-[12px] sm:text-[13px] font-semibold text-mute flex items-center justify-between">
                 <span className="truncate">{mc.fieldLabel} · 合计</span>
-                <Calculator className="w-4 h-4 text-[#aeaeb2] shrink-0" />
+                <Calculator className="w-4 h-4 text-faint shrink-0" />
               </div>
-              <div className="text-[24px] sm:text-[28px] font-bold tabular-nums text-[#1d1d1f] tracking-[-0.02em]">{mc.total.toLocaleString()}</div>
-              <div className="text-[11px] sm:text-[12px] text-[#86868b] flex items-center justify-between pt-2 border-t border-[rgba(0,0,0,0.07)]">
+              <div className="text-[24px] sm:text-[28px] font-bold tabular-nums text-ink tracking-[-0.02em]">{mc.total.toLocaleString()}</div>
+              <div className="text-[11px] sm:text-[12px] text-mute flex items-center justify-between pt-2 border-t border-line">
                 <span>通过 {mc.count}</span>
                 <span className="tabular-nums">均值 {mc.average}</span>
               </div>
@@ -300,26 +307,26 @@ export const AggregationView: React.FC = () => {
 
       {/* Tabs section */}
       {loading ? (
-        <div className="py-16 text-center text-[13px] text-[#aeaeb2]">正在按维度汇总运算...</div>
+        <div className="py-16 text-center text-[13px] text-faint">正在按维度汇总运算...</div>
       ) : error ? (
-        <div className="bg-white p-10 text-center rounded-[22px]" style={{ boxShadow: 'var(--sh-card)' }}>
-          <AlertCircle className="w-10 h-10 text-[#ff6b00] mx-auto mb-3" />
-          <div className="text-[15px] font-bold text-[#1d1d1f]">加载失败</div>
-          <p className="text-[13px] text-[#6e6e73] mt-1">{error}</p>
+        <div className="bg-white p-10 text-center rounded-[12px]" style={{ boxShadow: 'var(--sh-card)' }}>
+          <AlertCircle className="w-10 h-10 text-[#9F2F2D] mx-auto mb-3" />
+          <div className="text-[15px] font-bold text-ink">加载失败</div>
+          <p className="text-[13px] text-mute mt-1">{error}</p>
           <button onClick={() => loadAggregation(selectedTemplateId, effectivePeriod)}
-            className="mt-4 h-11 px-5 bg-[#0071e3] hover:bg-[#0066cc] text-white text-[13px] font-semibold rounded-full transition-colors flex items-center gap-1.5 mx-auto">
+            className="mt-4 h-11 px-5 bg-ink hover:bg-inkhover text-white text-[13px] font-semibold rounded-md transition-colors flex items-center gap-1.5 mx-auto">
             <RefreshCw className="w-4 h-4" /><span>重新加载</span>
           </button>
         </div>
       ) : aggregationData ? (
         <div className="space-y-4 sm:space-y-5">
           {/* Tab buttons — segmented control, scrollable on mobile */}
-          <div className="flex gap-1 bg-[#f5f5f7] rounded-full p-1 w-fit max-w-full overflow-x-auto" role="tablist" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex gap-1 bg-canvas rounded-full p-1 w-fit max-w-full overflow-x-auto" role="tablist" style={{ scrollbarWidth: 'none' }}>
             {tabs.map((t) => {
               const Icon = t.icon;
               return (
                 <button key={t.key} role="tab" aria-selected={activeTab === t.key} onClick={() => setActiveTab(t.key)}
-                  className={`flex items-center gap-1.5 px-3 sm:px-4 h-9 text-[12px] sm:text-[13px] font-semibold rounded-full transition-all whitespace-nowrap ${activeTab === t.key ? 'bg-white text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.04)]' : 'text-[#6e6e73] hover:text-[#1d1d1f]'}`}>
+                  className={`flex items-center gap-1.5 px-3 sm:px-4 h-9 text-[12px] sm:text-[13px] font-semibold rounded-full transition-all whitespace-nowrap ${activeTab === t.key ? 'bg-white text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.04)]' : 'text-mute hover:text-ink'}`}>
                   <Icon className="w-4 h-4 shrink-0" /><span>{t.label}</span>
                 </button>
               );
@@ -331,34 +338,34 @@ export const AggregationView: React.FC = () => {
             <div role="tabpanel">
               <div className="flex items-center justify-between mb-3 gap-2 sm:gap-3">
                 <input type="text" placeholder="搜索机构名称 / 编号..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 max-w-sm h-10 sm:h-11 px-3 sm:px-4 bg-[#f5f5f7] rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white" />
-                <span className="text-[11px] sm:text-[12px] text-[#6e6e73] tabular-nums shrink-0">{aggregationData.company_data.length} 个机构 · 未提交 {uncodedCount}</span>
+                  className="flex-1 max-w-sm h-10 sm:h-11 px-3 sm:px-4 bg-canvas rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] text-ink placeholder:text-faint focus:outline-none focus:ring-1 focus:ring-ink focus:bg-white" />
+                <span className="text-[11px] sm:text-[12px] text-mute tabular-nums shrink-0">{aggregationData.company_data.length} 个机构 · 未提交 {uncodedCount}</span>
               </div>
-              <div className="bg-white rounded-[14px] sm:rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
+              <div className="bg-white rounded-[12px] sm:rounded-[12px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
                 <div className="overflow-x-auto">
                   <table className="w-full text-[12px] sm:text-[13px]">
-                    <thead><tr className="bg-[#f5f5f7] text-[#6e6e73] text-[11px] sm:text-[12px] font-semibold">
-                      <th className="p-3 sm:p-4 w-32 sm:w-40 text-left sticky left-0 bg-[#f5f5f7] z-10">机构</th>
+                    <thead><tr className="bg-canvas text-mute text-[11px] sm:text-[12px] font-semibold">
+                      <th className="p-3 sm:p-4 w-32 sm:w-40 text-left sticky left-0 bg-canvas z-10">机构</th>
                       <th className="p-3 sm:p-4 w-20 sm:w-24 text-center">状态</th>
                       {aggregationData.summary_fields.map((f) => (<th key={f.id} className="p-3 sm:p-4 min-w-[90px] sm:min-w-[110px] text-right font-semibold">{f.field_label}</th>))}
                     </tr></thead>
                     <tbody>
                       {filteredInst.length === 0 ? (
-                        <tr><td colSpan={aggregationData.summary_fields.length + 2} className="p-8 sm:p-10 text-center text-[12px] sm:text-[13px] text-[#aeaeb2]">无匹配机构</td></tr>
+                        <tr><td colSpan={aggregationData.summary_fields.length + 2} className="p-8 sm:p-10 text-center text-[12px] sm:text-[13px] text-faint">无匹配机构</td></tr>
                       ) : filteredInst.map((c) => (
-                        <tr key={c.company_id} className="hover:bg-[#fbfbfd] transition-colors" style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}>
-                          <td className="p-3 sm:p-4 sticky left-0 bg-white z-10 hover:bg-[#fbfbfd]">
-                            <div className="font-semibold text-[#1d1d1f] truncate">{c.company_name}</div>
-                            <div className="text-[10px] sm:text-[11px] text-[#86868b] tabular-nums mt-0.5">{c.company_code}</div>
+                        <tr key={c.company_id} className="hover:bg-hoverbg transition-colors" style={{ borderTop: '1px solid var(--hairline)' }}>
+                          <td className="p-3 sm:p-4 sticky left-0 bg-white z-10 hover:bg-hoverbg">
+                            <div className="font-semibold text-ink truncate">{c.company_name}</div>
+                            <div className="text-[10px] sm:text-[11px] text-mute tabular-nums mt-0.5">{c.company_code}</div>
                           </td>
                           <td className="p-3 sm:p-4 text-center">
-                            {c.has_submitted ? getStatusBadge(c.submission_status) : <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold text-[#86868b] bg-[#f5f5f7]">未提交</span>}
+                            {c.has_submitted ? getStatusBadge(c.submission_status) : <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold text-mute bg-canvas">未提交</span>}
                           </td>
                           {aggregationData.summary_fields.map((f) => (
                             <td key={f.id} className="p-3 sm:p-4 text-right tabular-nums">
                               {c.has_submitted && c.values[f.field_name] ? (
-                                f.field_type === 'number' ? <span className="text-[#1d1d1f]">{Number(c.values[f.field_name]).toLocaleString()}</span> : <span className="text-[#424245]">{c.values[f.field_name]}</span>
-                              ) : <span className="text-[#d2d2d7]">—</span>}
+                                f.field_type === 'number' ? <span className="text-ink">{Number(c.values[f.field_name]).toLocaleString()}</span> : <span className="text-body">{c.values[f.field_name]}</span>
+                              ) : <span className="text-line">—</span>}
                             </td>
                           ))}
                         </tr>
@@ -366,18 +373,18 @@ export const AggregationView: React.FC = () => {
                     </tbody>
                     {metricCards.length > 0 && (
                       <tfoot>
-                        <tr className="bg-[#f5f5f7] font-bold text-[#1d1d1f]" style={{ borderTop: '2px solid rgba(0,0,0,0.07)' }}>
-                          <td className="p-3 sm:p-4 sticky left-0 bg-[#f5f5f7] z-10" colSpan={2}>合计 / 均值</td>
+                        <tr className="bg-canvas font-bold text-ink" style={{ borderTop: '2px solid var(--hairline)' }}>
+                          <td className="p-3 sm:p-4 sticky left-0 bg-canvas z-10" colSpan={2}>合计 / 均值</td>
                           {aggregationData.summary_fields.map((f) => {
                             const s = aggregationData.summary[f.field_name];
                             return (
                               <td key={f.id} className="p-3 sm:p-4 text-right">
                                 {s ? (
                                   <div className="text-right">
-                                    <div className="text-[12px] sm:text-[13px] font-bold text-[#1d1d1f] tabular-nums">合计 {s.total.toLocaleString()}</div>
-                                    <div className="text-[10px] sm:text-[11px] text-[#6e6e73] tabular-nums mt-0.5">均值 {s.average}</div>
+                                    <div className="text-[12px] sm:text-[13px] font-bold text-ink tabular-nums">合计 {s.total.toLocaleString()}</div>
+                                    <div className="text-[10px] sm:text-[11px] text-mute tabular-nums mt-0.5">均值 {s.average}</div>
                                   </div>
-                                ) : <span className="text-[#d2d2d7]">—</span>}
+                                ) : <span className="text-line">—</span>}
                               </td>
                             );
                           })}
@@ -395,32 +402,32 @@ export const AggregationView: React.FC = () => {
             <div role="tabpanel">
               <div className="flex items-center justify-between mb-3 gap-2 sm:gap-3">
                 <input type="text" placeholder="搜索明细内容..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 max-w-sm h-10 sm:h-11 px-3 sm:px-4 bg-[#f5f5f7] rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white" />
-                <span className="text-[11px] sm:text-[12px] text-[#6e6e73] tabular-nums shrink-0">{aggregationData.detail_rows.length} 行明细</span>
+                  className="flex-1 max-w-sm h-10 sm:h-11 px-3 sm:px-4 bg-canvas rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] text-ink placeholder:text-faint focus:outline-none focus:ring-1 focus:ring-ink focus:bg-white" />
+                <span className="text-[11px] sm:text-[12px] text-mute tabular-nums shrink-0">{aggregationData.detail_rows.length} 行明细</span>
               </div>
               {aggregationData.detail_fields.length === 0 || filteredDet.length === 0 ? (
-                <div className="bg-white p-8 sm:p-10 text-center rounded-[14px] sm:rounded-[22px]" style={{ boxShadow: 'var(--sh-card)' }}>
-                  <FileSpreadsheet className="w-10 h-10 text-[#aeaeb2] mx-auto mb-2" />
-                  <div className="text-[12px] sm:text-[13px] font-semibold text-[#424245]">{aggregationData.detail_fields.length === 0 ? '该模板无明细字段' : '无匹配明细行'}</div>
+                <div className="bg-white p-8 sm:p-10 text-center rounded-[12px] sm:rounded-[12px]" style={{ boxShadow: 'var(--sh-card)' }}>
+                  <FileSpreadsheet className="w-10 h-10 text-faint mx-auto mb-2" />
+                  <div className="text-[12px] sm:text-[13px] font-semibold text-body">{aggregationData.detail_fields.length === 0 ? '该模板无明细字段' : '无匹配明细行'}</div>
                 </div>
               ) : (
-                <div className="bg-white rounded-[14px] sm:rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
+                <div className="bg-white rounded-[12px] sm:rounded-[12px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
                   <div className="overflow-x-auto">
                     <table className="w-full text-[12px] sm:text-[13px]">
-                      <thead><tr className="bg-[#f5f5f7] text-[#6e6e73] text-[11px] sm:text-[12px] font-semibold">
-                        <th className="p-3 sm:p-4 w-32 sm:w-40 text-left sticky left-0 bg-[#f5f5f7] z-10">机构</th>
+                      <thead><tr className="bg-canvas text-mute text-[11px] sm:text-[12px] font-semibold">
+                        <th className="p-3 sm:p-4 w-32 sm:w-40 text-left sticky left-0 bg-canvas z-10">机构</th>
                         <th className="p-3 sm:p-4 w-12 sm:w-14 text-center">#</th>
                         <th className="p-3 sm:p-4 w-20 sm:w-24 text-center">状态</th>
                         {aggregationData.detail_fields.map((df) => (<th key={df.id} className="p-3 sm:p-4 min-w-[90px] sm:min-w-[110px] text-right font-semibold">{df.field_label}</th>))}
                       </tr></thead>
                       <tbody>
                         {filteredDet.map((row, idx) => (
-                          <tr key={idx} className="hover:bg-[#fbfbfd] transition-colors" style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}>
-                            <td className="p-3 sm:p-4 font-semibold text-[#1d1d1f] sticky left-0 bg-white z-10 hover:bg-[#fbfbfd] truncate">{row.company_name}</td>
-                            <td className="p-3 sm:p-4 text-center text-[#86868b] tabular-nums">{row.row_index}</td>
-                            <td className="p-3 sm:p-4 text-center">{row.submission_status ? getStatusBadge(row.submission_status) : <span className="text-[#d2d2d7]">—</span>}</td>
+                          <tr key={idx} className="hover:bg-hoverbg transition-colors" style={{ borderTop: '1px solid var(--hairline)' }}>
+                            <td className="p-3 sm:p-4 font-semibold text-ink sticky left-0 bg-white z-10 hover:bg-hoverbg truncate">{row.company_name}</td>
+                            <td className="p-3 sm:p-4 text-center text-mute tabular-nums">{row.row_index}</td>
+                            <td className="p-3 sm:p-4 text-center">{row.submission_status ? getStatusBadge(row.submission_status) : <span className="text-line">—</span>}</td>
                             {aggregationData.detail_fields.map((df) => (
-                              <td key={df.id} className="p-3 sm:p-4 text-right tabular-nums">{row[df.field_name] ? (df.field_type === 'number' ? <span className="text-[#1d1d1f]">{Number(row[df.field_name]).toLocaleString()}</span> : <span className="text-[#424245]">{row[df.field_name]}</span>) : <span className="text-[#d2d2d7]">—</span>}</td>
+                              <td key={df.id} className="p-3 sm:p-4 text-right tabular-nums">{row[df.field_name] ? (df.field_type === 'number' ? <span className="text-ink">{Number(row[df.field_name]).toLocaleString()}</span> : <span className="text-body">{row[df.field_name]}</span>) : <span className="text-line">—</span>}</td>
                             ))}
                           </tr>
                         ))}
@@ -436,25 +443,25 @@ export const AggregationView: React.FC = () => {
           {activeTab === 'matrix' && (
             <div role="tabpanel" className="space-y-4">
               {matrixGroups.length === 0 ? (
-                <div className="bg-white p-8 sm:p-10 text-center rounded-[14px] sm:rounded-[22px]" style={{ boxShadow: 'var(--sh-card)' }}>
-                  <Grid3x3 className="w-10 h-10 text-[#aeaeb2] mx-auto mb-2" />
-                  <div className="text-[12px] sm:text-[13px] font-semibold text-[#424245]">该模板暂无交叉表字段</div>
-                  <p className="text-[11px] sm:text-[12px] text-[#86868b] mt-1">在模板编辑器中使用"创建交叉表"功能即可添加</p>
+                <div className="bg-white p-8 sm:p-10 text-center rounded-[12px] sm:rounded-[12px]" style={{ boxShadow: 'var(--sh-card)' }}>
+                  <Grid3x3 className="w-10 h-10 text-faint mx-auto mb-2" />
+                  <div className="text-[12px] sm:text-[13px] font-semibold text-body">该模板暂无交叉表字段</div>
+                  <p className="text-[11px] sm:text-[12px] text-mute mt-1">在模板编辑器中使用"创建交叉表"功能即可添加</p>
                 </div>
               ) : (
                 matrixGroups.map((group, gIdx) => (
-                  <div key={gIdx} className="bg-white rounded-[14px] sm:rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
-                    <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[rgba(0,0,0,0.07)]">
-                      <h3 className="text-[14px] sm:text-[15px] font-bold tracking-[-0.01em] text-[#1d1d1f] flex items-center gap-2">
-                        <Grid3x3 className="w-4 h-4 text-[#6e6e73] shrink-0" />
+                  <div key={gIdx} className="bg-white rounded-[12px] sm:rounded-[12px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
+                    <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-line">
+                      <h3 className="text-[14px] sm:text-[15px] font-bold tracking-[-0.01em] text-ink flex items-center gap-2">
+                        <Grid3x3 className="w-4 h-4 text-mute shrink-0" />
                         <span>{group.rowLabel}交叉表</span>
                       </h3>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-[12px] sm:text-[13px]">
                         <thead>
-                          <tr className="bg-[#f5f5f7] text-[#6e6e73] text-[11px] sm:text-[12px] font-semibold">
-                            <th className="p-3 sm:p-4 w-32 sm:w-40 text-left sticky left-0 bg-[#f5f5f7] z-10">机构</th>
+                          <tr className="bg-canvas text-mute text-[11px] sm:text-[12px] font-semibold">
+                            <th className="p-3 sm:p-4 w-32 sm:w-40 text-left sticky left-0 bg-canvas z-10">机构</th>
                             <th className="p-3 sm:p-4 w-24 sm:w-28 text-left">{group.rowLabel}</th>
                             {group.columns.map((col) => (
                               <th key={col.id} className="p-3 sm:p-4 min-w-[90px] sm:min-w-[110px] text-center font-semibold">{col.field_label}</th>
@@ -465,9 +472,9 @@ export const AggregationView: React.FC = () => {
                           {filteredInst.flatMap((c) =>
                             group.rowOptions.map((rowOpt, rowIdx) => {
                               return (
-                                <tr key={`${c.company_id}-${rowIdx}`} className="hover:bg-[#fbfbfd] transition-colors" style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}>
-                                  <td className="p-3 sm:p-4 font-semibold text-[#1d1d1f] sticky left-0 bg-white z-10 hover:bg-[#fbfbfd] truncate">{c.company_name}</td>
-                                  <td className="p-3 sm:p-4 text-[#424245]">{rowOpt}</td>
+                                <tr key={`${c.company_id}-${rowIdx}`} className="hover:bg-hoverbg transition-colors" style={{ borderTop: '1px solid var(--hairline)' }}>
+                                  <td className="p-3 sm:p-4 font-semibold text-ink sticky left-0 bg-white z-10 hover:bg-hoverbg truncate">{c.company_name}</td>
+                                  <td className="p-3 sm:p-4 text-body">{rowOpt}</td>
                                   {group.columns.map((col) => {
                                     const detRow = aggregationData.detail_rows.find(
                                       (r) => r.company_name === c.company_name && r.row_index === rowIdx + 1
@@ -477,12 +484,12 @@ export const AggregationView: React.FC = () => {
                                       <td key={col.id} className="p-3 sm:p-4 text-center tabular-nums">
                                         {val ? (
                                           col.field_type === 'number' ? (
-                                            <span className="text-[#1d1d1f]">{Number(val).toLocaleString()}</span>
+                                            <span className="text-ink">{Number(val).toLocaleString()}</span>
                                           ) : (
-                                            <span className="text-[#424245]">{val}</span>
+                                            <span className="text-body">{val}</span>
                                           )
                                         ) : (
-                                          <span className="text-[#d2d2d7]">—</span>
+                                          <span className="text-line">—</span>
                                         )}
                                       </td>
                                     );
@@ -495,19 +502,19 @@ export const AggregationView: React.FC = () => {
                         {/* Summary row */}
                         {group.columns.some((c) => c.field_type === 'number') && (
                           <tfoot>
-                            <tr className="bg-[#f5f5f7] font-bold text-[#1d1d1f]" style={{ borderTop: '2px solid rgba(0,0,0,0.07)' }}>
-                              <td className="p-3 sm:p-4 sticky left-0 bg-[#f5f5f7] z-10" colSpan={2}>合计</td>
+                            <tr className="bg-canvas font-bold text-ink" style={{ borderTop: '2px solid var(--hairline)' }}>
+                              <td className="p-3 sm:p-4 sticky left-0 bg-canvas z-10" colSpan={2}>合计</td>
                               {group.columns.map((col) => {
-                                if (col.field_type !== 'number') return <td key={col.id} className="p-3 sm:p-4 text-center text-[#d2d2d7]">—</td>;
+                                if (col.field_type !== 'number') return <td key={col.id} className="p-3 sm:p-4 text-center text-line">—</td>;
                                 const s = aggregationData.detail_summary[col.field_name];
                                 return (
                                   <td key={col.id} className="p-3 sm:p-4 text-center">
                                     {s ? (
                                       <div>
-                                        <div className="text-[12px] sm:text-[13px] font-bold text-[#1d1d1f] tabular-nums">{s.total.toLocaleString()}</div>
-                                        <div className="text-[10px] sm:text-[11px] text-[#6e6e73] tabular-nums mt-0.5">均值 {s.average}</div>
+                                        <div className="text-[12px] sm:text-[13px] font-bold text-ink tabular-nums">{s.total.toLocaleString()}</div>
+                                        <div className="text-[10px] sm:text-[11px] text-mute tabular-nums mt-0.5">均值 {s.average}</div>
                                       </div>
-                                    ) : <span className="text-[#d2d2d7]">—</span>}
+                                    ) : <span className="text-line">—</span>}
                                   </td>
                                 );
                               })}
@@ -527,46 +534,46 @@ export const AggregationView: React.FC = () => {
             <div role="tabpanel" className="space-y-4">
               {/* Progress summary cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="apple-card bg-white p-4 rounded-[18px]" style={{ boxShadow: 'var(--sh-card)' }}>
-                  <div className="text-[12px] text-[#6e6e73] font-medium">应填报机构</div>
-                  <div className="text-[28px] font-bold tabular-nums text-[#1d1d1f] mt-1 tracking-[-0.02em]">{progressStats.total}</div>
+                <div className="apple-card bg-white p-4 rounded-[12px]" style={{ boxShadow: 'var(--sh-card)' }}>
+                  <div className="text-[12px] text-mute font-medium">应填报机构</div>
+                  <div className="text-[28px] font-bold tabular-nums text-ink mt-1 tracking-[-0.02em]">{progressStats.total}</div>
                 </div>
-                <div className="apple-card bg-white p-4 rounded-[18px]" style={{ boxShadow: 'var(--sh-card)' }}>
-                  <div className="text-[12px] text-[#6e6e73] font-medium">已提交</div>
-                  <div className="text-[28px] font-bold tabular-nums text-[#1d1d1f] mt-1 tracking-[-0.02em]">{progressStats.submitted}</div>
+                <div className="apple-card bg-white p-4 rounded-[12px]" style={{ boxShadow: 'var(--sh-card)' }}>
+                  <div className="text-[12px] text-mute font-medium">已提交</div>
+                  <div className="text-[28px] font-bold tabular-nums text-ink mt-1 tracking-[-0.02em]">{progressStats.submitted}</div>
                 </div>
-                <div className="apple-card bg-white p-4 rounded-[18px]" style={{ boxShadow: 'var(--sh-card)' }}>
-                  <div className="text-[12px] text-[#6e6e73] font-medium">审批通过</div>
-                  <div className="text-[28px] font-bold tabular-nums text-[#1d1d1f] mt-1 tracking-[-0.02em]">{progressStats.approved}</div>
+                <div className="apple-card bg-white p-4 rounded-[12px]" style={{ boxShadow: 'var(--sh-card)' }}>
+                  <div className="text-[12px] text-mute font-medium">审批通过</div>
+                  <div className="text-[28px] font-bold tabular-nums text-ink mt-1 tracking-[-0.02em]">{progressStats.approved}</div>
                 </div>
-                <div className="apple-card bg-white p-4 rounded-[18px]" style={{ boxShadow: 'var(--sh-card)' }}>
-                  <div className="text-[12px] text-[#6e6e73] font-medium">提交率</div>
-                  <div className="text-[28px] font-bold tabular-nums text-[#1d1d1f] mt-1 tracking-[-0.02em]">{progressStats.rate}<span className="text-[18px] text-[#6e6e73] ml-0.5">%</span></div>
+                <div className="apple-card bg-white p-4 rounded-[12px]" style={{ boxShadow: 'var(--sh-card)' }}>
+                  <div className="text-[12px] text-mute font-medium">提交率</div>
+                  <div className="text-[28px] font-bold tabular-nums text-ink mt-1 tracking-[-0.02em]">{progressStats.rate}<span className="text-[18px] text-mute ml-0.5">%</span></div>
                 </div>
               </div>
 
               {/* Progress bar panel */}
-              <div className="bg-white p-5 rounded-[22px]" style={{ boxShadow: 'var(--sh-panel)' }}>
+              <div className="bg-white p-5 rounded-[12px]" style={{ boxShadow: 'var(--sh-panel)' }}>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[13px] font-semibold text-[#1d1d1f]">填报进度</span>
-                  <span className="text-[12px] text-[#6e6e73] tabular-nums">{progressStats.submitted} / {progressStats.total} 已提交</span>
+                  <span className="text-[13px] font-semibold text-ink">填报进度</span>
+                  <span className="text-[12px] text-mute tabular-nums">{progressStats.submitted} / {progressStats.total} 已提交</span>
                 </div>
-                <div className="w-full h-2.5 bg-[#f5f5f7] rounded-full overflow-hidden flex">
-                  <div className="bg-[#1d1d1f] h-full transition-all" style={{ width: `${progressStats.total > 0 ? (progressStats.approved / progressStats.total) * 100 : 0}%` }} title={`审批通过: ${progressStats.approved}`} />
-                  <div className="bg-[#0071e3] h-full transition-all" style={{ width: `${progressStats.total > 0 ? (progressStats.pending / progressStats.total) * 100 : 0}%` }} title={`审批中: ${progressStats.pending}`} />
+                <div className="w-full h-2.5 bg-canvas rounded-full overflow-hidden flex">
+                  <div className="bg-ink h-full transition-all" style={{ width: `${progressStats.total > 0 ? (progressStats.approved / progressStats.total) * 100 : 0}%` }} title={`审批通过: ${progressStats.approved}`} />
+                  <div className="bg-ink h-full transition-all" style={{ width: `${progressStats.total > 0 ? (progressStats.pending / progressStats.total) * 100 : 0}%` }} title={`审批中: ${progressStats.pending}`} />
                 </div>
-                <div className="flex items-center gap-5 mt-3 text-[12px] text-[#6e6e73]">
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-[#1d1d1f] rounded-full" /><span>审批通过 <span className="tabular-nums">{progressStats.approved}</span></span></span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-[#0071e3] rounded-full" /><span>审批中 <span className="tabular-nums">{progressStats.pending}</span></span></span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-[#d2d2d7] rounded-full" /><span>未提交 <span className="tabular-nums">{progressStats.total - progressStats.submitted}</span></span></span>
+                <div className="flex items-center gap-5 mt-3 text-[12px] text-mute">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-ink rounded-full" /><span>审批通过 <span className="tabular-nums">{progressStats.approved}</span></span></span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-ink rounded-full" /><span>审批中 <span className="tabular-nums">{progressStats.pending}</span></span></span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-line rounded-full" /><span>未提交 <span className="tabular-nums">{progressStats.total - progressStats.submitted}</span></span></span>
                 </div>
               </div>
 
               {/* Detail table */}
-              <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
+              <div className="bg-white rounded-[12px] overflow-hidden" style={{ boxShadow: 'var(--sh-panel)' }}>
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
-                    <thead><tr className="bg-[#f5f5f7] text-[#6e6e73] text-[12px] font-semibold">
+                    <thead><tr className="bg-canvas text-mute text-[12px] font-semibold">
                       <th className="p-4 w-40 text-left">机构</th>
                       <th className="p-4 w-28 text-left">任务状态</th>
                       <th className="p-4 w-28 text-left">提交状态</th>
@@ -574,11 +581,11 @@ export const AggregationView: React.FC = () => {
                     </tr></thead>
                     <tbody>
                       {progressItems.map((p) => (
-                        <tr key={p.companyId} className="hover:bg-[#fbfbfd] transition-colors" style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}>
-                          <td className="p-4 font-semibold text-[#1d1d1f]">{p.companyName}</td>
-                          <td className="p-4"><span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-[#424245] bg-[#e8e8ed]">{p.assignmentStatus}</span></td>
-                          <td className="p-4">{p.submissionStatus ? getStatusBadge(p.submissionStatus) : <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-[#86868b] bg-[#f5f5f7]">未提交</span>}</td>
-                          <td className="p-4 text-center text-[#6e6e73] tabular-nums">{p.version || '—'}</td>
+                        <tr key={p.companyId} className="hover:bg-hoverbg transition-colors" style={{ borderTop: '1px solid var(--hairline)' }}>
+                          <td className="p-4 font-semibold text-ink">{p.companyName}</td>
+                          <td className="p-4"><span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-body bg-line">{p.assignmentStatus}</span></td>
+                          <td className="p-4">{p.submissionStatus ? getStatusBadge(p.submissionStatus) : <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-mute bg-canvas">未提交</span>}</td>
+                          <td className="p-4 text-center text-mute tabular-nums">{p.version || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -589,45 +596,45 @@ export const AggregationView: React.FC = () => {
           )}
         </div>
       ) : periods.length === 0 ? (
-        <div className="bg-white p-12 text-center rounded-[22px]" style={{ boxShadow: 'var(--sh-card)' }}>
-          <div className="text-[15px] font-semibold text-[#1d1d1f]">该模板暂无下发任务</div>
-          <p className="text-[13px] text-[#86868b] mt-1">请先创建并下发报表周期后再查看汇总。</p>
+        <div className="bg-white p-12 text-center rounded-[12px]" style={{ boxShadow: 'var(--sh-card)' }}>
+          <div className="text-[15px] font-semibold text-ink">该模板暂无下发任务</div>
+          <p className="text-[13px] text-mute mt-1">请先创建并下发报表周期后再查看汇总。</p>
         </div>
       ) : null}
 
       {/* History Modal */}
       {showHistory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
-          <div className="bg-white rounded-[22px] max-w-4xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150" style={{ boxShadow: 'var(--sh-overlay)' }}>
-            <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.07)] pb-3">
-              <h2 className="text-[17px] font-bold tracking-[-0.01em] text-[#1d1d1f] flex items-center gap-2">
-                <History className="w-4 h-4 text-[#0071e3]" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }}>
+          <div className="bg-white rounded-[12px] max-w-4xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150" style={{ boxShadow: 'var(--sh-overlay)' }}>
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <h2 className="text-[17px] font-bold tracking-[-0.01em] text-ink flex items-center gap-2">
+                <History className="w-4 h-4 text-ink" />
                 <span>填报历史版本</span>
-                <span className="text-[12px] text-[#86868b] font-normal">({templates.find((t) => t.id === selectedTemplateId)?.name})</span>
+                <span className="text-[12px] text-mute font-normal">({templates.find((t) => t.id === selectedTemplateId)?.name})</span>
               </h2>
-              <button onClick={() => setShowHistory(false)} className="text-[#86868b] hover:text-[#1d1d1f] transition-colors"><X size={18} /></button>
+              <button onClick={() => setShowHistory(false)} className="text-mute hover:text-ink transition-colors"><X size={18} /></button>
             </div>
             {historyLoading ? (
-              <div className="py-12 text-center text-[13px] text-[#aeaeb2]">正在加载历史记录...</div>
+              <div className="py-12 text-center text-[13px] text-faint">正在加载历史记录...</div>
             ) : !historyData || historyData.length === 0 ? (
-              <div className="py-12 text-center text-[13px] text-[#aeaeb2]">暂无历史记录</div>
+              <div className="py-12 text-center text-[13px] text-faint">暂无历史记录</div>
             ) : (
               <div className="space-y-3">
                 {historyData.map((h) => (
-                  <div key={h.assignment_id} className="bg-white rounded-[18px] overflow-hidden border border-[rgba(0,0,0,0.07)]">
-                    <div className="bg-[#f5f5f7] px-4 py-3 flex items-center justify-between">
+                  <div key={h.assignment_id} className="bg-white rounded-[12px] overflow-hidden border border-line">
+                    <div className="bg-canvas px-4 py-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-[#86868b]" />
-                        <span className="text-[13px] font-semibold text-[#1d1d1f]">{h.company_name}</span>
-                        <span className="text-[12px] text-[#86868b] tabular-nums">{h.period_label}</span>
+                        <Building2 className="w-4 h-4 text-mute" />
+                        <span className="text-[13px] font-semibold text-ink">{h.company_name}</span>
+                        <span className="text-[12px] text-mute tabular-nums">{h.period_label}</span>
                       </div>
-                      <span className="text-[12px] text-[#6e6e73]">任务状态 {h.status}</span>
+                      <span className="text-[12px] text-mute">任务状态 {h.status}</span>
                     </div>
                     {h.submissions_history.length === 0 ? (
-                      <div className="px-4 py-3 text-[12px] text-[#aeaeb2]">暂无提交记录</div>
+                      <div className="px-4 py-3 text-[12px] text-faint">暂无提交记录</div>
                     ) : (
                       <table className="w-full text-[12px]">
-                        <thead><tr className="text-[#6e6e73] border-b border-[rgba(0,0,0,0.07)]">
+                        <thead><tr className="text-mute border-b border-line">
                           <th className="p-3 text-left font-semibold">版本</th>
                           <th className="p-3 text-left font-semibold">状态</th>
                           <th className="p-3 text-left font-semibold">提交人</th>
@@ -636,12 +643,12 @@ export const AggregationView: React.FC = () => {
                         </tr></thead>
                         <tbody>
                           {h.submissions_history.map((s: any) => (
-                            <tr key={s.submission_id} className="hover:bg-[#fbfbfd] transition-colors" style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}>
-                              <td className="p-3 font-bold text-[#1d1d1f] tabular-nums">v{s.version}</td>
+                            <tr key={s.submission_id} className="hover:bg-hoverbg transition-colors" style={{ borderTop: '1px solid var(--hairline)' }}>
+                              <td className="p-3 font-bold text-ink tabular-nums">v{s.version}</td>
                               <td className="p-3">{getStatusBadge(s.status)}</td>
-                              <td className="p-3 text-[#424245]">{s.submitted_by_name || '—'}</td>
-                              <td className="p-3 text-[#6e6e73] tabular-nums">{s.submitted_at ? new Date(s.submitted_at).toLocaleString('zh-CN') : '—'}</td>
-                              <td className="p-3 text-[#6e6e73] max-w-xs truncate">{s.comment || '—'}</td>
+                              <td className="p-3 text-body">{s.submitted_by_name || '—'}</td>
+                              <td className="p-3 text-mute tabular-nums">{s.submitted_at ? new Date(s.submitted_at).toLocaleString('zh-CN') : '—'}</td>
+                              <td className="p-3 text-mute max-w-xs truncate">{s.comment || '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -657,7 +664,7 @@ export const AggregationView: React.FC = () => {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-[60] h-11 px-5 rounded-full flex items-center text-[13px] font-semibold shadow-[0_12px_32px_rgba(0,0,0,0.1)] animate-in fade-in slide-in-from-top-2 duration-200 ${toast.type === 'error' ? 'bg-[#ff6b00] text-white' : 'bg-[#0071e3] text-white'}`}>
+        <div className={`fixed top-6 right-6 z-[60] h-11 px-5 rounded-md flex items-center text-[13px] font-semibold shadow-[0_12px_32px_rgba(0,0,0,0.1)] animate-in fade-in slide-in-from-top-2 duration-200 ${toast.type === 'error' ? 'bg-[#9F2F2D] text-white' : 'bg-ink text-white'}`}>
           {toast.message}
         </div>
       )}

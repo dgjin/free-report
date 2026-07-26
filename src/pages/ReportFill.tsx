@@ -19,7 +19,7 @@ import {
   X,
   Download,
   Grid3x3,
-} from 'lucide-react';
+} from '../components/icons';
 import { api, getStoredUser } from '../services/api';
 import { toast, confirmDialog } from '../utils/toast';
 import {
@@ -352,7 +352,7 @@ export const ReportFill: React.FC = () => {
   if (loading || !assignment) {
     return (
       <div className="max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)]">
-        <div className="text-center text-xs text-[#86868b] py-12">正在加载填报页面数据...</div>
+        <div className="text-center text-xs text-mute py-12">正在加载填报页面数据...</div>
       </div>
     );
   }
@@ -363,35 +363,35 @@ export const ReportFill: React.FC = () => {
 
   const isRejected = submission?.status === 'rejected' || submission?.status === 'returned';
 
-  // Apple-style status badge: grayscale (done) / accent (progress) / orange (warning)
+  // Status badge: muted pastel semantics (done=green / progress=blue / warn=red)
   const getStatusBadgeClass = (status?: string) => {
     if (status === 'approved' || status === 'completed' || status === 'signed') {
-      return 'bg-[#e8e8ed] text-[#1d1d1f]';
+      return 'bg-[#EDF3EC] text-[#346538]';
     }
     if (status === 'rejected' || status === 'returned') {
-      return 'bg-[rgba(255,107,0,0.1)] text-[#ff6b00]';
+      return 'bg-[#FDEBEC] text-[#9F2F2D]';
     }
-    return 'bg-[rgba(0,113,227,0.08)] text-[#0071e3]';
+    return 'bg-[#E1F3FE] text-[#1F6C9F]';
   };
 
   // Approval row badge by approval status
   const getApprovalBadgeClass = (status?: string) => {
-    if (status === 'approved') return 'bg-[#e8e8ed] text-[#1d1d1f]';
-    if (status === 'rejected') return 'bg-[rgba(255,107,0,0.1)] text-[#ff6b00]';
-    return 'bg-[rgba(0,113,227,0.08)] text-[#0071e3]';
+    if (status === 'approved') return 'bg-[#EDF3EC] text-[#346538]';
+    if (status === 'rejected') return 'bg-[#FDEBEC] text-[#9F2F2D]';
+    return 'bg-[#E1F3FE] text-[#1F6C9F]';
   };
 
   return (
-    <div className="max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-5 pb-12">
+    <div className="reveal max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-5 pb-12">
       {/* Header */}
       <div
-        className="bg-white rounded-[22px] p-6 sm:p-7 space-y-4"
+        className="bg-white rounded-[12px] p-6 sm:p-7 space-y-4"
         style={{ boxShadow: 'var(--sh-panel)' }}
       >
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate('/fill')}
-            className="text-xs text-[#6e6e73] hover:text-[#0071e3] flex items-center space-x-1 font-medium rounded-full px-1"
+            className="text-xs text-mute hover:text-ink flex items-center space-x-1 font-medium rounded-full px-1"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>返回任务列表</span>
@@ -404,7 +404,7 @@ export const ReportFill: React.FC = () => {
               {workflowView.label}
             </span>
             {submission && (
-              <span className="px-2.5 py-0.5 bg-[#f5f5f7] text-[#424245] text-[11px] font-mono font-semibold rounded-full tabular-nums">
+              <span className="px-2.5 py-0.5 bg-canvas text-body text-[11px] font-mono font-semibold rounded-full tabular-nums">
                 版本 v{submission.version}
               </span>
             )}
@@ -413,10 +413,10 @@ export const ReportFill: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div className="space-y-1.5 min-w-0">
-            <h1 className="text-[22px] font-bold text-[#1d1d1f] tracking-[-0.03em] leading-tight">
+            <h1 className="t-serif text-[26px] text-ink leading-tight">
               {assignment.title}
             </h1>
-            <div className="text-xs text-[#6e6e73] flex items-center flex-wrap gap-x-4 gap-y-1">
+            <div className="text-xs text-mute flex items-center flex-wrap gap-x-4 gap-y-1">
               <span>周期: {assignment.period_label}</span>
               <span>模板: {assignment.template_name}</span>
               <span>截止日期: {assignment.deadline}</span>
@@ -429,7 +429,7 @@ export const ReportFill: React.FC = () => {
                 type="button"
                 onClick={() => handleSave(false)}
                 disabled={saving || submitting}
-                className="h-11 px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-semibold text-xs rounded-full transition-colors flex items-center space-x-1.5 disabled:opacity-50"
+                className="h-11 px-5 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 <span>{saving ? '保存草稿中...' : '保存为草稿'}</span>
@@ -439,7 +439,7 @@ export const ReportFill: React.FC = () => {
                 type="button"
                 onClick={() => handleSave(true)}
                 disabled={saving || submitting}
-                className="h-11 px-5 bg-[#0071e3] hover:bg-[#0066cc] text-white font-semibold text-xs rounded-full transition-colors flex items-center space-x-1.5 disabled:opacity-50"
+                className="h-11 px-5 bg-ink hover:bg-inkhover text-white font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5 disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
                 <span>{submitting ? '提交中...' : '提交至下发部门'}</span>
@@ -452,13 +452,13 @@ export const ReportFill: React.FC = () => {
       {/* Rejection Alert if rejected */}
       {isRejected && (
         <div
-          className="bg-[rgba(255,107,0,0.08)] rounded-[18px] px-5 py-4 flex items-start space-x-3 text-xs"
-          style={{ border: '1px solid rgba(255,107,0,0.18)' }}
+          className="bg-[#FDEBEC] rounded-[12px] px-5 py-4 flex items-start space-x-3 text-xs"
+          style={{ border: '1px solid #FDEBEC' }}
         >
-          <XCircle className="w-[18px] h-[18px] text-[#ff6b00] shrink-0 mt-0.5" />
+          <XCircle className="w-[18px] h-[18px] text-[#9F2F2D] shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <div className="font-bold text-[#1d1d1f]">您的填报数据已被退回</div>
-            <div className="text-[#6e6e73] leading-relaxed">
+            <div className="font-bold text-ink">您的填报数据已被退回</div>
+            <div className="text-mute leading-relaxed">
               请根据审核意见修改下方数据后重新提交（提交后系统将自动升级至版本 v
               {(submission?.version || 1) + 1}）。
             </div>
@@ -469,22 +469,22 @@ export const ReportFill: React.FC = () => {
       {/* Summary Form Section (汇总字段) */}
       {summaryFields.length > 0 && (
         <div
-          className="bg-white rounded-[22px] p-6 sm:p-7 space-y-5"
+          className="bg-white rounded-[12px] p-6 sm:p-7 space-y-5"
           style={{ boxShadow: 'var(--sh-panel)' }}
         >
           <div
             className="flex items-center justify-between pb-4"
-            style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}
+            style={{ borderBottom: '1px solid var(--hairline)' }}
           >
             <div className="flex items-center space-x-2.5">
-              <div className="p-1.5 bg-[#f5f5f7] text-[#1d1d1f] rounded-[10px]">
+              <div className="p-1.5 bg-canvas text-ink rounded-[10px]">
                 <FileSpreadsheet className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-[#1d1d1f] tracking-[-0.01em]">
+                <h2 className="text-base font-bold text-ink tracking-[-0.01em]">
                   一、汇总指标数据 (Summary Data)
                 </h2>
-                <p className="text-[11px] text-[#86868b] mt-0.5">请按要求填写分公司整体汇总考核数据</p>
+                <p className="text-[11px] text-mute mt-0.5">请按要求填写分公司整体汇总考核数据</p>
               </div>
             </div>
           </div>
@@ -499,9 +499,9 @@ export const ReportFill: React.FC = () => {
 
               return (
                 <div key={field.id} className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-[#1d1d1f]">
+                  <label className="block text-xs font-semibold text-ink">
                     {field.field_label}
-                    {config.required && <span className="text-[#ff6b00] ml-1">*</span>}
+                    {config.required && <span className="text-[#9F2F2D] ml-1">*</span>}
                   </label>
 
                   {field.field_type === 'select' ? (
@@ -509,7 +509,7 @@ export const ReportFill: React.FC = () => {
                       disabled={isReadOnly}
                       value={val}
                       onChange={(e) => handleSummaryChange(field.id, e.target.value)}
-                      className="w-full h-11 px-3.5 bg-[#f5f5f7] rounded-[12px] text-xs text-[#1d1d1f] focus:ring-2 focus:ring-[#0071e3] focus:bg-white focus:outline-none disabled:opacity-60 disabled:text-[#86868b]"
+                      className="w-full h-11 px-3.5 bg-canvas rounded-[12px] text-xs text-ink focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60 disabled:text-mute"
                     >
                       <option value="">-- 请选择 --</option>
                       {(config.options || []).map((opt: string) => (
@@ -525,7 +525,7 @@ export const ReportFill: React.FC = () => {
                       value={val}
                       onChange={(e) => handleSummaryChange(field.id, e.target.value)}
                       placeholder="请输入..."
-                      className="w-full px-3.5 py-2.5 bg-[#f5f5f7] rounded-[12px] text-xs text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:ring-2 focus:ring-[#0071e3] focus:bg-white focus:outline-none disabled:opacity-60 disabled:text-[#86868b]"
+                      className="w-full px-3.5 py-2.5 bg-canvas rounded-[12px] text-xs text-ink placeholder:text-faint focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60 disabled:text-mute"
                     />
                   ) : (
                     <input
@@ -540,7 +540,7 @@ export const ReportFill: React.FC = () => {
                       value={val}
                       onChange={(e) => handleSummaryChange(field.id, e.target.value)}
                       placeholder="请输入..."
-                      className={`w-full h-11 px-3.5 bg-[#f5f5f7] rounded-[12px] text-xs text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:ring-2 focus:ring-[#0071e3] focus:bg-white focus:outline-none disabled:opacity-60 disabled:text-[#86868b] ${
+                      className={`w-full h-11 px-3.5 bg-canvas rounded-[12px] text-xs text-ink placeholder:text-faint focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60 disabled:text-mute ${
                         field.field_type === 'number' ? 'tabular-nums' : ''
                       }`}
                     />
@@ -555,22 +555,22 @@ export const ReportFill: React.FC = () => {
       {/* 2. Detail Grid Section (明细字段) */}
       {detailFields.length > 0 && (
         <div
-          className="bg-white rounded-[22px] p-6 sm:p-7 space-y-5"
+          className="bg-white rounded-[12px] p-6 sm:p-7 space-y-5"
           style={{ boxShadow: 'var(--sh-panel)' }}
         >
           <div
             className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4"
-            style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}
+            style={{ borderBottom: '1px solid var(--hairline)' }}
           >
             <div className="flex items-center space-x-2.5">
-              <div className="p-1.5 bg-[#f5f5f7] text-[#1d1d1f] rounded-[10px]">
+              <div className="p-1.5 bg-canvas text-ink rounded-[10px]">
                 <CheckSquare className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-[#1d1d1f] tracking-[-0.01em]">
+                <h2 className="text-base font-bold text-ink tracking-[-0.01em]">
                   {summaryFields.length > 0 ? '二' : '一'}、明细清单填写 (Detail Rows)
                 </h2>
-                <p className="text-[11px] text-[#86868b] mt-0.5">支持多行表格展开添加，系统将自动对数值类型汇总计算</p>
+                <p className="text-[11px] text-mute mt-0.5">支持多行表格展开添加，系统将自动对数值类型汇总计算</p>
               </div>
             </div>
 
@@ -579,12 +579,12 @@ export const ReportFill: React.FC = () => {
                 <button
                   type="button"
                   onClick={downloadTemplate}
-                  className="h-9 px-3 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-semibold text-xs rounded-full transition-colors flex items-center space-x-1.5"
+                  className="h-9 px-3 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>下载模板</span>
                 </button>
-                <label className="h-9 px-3 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-semibold text-xs rounded-full transition-colors flex items-center space-x-1.5 cursor-pointer">
+                <label className="h-9 px-3 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5 cursor-pointer">
                   <Upload className="w-3.5 h-3.5" />
                   <span>{importing ? '解析中...' : '导入Excel'}</span>
                   <input
@@ -598,7 +598,7 @@ export const ReportFill: React.FC = () => {
                 <button
                   type="button"
                   onClick={addDetailRow}
-                  className="h-9 px-3 bg-[#0071e3] hover:bg-[#0066cc] text-white font-semibold text-xs rounded-full transition-colors flex items-center space-x-1.5"
+                  className="h-9 px-3 bg-ink hover:bg-inkhover text-white font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>添加一行明细</span>
@@ -608,12 +608,12 @@ export const ReportFill: React.FC = () => {
           </div>
 
           <div
-            className="overflow-x-auto rounded-[18px]"
-            style={{ border: '1px solid rgba(0,0,0,0.07)' }}
+            className="overflow-x-auto rounded-[12px]"
+            style={{ border: '1px solid var(--hairline)' }}
           >
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-[#f5f5f7] text-[#1d1d1f] font-semibold">
+                <tr className="bg-canvas text-ink font-semibold">
                   <th className="p-3 w-12 text-center tabular-nums">#</th>
                   {detailFields.map((df) => (
                     <th key={df.id} className="p-3 min-w-[140px]">
@@ -625,10 +625,10 @@ export const ReportFill: React.FC = () => {
               </thead>
               <tbody>
                 {detailRows.map((row, rowIndex) => (
-                  <tr key={rowIndex} className="hover:bg-[#fbfbfd]">
+                  <tr key={rowIndex} className="hover:bg-hoverbg">
                     <td
-                      className="p-3 text-center text-[#86868b] font-mono font-semibold tabular-nums"
-                      style={{ borderTop: rowIndex === 0 ? 'none' : '1px solid rgba(0,0,0,0.07)' }}
+                      className="p-3 text-center text-mute font-mono font-semibold tabular-nums"
+                      style={{ borderTop: rowIndex === 0 ? 'none' : '1px solid var(--hairline)' }}
                     >
                       {rowIndex + 1}
                     </td>
@@ -644,14 +644,14 @@ export const ReportFill: React.FC = () => {
                         <td
                           key={df.id}
                           className="p-2"
-                          style={{ borderTop: rowIndex === 0 && dfIdx === 0 ? 'none' : '1px solid rgba(0,0,0,0.07)' }}
+                          style={{ borderTop: rowIndex === 0 && dfIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
                         >
                           {df.field_type === 'select' ? (
                             <select
                               disabled={isReadOnly}
                               value={val}
                               onChange={(e) => handleDetailChange(rowIndex, df.id, e.target.value)}
-                              className="w-full h-9 px-2.5 bg-[#f5f5f7] rounded-[10px] text-xs text-[#1d1d1f] focus:ring-2 focus:ring-[#0071e3] focus:bg-white focus:outline-none disabled:opacity-60"
+                              className="w-full h-9 px-2.5 bg-canvas rounded-[10px] text-xs text-ink focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60"
                             >
                               <option value="">-- 选择 --</option>
                               {(config.options || []).map((opt: string) => (
@@ -667,7 +667,7 @@ export const ReportFill: React.FC = () => {
                               value={val}
                               onChange={(e) => handleDetailChange(rowIndex, df.id, e.target.value)}
                               placeholder="..."
-                              className={`w-full h-9 px-2.5 bg-[#f5f5f7] rounded-[10px] text-xs text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:ring-2 focus:ring-[#0071e3] focus:bg-white focus:outline-none disabled:opacity-60 ${
+                              className={`w-full h-9 px-2.5 bg-canvas rounded-[10px] text-xs text-ink placeholder:text-faint focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60 ${
                                 df.field_type === 'number' ? 'tabular-nums' : ''
                               }`}
                             />
@@ -679,12 +679,12 @@ export const ReportFill: React.FC = () => {
                     {!isReadOnly && (
                       <td
                         className="p-2 text-center"
-                        style={{ borderTop: rowIndex === 0 ? 'none' : '1px solid rgba(0,0,0,0.07)' }}
+                        style={{ borderTop: rowIndex === 0 ? 'none' : '1px solid var(--hairline)' }}
                       >
                         <button
                           type="button"
                           onClick={() => removeDetailRow(rowIndex)}
-                          className="p-1.5 text-[#aeaeb2] hover:text-[#ff6b00] hover:bg-[rgba(255,107,0,0.08)] rounded-full transition-colors"
+                          className="p-1.5 text-faint hover:text-[#9F2F2D] hover:bg-[#FDEBEC] rounded-full transition-colors"
                           title="删除本行"
                         >
                           <Trash2 size={15} />
@@ -705,33 +705,33 @@ export const ReportFill: React.FC = () => {
         return (
           <div
             key={groupIdx}
-            className="bg-white rounded-[22px] p-6 sm:p-7 space-y-5"
+            className="bg-white rounded-[12px] p-6 sm:p-7 space-y-5"
             style={{ boxShadow: 'var(--sh-panel)' }}
           >
             <div
               className="flex items-center justify-between pb-4"
-              style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}
+              style={{ borderBottom: '1px solid var(--hairline)' }}
             >
               <div className="flex items-center space-x-2.5">
-                <div className="p-1.5 bg-[#f5f5f7] text-[#1d1d1f] rounded-[10px]">
+                <div className="p-1.5 bg-canvas text-ink rounded-[10px]">
                   <Grid3x3 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-[#1d1d1f] tracking-[-0.01em]">
+                  <h2 className="text-base font-bold text-ink tracking-[-0.01em]">
                     {sectionNum}、{group.rowLabel}交叉表 (Cross-Tab)
                   </h2>
-                  <p className="text-[11px] text-[#86868b] mt-0.5">固定行 × 动态列，数值列将自动合计</p>
+                  <p className="text-[11px] text-mute mt-0.5">固定行 × 动态列，数值列将自动合计</p>
                 </div>
               </div>
             </div>
 
             <div
-              className="overflow-x-auto rounded-[18px]"
-              style={{ border: '1px solid rgba(0,0,0,0.07)' }}
+              className="overflow-x-auto rounded-[12px]"
+              style={{ border: '1px solid var(--hairline)' }}
             >
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-[#f5f5f7] text-[#1d1d1f] font-semibold">
+                  <tr className="bg-canvas text-ink font-semibold">
                     <th className="p-3 min-w-[120px]">{group.rowLabel}</th>
                     {group.columns.map((col) => (
                       <th key={col.id} className="p-3 min-w-[100px] text-center">{col.field_label}</th>
@@ -740,10 +740,10 @@ export const ReportFill: React.FC = () => {
                 </thead>
                 <tbody>
                   {group.rowOptions.map((rowOpt, rowIdx) => (
-                    <tr key={rowIdx} className="hover:bg-[#fbfbfd]">
+                    <tr key={rowIdx} className="hover:bg-hoverbg">
                       <td
-                        className="p-3 font-semibold text-[#1d1d1f]"
-                        style={{ borderTop: rowIdx === 0 ? 'none' : '1px solid rgba(0,0,0,0.07)' }}
+                        className="p-3 font-semibold text-ink"
+                        style={{ borderTop: rowIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
                       >
                         {rowOpt}
                       </td>
@@ -754,16 +754,16 @@ export const ReportFill: React.FC = () => {
                           <td
                             key={col.id}
                             className="p-2 text-center"
-                            style={{ borderTop: rowIdx === 0 && colIdx === 0 ? 'none' : '1px solid rgba(0,0,0,0.07)' }}
+                            style={{ borderTop: rowIdx === 0 && colIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
                           >
                             {isReadOnly ? (
-                              <span className="text-[#424245] font-mono tabular-nums">
-                                {val || <span className="text-[#d2d2d7]">—</span>}
+                              <span className="text-body font-mono tabular-nums">
+                                {val || <span className="text-line">—</span>}
                               </span>
                             ) : colType === 'select' ? (
                               <select disabled={isReadOnly} value={val}
                                 onChange={(e) => handleMatrixChange(rowIdx, col.id, e.target.value)}
-                                className="w-full h-9 px-2.5 bg-[#f5f5f7] rounded-[10px] text-xs text-[#1d1d1f] focus:ring-2 focus:ring-[#0071e3] focus:bg-white focus:outline-none">
+                                className="w-full h-9 px-2.5 bg-canvas rounded-[10px] text-xs text-ink focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none">
                                 <option value="">-- 选择 --</option>
                               </select>
                             ) : (
@@ -771,7 +771,7 @@ export const ReportFill: React.FC = () => {
                                 disabled={isReadOnly} value={val}
                                 onChange={(e) => handleMatrixChange(rowIdx, col.id, e.target.value)}
                                 placeholder="..."
-                                className={`w-full h-9 px-2.5 bg-[#f5f5f7] rounded-[10px] text-xs text-center text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:ring-2 focus:ring-[#0071e3] focus:bg-white focus:outline-none ${
+                                className={`w-full h-9 px-2.5 bg-canvas rounded-[10px] text-xs text-center text-ink placeholder:text-faint focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none ${
                                   colType === 'number' ? 'tabular-nums' : ''
                                 }`} />
                             )}
@@ -784,17 +784,17 @@ export const ReportFill: React.FC = () => {
                 {/* Summary row for number columns */}
                 {group.columns.some((c) => c.field_type === 'number') && (
                   <tfoot>
-                    <tr className="bg-[#f5f5f7] font-bold text-[#1d1d1f]">
-                      <td className="p-3" style={{ borderTop: '2px solid rgba(0,0,0,0.07)' }}>合计</td>
+                    <tr className="bg-canvas font-bold text-ink">
+                      <td className="p-3" style={{ borderTop: '2px solid var(--hairline)' }}>合计</td>
                       {group.columns.map((col) => {
                         if (col.field_type !== 'number') {
-                          return <td key={col.id} className="p-3 text-center text-[#d2d2d7]" style={{ borderTop: '2px solid rgba(0,0,0,0.07)' }}>—</td>;
+                          return <td key={col.id} className="p-3 text-center text-line" style={{ borderTop: '2px solid var(--hairline)' }}>—</td>;
                         }
                         const total = group.rowOptions.reduce((sum, _, idx) => {
                           const v = detailRows[idx]?.[col.id];
                           return v && !isNaN(Number(v)) ? sum + Number(v) : sum;
                         }, 0);
-                        return <td key={col.id} className="p-3 text-center text-[#0071e3] font-mono tabular-nums" style={{ borderTop: '2px solid rgba(0,0,0,0.07)' }}>{total.toLocaleString()}</td>;
+                        return <td key={col.id} className="p-3 text-center text-ink font-mono tabular-nums" style={{ borderTop: '2px solid var(--hairline)' }}>{total.toLocaleString()}</td>;
                       })}
                     </tr>
                   </tfoot>
@@ -808,16 +808,16 @@ export const ReportFill: React.FC = () => {
       {/* Comment input */}
       {!isReadOnly && (
         <div
-          className="bg-white rounded-[22px] p-5 sm:p-6 space-y-3"
+          className="bg-white rounded-[12px] p-5 sm:p-6 space-y-3"
           style={{ boxShadow: 'var(--sh-card)' }}
         >
-          <label className="block text-xs font-semibold text-[#1d1d1f]">填报备注说明 (选填)</label>
+          <label className="block text-xs font-semibold text-ink">填报备注说明 (选填)</label>
           <input
             type="text"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="说明特殊情况、数据口径或提交注意事项"
-            className="w-full h-11 px-3.5 bg-[#f5f5f7] rounded-[12px] text-xs text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:ring-2 focus:ring-[#0071e3] focus:bg-white focus:outline-none"
+            className="w-full h-11 px-3.5 bg-canvas rounded-[12px] text-xs text-ink placeholder:text-faint focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none"
           />
         </div>
       )}
@@ -825,20 +825,20 @@ export const ReportFill: React.FC = () => {
       {/* 3. Approval Flow Records Tracker */}
       {submission && submission.approvals && submission.approvals.length > 0 && (
         <div
-          className="bg-white rounded-[22px] p-6 sm:p-7"
+          className="bg-white rounded-[12px] p-6 sm:p-7"
           style={{ boxShadow: 'var(--sh-panel)' }}
         >
           <div
             className="flex items-center justify-between pb-4"
-            style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}
+            style={{ borderBottom: '1px solid var(--hairline)' }}
           >
             <div className="flex items-center space-x-2.5">
-              <div className="p-1.5 bg-[#f5f5f7] text-[#1d1d1f] rounded-[10px]">
+              <div className="p-1.5 bg-canvas text-ink rounded-[10px]">
                 <UserCheck className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-[#1d1d1f] tracking-[-0.01em]">三级审批流程监控 (Approval History)</h2>
-                <p className="text-[11px] text-[#86868b] mt-0.5">经办提交 → 复核审核 → 审批终审</p>
+                <h2 className="text-base font-bold text-ink tracking-[-0.01em]">三级审批流程监控 (Approval History)</h2>
+                <p className="text-[11px] text-mute mt-0.5">经办提交 → 复核审核 → 审批终审</p>
               </div>
             </div>
           </div>
@@ -861,7 +861,7 @@ export const ReportFill: React.FC = () => {
                 >
                   <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-semibold text-[#1d1d1f] tracking-[-0.01em]">
+                      <span className="text-sm font-semibold text-ink tracking-[-0.01em]">
                         {levelNames[app.approval_level]}
                       </span>
                       <span
@@ -871,20 +871,20 @@ export const ReportFill: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="text-xs text-[#6e6e73]">
-                      处理人: <span className="font-semibold text-[#1d1d1f]">{app.approver_name}</span>
+                    <div className="text-xs text-mute">
+                      处理人: <span className="font-semibold text-ink">{app.approver_name}</span>
                     </div>
 
                     {app.comment && (
                       <div
-                        className="text-xs text-[#424245] bg-[#f5f5f7] px-3 py-2 rounded-[10px]"
-                        style={{ border: '1px solid rgba(0,0,0,0.07)' }}
+                        className="text-xs text-body bg-canvas px-3 py-2 rounded-[10px]"
+                        style={{ border: '1px solid var(--hairline)' }}
                       >
                         "{app.comment}"
                       </div>
                     )}
 
-                    <div className="text-[10px] text-[#aeaeb2] tabular-nums">{app.updated_at || app.created_at}</div>
+                    <div className="text-[10px] text-faint tabular-nums">{app.updated_at || app.created_at}</div>
                   </div>
                 </div>
               );
@@ -897,26 +897,26 @@ export const ReportFill: React.FC = () => {
       {importModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+          style={{ background: 'rgba(0,0,0,0.35)' }}
         >
           <div
-            className="bg-white rounded-[22px] max-w-4xl w-full max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white rounded-[12px] max-w-4xl w-full max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-150"
             style={{ boxShadow: 'var(--sh-overlay)' }}
           >
             {/* Modal Header */}
             <div
               className="flex items-center justify-between p-5 sm:p-6 shrink-0"
-              style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}
+              style={{ borderBottom: '1px solid var(--hairline)' }}
             >
               <div className="space-y-0.5">
-                <h2 className="text-base font-bold text-[#1d1d1f] tracking-[-0.01em]">Excel 数据导入预览</h2>
-                <p className="text-[11px] text-[#86868b]">
+                <h2 className="text-base font-bold text-ink tracking-[-0.01em]">Excel 数据导入预览</h2>
+                <p className="text-[11px] text-mute">
                   共识别到 <span className="tabular-nums">{importAllRows.length}</span> 行数据，以下展示前 <span className="tabular-nums">{importPreviewRows.length}</span> 行预览
                 </p>
               </div>
               <button
                 onClick={() => setImportModalOpen(false)}
-                className="text-[#aeaeb2] hover:text-[#1d1d1f] p-1 rounded-full hover:bg-[#f5f5f7]"
+                className="text-faint hover:text-ink p-1 rounded-full hover:bg-canvas"
               >
                 <X size={18} />
               </button>
@@ -926,21 +926,21 @@ export const ReportFill: React.FC = () => {
             <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
               {/* Field Mapping */}
               <div className="space-y-2.5">
-                <h3 className="text-xs font-semibold text-[#1d1d1f]">字段匹配结果</h3>
+                <h3 className="text-xs font-semibold text-ink">字段匹配结果</h3>
                 <div className="flex flex-wrap gap-2">
                   {importMapping.map((m, idx) => (
                     <span
                       key={idx}
                       className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${
                         m.matchedFieldId !== null
-                          ? 'bg-[#e8e8ed] text-[#1d1d1f]'
-                          : 'bg-[#f5f5f7] text-[#aeaeb2] line-through'
+                          ? 'bg-line text-ink'
+                          : 'bg-canvas text-faint line-through'
                       }`}
                     >
                       <span>Excel: {m.excelHeader}</span>
                       {m.matchedFieldId !== null && (
                         <>
-                          <span className="text-[#aeaeb2]">→</span>
+                          <span className="text-faint">→</span>
                           <span>{m.fieldLabel}</span>
                         </>
                       )}
@@ -948,7 +948,7 @@ export const ReportFill: React.FC = () => {
                   ))}
                 </div>
                 {importMapping.some((m) => m.matchedFieldId === null) && (
-                  <p className="text-[11px] text-[#ff6b00]">
+                  <p className="text-[11px] text-[#9F2F2D]">
                     部分 Excel 列未匹配到对应字段（灰色标记），这些数据将被忽略。
                   </p>
                 )}
@@ -956,7 +956,7 @@ export const ReportFill: React.FC = () => {
 
               {/* Import Mode */}
               <div className="flex items-center space-x-4 flex-wrap gap-y-2">
-                <span className="text-xs font-semibold text-[#1d1d1f]">导入方式:</span>
+                <span className="text-xs font-semibold text-ink">导入方式:</span>
                 <label className="flex items-center space-x-1.5 cursor-pointer">
                   <input
                     type="radio"
@@ -964,9 +964,9 @@ export const ReportFill: React.FC = () => {
                     value="append"
                     checked={importMode === 'append'}
                     onChange={() => setImportMode('append')}
-                    className="accent-[#0071e3]"
+                    className="accent-ink"
                   />
-                  <span className="text-xs text-[#1d1d1f]">追加到现有数据后</span>
+                  <span className="text-xs text-ink">追加到现有数据后</span>
                 </label>
                 <label className="flex items-center space-x-1.5 cursor-pointer">
                   <input
@@ -975,31 +975,31 @@ export const ReportFill: React.FC = () => {
                     value="replace"
                     checked={importMode === 'replace'}
                     onChange={() => setImportMode('replace')}
-                    className="accent-[#0071e3]"
+                    className="accent-ink"
                   />
-                  <span className="text-xs text-[#1d1d1f]">覆盖现有明细数据</span>
+                  <span className="text-xs text-ink">覆盖现有明细数据</span>
                 </label>
               </div>
 
               {/* Preview Table */}
               <div
-                className="overflow-x-auto rounded-[18px]"
-                style={{ border: '1px solid rgba(0,0,0,0.07)' }}
+                className="overflow-x-auto rounded-[12px]"
+                style={{ border: '1px solid var(--hairline)' }}
               >
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-[#f5f5f7] text-[#1d1d1f] font-semibold">
+                    <tr className="bg-canvas text-ink font-semibold">
                       <th className="p-2.5 w-10 text-center tabular-nums">#</th>
                       {detailFields.map((df) => {
                         const isMapped = importMapping.some((m) => m.matchedFieldId === df.id);
                         return (
                           <th
                             key={df.id}
-                            className={`p-2.5 min-w-[120px] ${!isMapped ? 'text-[#aeaeb2]' : ''}`}
+                            className={`p-2.5 min-w-[120px] ${!isMapped ? 'text-faint' : ''}`}
                           >
                             {df.field_label}
                             {!isMapped && (
-                              <span className="ml-1 text-[10px] text-[#aeaeb2]">(未匹配)</span>
+                              <span className="ml-1 text-[10px] text-faint">(未匹配)</span>
                             )}
                           </th>
                         );
@@ -1008,21 +1008,21 @@ export const ReportFill: React.FC = () => {
                   </thead>
                   <tbody>
                     {importPreviewRows.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-[#fbfbfd]">
+                      <tr key={idx} className="hover:bg-hoverbg">
                         <td
-                          className="p-2.5 text-center text-[#86868b] font-mono tabular-nums"
-                          style={{ borderTop: idx === 0 ? 'none' : '1px solid rgba(0,0,0,0.07)' }}
+                          className="p-2.5 text-center text-mute font-mono tabular-nums"
+                          style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--hairline)' }}
                         >
                           {idx + 1}
                         </td>
                         {detailFields.map((df, dfIdx) => (
                           <td
                             key={df.id}
-                            className="p-2 text-[#424245] tabular-nums"
-                            style={{ borderTop: idx === 0 && dfIdx === 0 ? 'none' : '1px solid rgba(0,0,0,0.07)' }}
+                            className="p-2 text-body tabular-nums"
+                            style={{ borderTop: idx === 0 && dfIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
                           >
                             {row[df.id] || (
-                              <span className="text-[#d2d2d7]">—</span>
+                              <span className="text-line">—</span>
                             )}
                           </td>
                         ))}
@@ -1032,8 +1032,8 @@ export const ReportFill: React.FC = () => {
                       <tr>
                         <td
                           colSpan={detailFields.length + 1}
-                          className="p-2.5 text-center text-[11px] text-[#86868b]"
-                          style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}
+                          className="p-2.5 text-center text-[11px] text-mute"
+                          style={{ borderTop: '1px solid var(--hairline)' }}
                         >
                           … 还有 <span className="tabular-nums">{importAllRows.length - importPreviewRows.length}</span> 行数据未展示 …
                         </td>
@@ -1047,12 +1047,12 @@ export const ReportFill: React.FC = () => {
             {/* Modal Footer */}
             <div
               className="p-5 sm:p-6 flex justify-end space-x-3 shrink-0"
-              style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}
+              style={{ borderTop: '1px solid var(--hairline)' }}
             >
               <button
                 type="button"
                 onClick={() => setImportModalOpen(false)}
-                className="h-11 px-5 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-semibold text-xs rounded-full transition-colors"
+                className="h-11 px-5 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors"
               >
                 取消
               </button>
@@ -1060,7 +1060,7 @@ export const ReportFill: React.FC = () => {
                 type="button"
                 onClick={confirmImport}
                 disabled={importMapping.filter((m) => m.matchedFieldId !== null).length === 0}
-                className="h-11 px-5 bg-[#0071e3] hover:bg-[#0066cc] text-white font-semibold text-xs rounded-full transition-colors disabled:opacity-50"
+                className="h-11 px-5 bg-ink hover:bg-inkhover text-white font-semibold text-xs rounded-md transition-colors disabled:opacity-50"
               >
                 确认导入 (<span className="tabular-nums">{importAllRows.length}</span> 行)
               </button>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { FileSpreadsheet, Lock, User, ArrowRight, ShieldCheck } from '../components/icons';
 import { api } from '../services/api';
 
 export const Login: React.FC = () => {
@@ -45,30 +45,38 @@ export const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
-      <div className="max-w-[420px] w-full">
-        {/* Brand hero — no dark slab, just clean centered type */}
-        <div className="text-center mb-8">
+      {/* Ambient warm light spots — whisper-quiet depth */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(640px 420px at 72% 8%, rgba(149,100,0,0.035), transparent 70%), radial-gradient(560px 400px at 12% 88%, rgba(31,108,159,0.03), transparent 70%)',
+        }}
+      />
+      <div className="max-w-[420px] w-full relative">
+        {/* Brand hero — editorial centered type */}
+        <div className="mount-rise text-center mb-8">
           <div
-            className="inline-flex items-center justify-center w-14 h-14 rounded-[14px] mb-4"
+            className="inline-flex items-center justify-center w-14 h-14 rounded-[12px] mb-5"
             style={{ background: 'var(--grad-cta)', boxShadow: 'var(--sh-cta)' }}
           >
             <FileSpreadsheet className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-[28px] font-bold text-[#1d1d1f] tracking-[-0.03em]">随手报</h1>
-          <p className="text-[13px] text-[#6e6e73] mt-1.5 leading-[1.6]">
+          <h1 className="t-serif text-[36px] text-ink leading-[1.1]">随手报</h1>
+          <p className="text-[13px] text-mute mt-2.5 leading-[1.7]">
             企业级下发填报、三级在线审批与数据多维汇总平台
           </p>
         </div>
 
         {/* Login card — single white surface */}
         <div
-          className="bg-white rounded-[22px] p-8"
-          style={{ boxShadow: 'var(--sh-panel)' }}
+          className="mount-rise bg-white rounded-[12px] p-8"
+          style={{ boxShadow: 'var(--sh-panel)', animationDelay: '90ms' }}
         >
           {error && (
             <div
-              className="px-3.5 py-2.5 rounded-[12px] text-[12px] font-medium text-[#ff6b00] mb-5"
-              style={{ background: 'rgba(255,107,0,0.08)', border: '1px solid rgba(255,107,0,0.15)' }}
+              className="px-3.5 py-2.5 rounded-[8px] text-[12px] font-medium text-[#9F2F2D] mb-5"
+              style={{ background: '#FDEBEC' }}
             >
               {error}
             </div>
@@ -76,33 +84,33 @@ export const Login: React.FC = () => {
 
           <form onSubmit={(e) => handleLogin(e)} className="space-y-5">
             <div>
-              <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-2">
+              <label className="block text-[13px] font-semibold text-ink mb-2">
                 账号
               </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#aeaeb2]" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="例如: admin 或 bj_handler"
-                  className="w-full h-11 pl-10 pr-4 bg-[#f5f5f7] rounded-[12px] text-[14px] text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white transition-all"
+                  className="w-full h-11 pl-10 pr-4 bg-canvas rounded-[12px] text-[14px] text-ink placeholder:text-faint focus:outline-none focus:ring-1 focus:ring-ink focus:bg-white transition-all"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-2">
+              <label className="block text-[13px] font-semibold text-ink mb-2">
                 密码{import.meta.env.DEV ? ' (开发环境默认: 123456)' : ''}
               </label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#aeaeb2]" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="密码"
-                  className="w-full h-11 pl-10 pr-4 bg-[#f5f5f7] rounded-[12px] text-[14px] text-[#1d1d1f] placeholder:text-[#aeaeb2] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:bg-white transition-all"
+                  className="w-full h-11 pl-10 pr-4 bg-canvas rounded-[12px] text-[14px] text-ink placeholder:text-faint focus:outline-none focus:ring-1 focus:ring-ink focus:bg-white transition-all"
                 />
               </div>
             </div>
@@ -110,7 +118,7 @@ export const Login: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-[#0071e3] hover:bg-[#0066cc] text-white font-semibold rounded-full text-[14px] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full h-11 bg-ink hover:bg-inkhover text-white font-semibold rounded-md text-[14px] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <span>{loading ? '正在验证身份...' : '立即登录'}</span>
               <ArrowRight className="w-4 h-4" />
@@ -120,9 +128,9 @@ export const Login: React.FC = () => {
           {/* Preset accounts — unified panel list with hairlines */}
           {import.meta.env.DEV && (
             <div className="mt-7 pt-6" style={{ borderTop: '1px solid var(--hairline)' }}>
-              <div className="flex items-center justify-between text-[12px] font-semibold text-[#86868b] mb-3">
+              <div className="flex items-center justify-between text-[12px] font-semibold text-mute mb-3">
                 <span>预设体验账号 (点击一键登录)</span>
-                <ShieldCheck className="w-3.5 h-3.5 text-[#0071e3]" />
+                <ShieldCheck className="w-3.5 h-3.5 text-ink" />
               </div>
 
               <div className="rounded-[12px] overflow-hidden" style={{ border: '1px solid var(--hairline)' }}>
@@ -134,16 +142,16 @@ export const Login: React.FC = () => {
                       setUsername(acc.username);
                       handleLogin(undefined, acc.username);
                     }}
-                    className="apple-row w-full text-left px-3.5 py-2.5 hover:bg-[#f5f5f7] transition-colors flex items-center justify-between"
+                    className="apple-row w-full text-left px-3.5 py-2.5 hover:bg-canvas transition-colors flex items-center justify-between"
                     style={idx > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
                   >
                     <div>
-                      <div className="text-[13px] font-semibold text-[#1d1d1f]">{acc.company}</div>
-                      <div className="text-[11px] text-[#aeaeb2] tabular-nums">
+                      <div className="text-[13px] font-semibold text-ink">{acc.company}</div>
+                      <div className="text-[11px] text-faint tabular-nums">
                         {acc.username} · {acc.role}
                       </div>
                     </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-[#d2d2d7]" />
+                    <ArrowRight className="w-3.5 h-3.5 text-line" />
                   </button>
                 ))}
               </div>
@@ -151,7 +159,7 @@ export const Login: React.FC = () => {
           )}
         </div>
 
-        <p className="text-center text-[11px] text-[#aeaeb2] mt-6">
+        <p className="t-mono text-center text-[10px] uppercase tracking-[0.08em] text-faint mt-6">
           随手报 ReportNow v0.1.0 · 安全连接
         </p>
       </div>

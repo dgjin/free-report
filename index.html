@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>随手报 ReportNow</title>
+    <script>
+      // 首帧前恢复用户配色主题，避免闪烁（与 ThemeSwitcher 的 STORAGE_KEY 保持一致）
+      try {
+        var savedTheme = localStorage.getItem('free_report_theme');
+        if (savedTheme === 'blue') document.documentElement.dataset.theme = 'blue';
+      } catch (e) { /* ignore */ }
+    </script>
   </head>
   <body>
     <div id="root"></div>

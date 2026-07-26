@@ -56,22 +56,36 @@ export function promptDialog(message: string, placeholder?: string): Promise<str
   });
 }
 
+/* Muted pastel 语义色 */
+const typeStyles: Record<ToastType, { bar: string; icon: string }> = {
+  success: { bar: '#346538', icon: '✓' },
+  error: { bar: '#9F2F2D', icon: '✕' },
+  info: { bar: '#1F6C9F', icon: 'ℹ' },
+};
+
+const cardStyle: React.CSSProperties = {
+  background: 'var(--surface)',
+  border: '1px solid var(--hairline)',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+};
+
+const overlayStyle: React.CSSProperties = {
+  background: 'rgba(17,17,17,0.24)',
+};
+
+const primaryBtnCls =
+  'px-4 h-9 rounded-md text-[13px] font-medium text-white bg-ink hover:bg-inkhover active:scale-[0.98] transition-all';
+const ghostBtnCls =
+  'px-4 h-9 rounded-md text-[13px] font-medium text-body bg-canvas hover:bg-[#EFEEEB] border border-line transition-colors';
+
 const PromptCard: React.FC<{
   req: PromptRequest;
   onClose: (req: PromptRequest, value: string | null) => void;
 }> = ({ req, onClose }) => {
   const [value, setValue] = useState('');
   return (
-    <div
-      className="toast-pop-in w-[380px] rounded-2xl border border-black/[0.06] p-5"
-      style={{
-        background: 'rgba(255,255,255,0.97)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
-      }}
-    >
-      <div className="text-[14px] font-semibold text-slate-800 mb-3">{req.message}</div>
+    <div className="toast-pop-in w-[380px] rounded-xl p-5" style={cardStyle}>
+      <div className="text-[14px] font-semibold text-ink mb-3">{req.message}</div>
       <input
         autoFocus
         value={value}
@@ -81,31 +95,18 @@ const PromptCard: React.FC<{
           if (e.key === 'Escape') onClose(req, null);
         }}
         placeholder={req.placeholder}
-        className="w-full h-10 px-3 rounded-lg border border-black/[0.1] text-[13px] text-slate-700 outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20 mb-4"
+        className="w-full h-10 px-3 rounded-md border border-line text-[13px] text-body outline-none focus:border-ink mb-4"
       />
       <div className="flex justify-end gap-2">
-        <button
-          onClick={() => onClose(req, null)}
-          className="px-4 h-9 rounded-lg text-[13px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
-        >
+        <button onClick={() => onClose(req, null)} className={ghostBtnCls}>
           取消
         </button>
-        <button
-          onClick={() => onClose(req, value)}
-          className="px-4 h-9 rounded-lg text-[13px] font-medium text-white transition-opacity hover:opacity-90"
-          style={{ background: 'linear-gradient(135deg,#0071e3,#0a84ff)' }}
-        >
+        <button onClick={() => onClose(req, value)} className={primaryBtnCls}>
           确认
         </button>
       </div>
     </div>
   );
-};
-
-const typeStyles: Record<ToastType, { bar: string; icon: string }> = {
-  success: { bar: 'bg-emerald-500', icon: '✓' },
-  error: { bar: 'bg-red-500', icon: '✕' },
-  info: { bar: 'bg-blue-500', icon: 'ℹ' },
 };
 
 export const ToastHost: React.FC = () => {
@@ -151,22 +152,18 @@ export const ToastHost: React.FC = () => {
           return (
             <div
               key={t.id}
-              className="toast-slide-in pointer-events-auto flex items-stretch min-w-[240px] max-w-[380px] rounded-xl overflow-hidden border border-black/[0.06]"
-              style={{
-                background: 'rgba(255,255,255,0.92)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                boxShadow: '0 12px 32px rgba(0,0,0,0.14)',
-              }}
+              className="toast-slide-in pointer-events-auto flex items-stretch min-w-[240px] max-w-[380px] rounded-lg overflow-hidden"
+              style={cardStyle}
             >
-              <div className={`w-1 ${s.bar}`} />
+              <div className="w-1" style={{ background: s.bar }} />
               <div className="flex items-center gap-2.5 px-3.5 py-3">
                 <span
-                  className={`w-5 h-5 rounded-full ${s.bar} text-white text-[11px] font-bold flex items-center justify-center shrink-0`}
+                  className="w-5 h-5 rounded-full text-white text-[11px] font-bold flex items-center justify-center shrink-0"
+                  style={{ background: s.bar }}
                 >
                   {s.icon}
                 </span>
-                <span className="text-[13px] text-slate-700 leading-snug">{t.message}</span>
+                <span className="text-[13px] text-body leading-snug">{t.message}</span>
               </div>
             </div>
           );
@@ -175,10 +172,7 @@ export const ToastHost: React.FC = () => {
 
       {/* prompt 输入框：居中弹层，不阻塞页面 JS */}
       {prompts.length > 0 && (
-        <div
-          className="fixed inset-0 z-[9998] flex items-center justify-center"
-          style={{ background: 'rgba(15,23,42,0.28)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
-        >
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center" style={overlayStyle}>
           {prompts.map((p) => (
             <PromptCard key={p.id} req={p} onClose={closePrompt} />
           ))}
@@ -187,35 +181,16 @@ export const ToastHost: React.FC = () => {
 
       {/* confirm 对话框：居中弹层，不阻塞页面 JS */}
       {confirms.length > 0 && (
-        <div
-          className="fixed inset-0 z-[9998] flex items-center justify-center"
-          style={{ background: 'rgba(15,23,42,0.28)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
-        >
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center" style={overlayStyle}>
           {confirms.map((c) => (
-            <div
-              key={c.id}
-              className="toast-pop-in w-[380px] rounded-2xl border border-black/[0.06] p-5"
-              style={{
-                background: 'rgba(255,255,255,0.97)',
-                backdropFilter: 'blur(24px)',
-                WebkitBackdropFilter: 'blur(24px)',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
-              }}
-            >
-              <div className="text-[14px] font-semibold text-slate-800 mb-1.5">操作确认</div>
-              <div className="text-[13px] text-slate-600 leading-relaxed mb-4">{c.message}</div>
+            <div key={c.id} className="toast-pop-in w-[380px] rounded-xl p-5" style={cardStyle}>
+              <div className="text-[14px] font-semibold text-ink mb-1.5">操作确认</div>
+              <div className="text-[13px] text-mute leading-relaxed mb-4">{c.message}</div>
               <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => closeConfirm(c, false)}
-                  className="px-4 h-9 rounded-lg text-[13px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
-                >
+                <button onClick={() => closeConfirm(c, false)} className={ghostBtnCls}>
                   取消
                 </button>
-                <button
-                  onClick={() => closeConfirm(c, true)}
-                  className="px-4 h-9 rounded-lg text-[13px] font-medium text-white transition-opacity hover:opacity-90"
-                  style={{ background: 'linear-gradient(135deg,#0071e3,#0a84ff)' }}
-                >
+                <button onClick={() => closeConfirm(c, true)} className={primaryBtnCls}>
                   确认
                 </button>
               </div>
