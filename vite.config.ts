@@ -32,7 +32,7 @@ export default defineConfig(() => {
       // Proxy API requests to Spring Boot backend in dev mode
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          target: 'http://127.0.0.1:3001',
           changeOrigin: true,
         },
       },

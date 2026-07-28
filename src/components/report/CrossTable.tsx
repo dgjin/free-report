@@ -1,6 +1,7 @@
 import React from 'react';
 import { Grid3x3 } from '../icons';
 import { ReportTemplateField } from '../../types';
+import { FullscreenButton, fullscreenSectionClass, useFullscreen } from '../FullscreenToggle';
 
 export interface MatrixGroup {
   rowLabel: string;
@@ -24,6 +25,7 @@ export const CrossTable: React.FC<CrossTableProps> = ({
   sectionNumber,
   onChange,
 }) => {
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
   if (groups.length === 0) return null;
 
   return (
@@ -31,7 +33,7 @@ export const CrossTable: React.FC<CrossTableProps> = ({
       {groups.map((group, groupIdx) => (
         <div
           key={groupIdx}
-          className="bg-white rounded-[12px] p-6 sm:p-7 space-y-5"
+          className={`bg-white p-6 sm:p-7 space-y-5 ${fullscreenSectionClass(isFullscreen, 'rounded-[12px]')}`}
           style={{ boxShadow: 'var(--sh-panel)' }}
         >
           <div
@@ -49,6 +51,7 @@ export const CrossTable: React.FC<CrossTableProps> = ({
                 <p className="text-[11px] text-mute mt-0.5">固定行 × 动态列，数值列将自动合计</p>
               </div>
             </div>
+            <FullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
           </div>
 
           <div

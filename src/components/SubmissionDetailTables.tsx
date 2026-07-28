@@ -1,5 +1,6 @@
 import React from 'react';
 import { ReportSubmissionDetail, SubmissionDetailItem } from '../types';
+import { FullscreenButton, useFullscreen } from './FullscreenToggle';
 
 /**
  * 提交数据的明细 + 交叉表只读视图（复核/签收弹窗共用）。
@@ -7,6 +8,7 @@ import { ReportSubmissionDetail, SubmissionDetailItem } from '../types';
  * - 交叉表字段：按 matrix_groups 重建行表头结构（行维度标签 + 行选项）
  */
 export const SubmissionDetailTables: React.FC<{ detail: ReportSubmissionDetail }> = ({ detail }) => {
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
   const details = detail.details || [];
   const matrixGroups = detail.matrix_groups || [];
 
@@ -29,7 +31,21 @@ export const SubmissionDetailTables: React.FC<{ detail: ReportSubmissionDetail }
   };
 
   return (
-    <>
+    <div
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-[80] bg-canvas overflow-y-auto p-4 sm:p-8 space-y-4'
+          : 'space-y-3'
+      }
+    >
+      {/* 全屏切换工具行 */}
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-faint">
+          {isFullscreen ? '全屏查看中，按 Esc 或点击右侧按钮退出' : ''}
+        </span>
+        <FullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} withLabel />
+      </div>
+
       {/* 普通明细平铺表 */}
       {detailColumns.length > 0 && (
         <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
@@ -99,6 +115,6 @@ export const SubmissionDetailTables: React.FC<{ detail: ReportSubmissionDetail }
       {detailColumns.length === 0 && matrixGroups.length === 0 && (
         <div className="py-6 text-center text-xs text-mute">无明细数据</div>
       )}
-    </>
+    </div>
   );
 };

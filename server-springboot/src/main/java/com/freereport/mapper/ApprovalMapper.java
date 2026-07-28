@@ -49,6 +49,16 @@ public interface ApprovalMapper {
                                                           @Param("role") String role);
 
     /**
+     * 查询分公司被驳回的填报任务（复核/审批驳回，含驳回人与意见）。
+     */
+    List<Map<String, Object>> findRejectedSubmissionsForCompany(@Param("companyId") Long companyId);
+
+    /**
+     * 查询分公司被签收退回的填报任务（含退回人与原因）。
+     */
+    List<Map<String, Object>> findReturnedSubmissionsForCompany(@Param("companyId") Long companyId);
+
+    /**
      * 查询公司复核人。
      */
     User findReviewer(@Param("companyId") Long companyId);

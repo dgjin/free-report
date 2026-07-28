@@ -19,8 +19,8 @@ import {
   X,
   UserCheck,
 } from '../components/icons';
-import { api, getStoredUser, swrKeys, swrFetcher } from '../services/api';
-import { UserInfo, ReportTemplate, ReportAssignment, PendingApprovalTask, Company, PendingReceipt, ReportSubmissionDetail } from '../types';
+import { api, getStoredUser, swrKeys, swrFetcher, useRejectedReminders } from '../services/api';
+import { UserInfo, ReportTemplate, ReportAssignment, PendingApprovalTask, Company, PendingReceipt, ReportSubmissionDetail, RejectedReminder } from '../types';
 import { getClientAccess } from '../utils/access';
 import { SubmissionDetailTables } from '../components/SubmissionDetailTables';
 
@@ -36,6 +36,8 @@ export const Dashboard: React.FC = () => {
   const { data: branches = [] } = useSWR<Company[]>(isHQ ? swrKeys.branches : null, swrFetcher, { revalidateOnFocus: false });
   const { data: pendingApprovals = [] } = useSWR<PendingApprovalTask[]>(!isHQ ? swrKeys.pendingApprovals : null, swrFetcher, { revalidateOnFocus: false });
   const { data: pendingReceipts = [], mutate: mutateReceipts } = useSWR<PendingReceipt[]>(canReceive ? swrKeys.pendingReceipts : null, swrFetcher, { revalidateOnFocus: false });
+  const remindersEnabled = user ? (user.company_level === 'branch' || user.role === 'department_report_admin') : false;
+  const { data: rejectedReminders = [] } = useRejectedReminders(remindersEnabled);
 
   useEffect(() => {
     api.getMe().then((res) => setUser(res.user)).catch(() => {});
@@ -248,6 +250,80 @@ export const Dashboard: React.FC = () => {
             </div>
           </Link>
         </div>
+      )}
+
+      {/* 退回提醒 — 填报被驳回/签收退回（分公司）或模板被驳回（部门管理员） */}
+      {rejectedReminders.length > 0 && (
+        <section
+          className="reveal bg-white rounded-[12px] overflow-hidden"
+          style={{ boxShadow: 'var(--sh-panel)', '--reveal-index': 2 } as React.CSSProperties}
+        >
+          <div className="flex items-center justify-between px-[clamp(17px,3vw,24px)] py-4" style={{ borderBottom: '1px solid var(--hairline)' }}>
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink tracking-[-0.01em]">
+              <AlertCircle className="w-4 h-4 text-[#9F2F2D]" />
+              <span>退回提醒</span>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold text-[#9F2F2D] bg-[#FDEBEC] tabular-nums">
+                {rejectedReminders.length}
+              </span>
+            </h2>
+            <span className="text-[11px] text-mute">修改后重新提交即可消除提醒</span>
+          </div>
+
+          <div>
+            {rejectedReminders.map((item: RejectedReminder) => {
+              const kindLabel = item.kind === 'template_rejected'
+                ? '模板被驳回'
+                : item.kind === 'receipt_returned'
+                  ? '签收退回'
+                  : item.stage === 'reviewer'
+                    ? '复核驳回'
+                    : '审批驳回';
+              return (
+                <div
+                  key={`${item.kind}-${item.assignment_id ?? item.template_id}`}
+                  className="apple-row px-[clamp(17px,3vw,24px)] py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                >
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-[#9F2F2D] bg-[#FDEBEC] px-2 py-0.5 rounded-full">{kindLabel}</span>
+                      {item.period_label && (
+                        <span className="text-[11px] font-semibold text-mute tabular-nums">{item.period_label}</span>
+                      )}
+                      <span className="text-[15px] font-semibold text-ink tracking-[-0.01em] truncate">{item.title}</span>
+                    </div>
+                    <div className="text-[12px] text-mute flex items-center flex-wrap gap-x-3 gap-y-1 tabular-nums">
+                      {item.rejected_by_name && (
+                        <span className="inline-flex items-center gap-1">
+                          <UserCheck className="w-3 h-3 text-faint" />
+                          <span>退回人: {item.rejected_by_name}</span>
+                        </span>
+                      )}
+                      {item.rejected_at && (
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-faint" />
+                          <span>{item.rejected_at}</span>
+                        </span>
+                      )}
+                      {item.deadline && <span>截止: {item.deadline}</span>}
+                    </div>
+                    {item.comment && (
+                      <div className="text-[11px] text-[#9F2F2D] bg-[#FDEBEC] px-2 py-1 rounded">
+                        退回意见: {item.comment}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => navigate(item.kind === 'template_rejected' ? `/templates/${item.template_id}` : `/fill/${item.assignment_id}`)}
+                    className="shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-ink hover:bg-inkhover text-white text-[13px] font-semibold transition-colors"
+                  >
+                    <span>前往修改</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {/* 待签收任务 — unified panel with hairline dividers */}

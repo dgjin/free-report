@@ -70,6 +70,46 @@
         ORDER BY s.submitted_at DESC
     </select>
 
+    <!-- 查询分公司被驳回的填报任务（复核/审批驳回，含驳回人与意见） -->
+    <select id="findRejectedSubmissionsForCompany" resultType="java.util.Map">
+        SELECT 'submission_rejected' AS kind,
+               a.id AS assignment_id,
+               a.title,
+               a.period_label,
+               a.deadline,
+               ar.approval_level AS stage,
+               ar.comment,
+               u.display_name AS rejected_by_name,
+               ar.updated_at AS rejected_at
+        FROM report_assignments a
+        JOIN report_submissions s ON s.assignment_id = a.id AND s.status = 'rejected'
+        JOIN approval_records ar ON ar.submission_id = s.id AND ar.status = 'rejected'
+        LEFT JOIN users u ON u.id = ar.approver_id
+        WHERE a.assigned_to_company_id = #{companyId}
+          AND a.status = 'rejected'
+        ORDER BY ar.updated_at DESC
+    </select>
+
+    <!-- 查询分公司被签收退回的填报任务（含退回人与原因） -->
+    <select id="findReturnedSubmissionsForCompany" resultType="java.util.Map">
+        SELECT 'receipt_returned' AS kind,
+               a.id AS assignment_id,
+               a.title,
+               a.period_label,
+               a.deadline,
+               NULL AS stage,
+               r.comment,
+               u.display_name AS rejected_by_name,
+               r.created_at AS rejected_at
+        FROM report_assignments a
+        JOIN report_submissions s ON s.assignment_id = a.id AND s.status = 'returned'
+        JOIN submission_receipts r ON r.submission_id = s.id AND r.action = 'returned'
+        LEFT JOIN users u ON u.id = r.received_by
+        WHERE a.assigned_to_company_id = #{companyId}
+          AND a.status = 'returned'
+        ORDER BY r.created_at DESC
+    </select>
+
     <!-- 查询公司复核人 -->
     <select id="findReviewer" resultType="com.freereport.entity.User">
         SELECT * FROM users

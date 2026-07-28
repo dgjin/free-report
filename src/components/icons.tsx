@@ -6,6 +6,7 @@ import {
   ListPlus, Lock, SignOut, List, ChatCircle, Plus, Power, ArrowsClockwise, ArrowCounterClockwise, FloppyDisk,
   MagnifyingGlass, PaperPlaneRight, Shield, ShieldCheck, SlidersHorizontal, Trash, TrendUp, TextT, Upload,
   User, UserCheck, FlowArrow, X, XCircle, Lightning, Palette, CaretRight, CaretLeft,
+  ArrowsOut, ArrowsIn,
 } from '@phosphor-icons/react';
 
 /**
@@ -108,3 +109,5 @@ export { ChevronLeftIcon as ChevronLeft };
 export const Zap = bold(Lightning);
 export const PaletteIcon = bold(Palette);
 export { PaletteIcon as Palette };
+export const Maximize2 = bold(ArrowsOut);
+export const Minimize2 = bold(ArrowsIn);

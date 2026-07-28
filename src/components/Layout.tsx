@@ -28,6 +28,7 @@ import { mutate } from 'swr';
 export const Layout: React.FC = () => {
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
   const [pendingCount, setPendingCount] = useState<number>(0);
+  const [rejectedCount, setRejectedCount] = useState<number>(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [accountSwitchOpen, setAccountSwitchOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
@@ -45,17 +46,38 @@ export const Layout: React.FC = () => {
     return () => window.removeEventListener('scroll', onScroll);
   }, [location.pathname]);
 
+  /** 刷新导航角标：待办审批数 + 退回提醒数 */
+  const refreshBadges = async (u: UserInfo) => {
+    try {
+      if (u.role === 'digital_admin') {
+        const pendingTemplates = await api.getPendingTemplateApprovals();
+        setPendingCount(pendingTemplates.length);
+        setRejectedCount(0);
+      } else if (u.company_level === 'branch') {
+        const [pending, reminders] = await Promise.all([
+          api.getPendingApprovals(),
+          api.getRejectedReminders(),
+        ]);
+        setPendingCount(pending.length);
+        setRejectedCount(reminders.length);
+      } else if (u.role === 'department_report_admin') {
+        const reminders = await api.getRejectedReminders();
+        setRejectedCount(reminders.length);
+        setPendingCount(0);
+      } else {
+        setPendingCount(0);
+        setRejectedCount(0);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const fetchMe = async () => {
     try {
       const res = await api.getMe();
       setUser(res.user);
-      if (res.user.role === 'digital_admin') {
-        const pendingTemplates = await api.getPendingTemplateApprovals();
-        setPendingCount(pendingTemplates.length);
-      } else if (res.user.company_level === 'branch') {
-        const pending = await api.getPendingApprovals();
-        setPendingCount(pending.length);
-      }
+      await refreshBadges(res.user);
     } catch {
       // ignore
     }
@@ -73,15 +95,8 @@ export const Layout: React.FC = () => {
       setAccountSwitchOpen(false);
       // 清除所有 SWR 缓存，确保切换用户后各页面按新权限重新获取数据
       await mutate(() => true, undefined, { revalidate: false });
-      // 更新待审批计数
-      if (data.user.company_level === 'branch') {
-        try {
-          const pending = await api.getPendingApprovals();
-          setPendingCount(pending.length);
-        } catch { setPendingCount(0); }
-      } else {
-        setPendingCount(0);
-      }
+      // 更新待办与退回角标
+      await refreshBadges(data.user);
       navigate('/');
     } catch (err: any) {
       toast(err.message || '切换账号失败', 'error');
@@ -288,6 +303,11 @@ export const Layout: React.FC = () => {
                       <FileSpreadsheet className={navIconClass(location.pathname.startsWith('/templates'))} />
                       <span>模板管理</span>
                     </div>
+                    {rejectedCount > 0 && (
+                      <span className="text-[#9F2F2D] bg-[#FDEBEC] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
+                        {rejectedCount}
+                      </span>
+                    )}
                   </Link>
 
                   <Link to="/assignments" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/assignments'))}>
@@ -356,6 +376,11 @@ export const Layout: React.FC = () => {
                       <FileSpreadsheet className={navIconClass(location.pathname.startsWith('/fill'))} />
                       <span>报表填报</span>
                     </div>
+                    {rejectedCount > 0 && (
+                      <span className="text-[#9F2F2D] bg-[#FDEBEC] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
+                        {rejectedCount}
+                      </span>
+                    )}
                   </Link>
 
                   <Link to="/approvals" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/approvals'))}>

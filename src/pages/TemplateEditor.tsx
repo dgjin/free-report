@@ -26,7 +26,7 @@ import { ReportTemplate, ReportTemplateField, FieldType } from '../types';
 import { DEFAULT_FIELD_DATA_TYPE } from '../utils/templateFields';
 import { getTemplateLifecycleView } from '../utils/templateLifecycle';
 import ExcelFieldImportModal, {
-  ImportFieldItem,
+  ImportPayload,
 } from '../components/ExcelFieldImportModal';
 
 export const TemplateEditor: React.FC = () => {
@@ -71,7 +71,7 @@ export const TemplateEditor: React.FC = () => {
     }
   };
 
-  const handleExcelImport = async (importFields: ImportFieldItem[]) => {
+  const handleExcelImport = async (payload: ImportPayload) => {
     if (!template) throw new Error('模板信息缺失');
 
     // 获取当前字段列表中的已有 field_name
@@ -79,26 +79,50 @@ export const TemplateEditor: React.FC = () => {
       (template.fields || []).map((f) => f.field_name)
     );
 
-    let currentSortOrder = (template.fields || []).length + 1;
-
-    // 为每个导入的字段去重命名
-    for (const field of importFields) {
-      let fieldName = field.field_name;
+    const dedupeName = (base: string) => {
+      let name = base;
       let counter = 1;
-
-      // 确保 field_name 全局唯一
-      while (existingNames.has(fieldName)) {
-        fieldName = `${field.field_name}_${counter}`;
+      while (existingNames.has(name)) {
+        name = `${base}_${counter}`;
         counter++;
       }
-      existingNames.add(fieldName);
+      existingNames.add(name);
+      return name;
+    };
 
+    // 交叉表：整体导入（行维度 + 列指标），后端统一置 data_type=matrix
+    if (payload.format === 'matrix' && payload.matrix) {
+      const m = payload.matrix;
+      const slug = m.row_label.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const columns = m.columns.map((c, idx) => ({
+        field_name: dedupeName(c.field_name || `matrix_${slug || 'dim'}_${idx + 1}`),
+        field_label: c.field_label,
+        field_type: c.field_type,
+      }));
+      await api.addMatrixFields(template.id, {
+        row_label: m.row_label,
+        row_options: m.row_options,
+        columns,
+      });
+      await loadTemplateDetail();
+      return;
+    }
+
+    let currentSortOrder = (template.fields || []).length + 1;
+
+    for (const field of payload.fields) {
       await api.addField(template.id, {
-        field_name: fieldName,
+        field_name: dedupeName(field.field_name),
         field_label: field.field_label,
         field_type: field.field_type,
         data_type: field.data_type,
-        field_config: { required: false },
+        field_config: {
+          required: field.required ?? false,
+          options:
+            field.field_type === 'select' && field.options?.length
+              ? field.options
+              : undefined,
+        },
         sort_order: currentSortOrder,
       });
 

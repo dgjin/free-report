@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 报表模板 MyBatis Mapper。
@@ -142,4 +143,9 @@ public interface TemplateMapper {
                               @Param("status") String status,
                               @Param("reviewedBy") Long reviewedBy,
                               @Param("comment") String comment);
+
+    /**
+     * 查询部门被数转办驳回的模板（最新审批记录为 rejected 且模板处于草稿，含审批人与意见）。
+     */
+    List<Map<String, Object>> findRejectedTemplatesForDepartment(@Param("companyId") Long companyId);
 }

@@ -245,6 +245,70 @@ export interface TemplateApproval {
   updated_at: string;
 }
 
+/** 模板周期下发计划（GET /api/templates/{id}/schedule 返回结构） */
+export interface TemplateSchedule {
+  template_id: number;
+  period_type: PeriodType;
+  schedulable: boolean;
+  enabled: boolean;
+  issue_month: number | null;
+  issue_day: number;
+  deadline_offset_days: number;
+  target_company_ids: number[];
+  last_period_label: string | null;
+}
+
+export interface TemplateScheduleSaveBody {
+  enabled: boolean;
+  issue_day: number;
+  issue_month?: number | null;
+  deadline_offset_days: number;
+  target_company_ids: number[];
+}
+
+/** 手动执行周期计划（POST /api/templates/{id}/schedule/run）返回 */
+export interface ScheduleRunResult {
+  message: string;
+  period_label?: string;
+  issue_date?: string;
+  generated?: number;
+  skipped?: string;
+  skipped_companies?: string[];
+}
+
+/** 数据初始化导入 */
+export interface DataImportRowPayload {
+  company_code: string;
+  summary: Record<string, string>;
+  details: Array<Record<string, string>>;
+}
+
+export interface DataImportErrorItem {
+  row: number;
+  company_code: string;
+  reason: string;
+}
+
+export interface DataImportResult {
+  message: string;
+  imported: number;
+  errors: DataImportErrorItem[];
+}
+
+/** 退回提醒：分公司填报被驳回/签收退回，或部门模板被数转办驳回 */
+export interface RejectedReminder {
+  kind: 'submission_rejected' | 'receipt_returned' | 'template_rejected';
+  assignment_id?: number;
+  template_id?: number;
+  title: string;
+  period_label?: string;
+  deadline?: string;
+  stage?: 'reviewer' | 'approver' | null;
+  comment?: string | null;
+  rejected_by_name?: string | null;
+  rejected_at?: string | null;
+}
+
 /** Statuses that count as "approved" for aggregation statistics */
 export const APPROVED_SUBMISSION_STATUSES = ['pending_receipt', 'received'];
 

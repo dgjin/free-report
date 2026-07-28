@@ -16,78 +16,87 @@ interface HelpDrawerProps {
   user: UserInfo | null;
 }
 
-interface GuideField {
-  label: string;
-  required?: boolean;
-  note?: string;
-}
-
-interface TemplateGuide {
+interface DataRegionGuide {
   name: string;
-  period: string;
-  purpose: string;
-  summaryFields?: GuideField[];
-  detailFields?: GuideField[];
-  matrix?: boolean;
-  tips: string[];
+  tag: string;
+  rows: Array<{ label: string; desc: string }>;
 }
 
 /**
- * 模板填报说明（与 sql/002_seed.sql 种子模板保持一致；新增模板时请同步补充）
+ * 模版制定说明：三种数据区域的概念、填报效果、汇总效果与举例
  */
-const TEMPLATE_GUIDES: TemplateGuide[] = [
+const DATA_REGION_GUIDES: DataRegionGuide[] = [
+  {
+    name: '汇总指标',
+    tag: '每机构每期一个值',
+    rows: [
+      { label: '适用场景', desc: '公司级关键指标，如总收入、净利润、填报基准日、盘点结论' },
+      { label: '填报效果', desc: '经办人在「汇总指标数据」区块逐项填写，每项仅一个值' },
+      { label: '汇总效果', desc: '数字型指标在「汇总报表」自动加总并生成各机构对比' },
+      { label: '举例', desc: '「总收入（万元）」设为数字型汇总指标；「盘点结论」设为下拉型汇总指标' },
+    ],
+  },
+  {
+    name: '明细行',
+    tag: '可添加任意多行',
+    rows: [
+      { label: '适用场景', desc: '清单 / 台账类数据，如产品明细、资产明细、问题清单' },
+      { label: '填报效果', desc: '经办人点击「添加一行」逐条录入，行数不限' },
+      { label: '汇总效果', desc: '数字列按机构自动合计，明细可在「汇总报表 → 明细数据」穿透查看' },
+      { label: '举例', desc: '「产品明细」= 产品名称（文本）+ 销量（数字）+ 销售额（数字）+ 渠道（下拉）' },
+    ],
+  },
+  {
+    name: '二维交叉表',
+    tag: '行维度 × 列指标',
+    rows: [
+      { label: '适用场景', desc: '按固定维度拆解指标，行与列的结构完全由模板预定义' },
+      { label: '填报效果', desc: '经办人在交叉单元格中直接填写，行列不可增删' },
+      { label: '汇总效果', desc: '数字列自动参与汇总统计，空白单元格视为未填报' },
+      { label: '举例', desc: '行「销售区域」（华东 / 华北 / 华南）× 列「销售额」「同比增长率」（均为数字）' },
+    ],
+  },
+];
+
+/** 创建字段的三种方式（模版编辑器右上角入口） */
+const FIELD_CREATION_WAYS: Array<{ name: string; desc: string }> = [
+  { name: '新增模版字段', desc: '逐个创建字段（默认作为明细行），把控件类型、显示名称、唯一标识与必填规则' },
+  { name: '导入Excel', desc: '智能识别真实表格：自动跳过标题/注释/落款行并定位表头（识别不准可手动选择表头行），自动判定明细表/汇总指标表/交叉表格式（普通表格也可强制按交叉表导入，首列作行维度），推断字段类型并提取下拉选项' },
+  { name: '创建交叉表', desc: '填写行维度标签与行选项（每行一个），再为每列指定列标签与控件类型' },
+];
+
+/** 完整模版设计示例 */
+const TEMPLATE_DESIGN_EXAMPLES: Array<{ name: string; period: string; structure: string; points: string[] }> = [
   {
     name: '月度销售与经营报表',
-    period: '月度',
-    purpose: '汇总各分公司月度销售收入、利润及核心产品销售明细。',
-    summaryFields: [
-      { label: '总收入（万元）', required: true },
-      { label: '净利润（万元）', required: true },
-      { label: '在册员工数（人）' },
-      { label: '填报基准日', required: true },
-      { label: '经营情况说明' },
-    ],
-    detailFields: [
-      { label: '产品/项目名称', required: true },
-      { label: '销量/数量（件）', required: true },
-      { label: '产品销售额（万元）', required: true },
-      { label: '销售渠道', note: '直销 / 代理商 / 线上平台 / 大客户' },
-    ],
-    tips: [
-      '金额单位均为「万元」，请与明细行销售额口径保持一致',
-      '明细区可一次添加多行产品，提交前请核对合计与总收入',
+    period: '月报',
+    structure: '5 项汇总指标 + 4 列明细行',
+    points: [
+      '汇总指标：总收入、净利润（数字，自动加总）、在册员工数（数字）、填报基准日（日期）、经营情况说明（多行文本）',
+      '明细行：产品名称（文本）、销量（数字）、销售额（数字）、销售渠道（下拉：直销 / 代理商 / 线上平台 / 大客户）',
+      '效果：汇总报表自动对比各公司收入与利润，并可逐条穿透产品明细',
     ],
   },
   {
-    name: '季度资产与设备清查表',
-    period: '季度',
-    purpose: '清查各分公司季度固定资产、设备状况及盘点明细。',
-    summaryFields: [
-      { label: '资产总估值（万元）', required: true },
-      { label: '盘点结论', required: true, note: '良好 / 正常 / 存在轻微异常 / 需要整改' },
-    ],
-    detailFields: [
-      { label: '资产编号', required: true },
-      { label: '资产名称', required: true },
-      { label: '资产类别', required: true, note: '办公设备 / IT基础设施 / 生产机械 / 运输车辆 / 其他' },
-      { label: '原值（元）', required: true },
-      { label: '使用状态', required: true, note: '正常在用 / 待维修 / 已提报废 / 闲置中' },
-    ],
-    tips: [
-      '明细「原值」单位为元，汇总「资产总估值」单位为万元，注意换算',
-      '建议按资产编号逐条盘点登记，盘点结论应与明细使用状态相符',
+    name: '区域经营交叉表',
+    period: '季报',
+    structure: '1 张交叉表（4 行 × 2 列）',
+    points: [
+      '行维度「销售区域」：华东 / 华北 / 华南 / 西南（创建时行选项每行填写一个）',
+      '列指标：销售额（数字）、订单数（数字），每一列即一个交叉表列字段',
+      '效果：经办人在 4×2 的单元格矩阵中直接填写，数字列自动汇总',
     ],
   },
-  {
-    name: '二维交叉表模板',
-    period: '通用',
-    purpose: '适用于「行维度 × 列指标」交叉填报的场景（如按区域 × 指标填报）。',
-    matrix: true,
-    tips: [
-      '行列结构由模板固定，点击交叉单元格直接填写',
-      '空白单元格视为未填报，数字列自动参与汇总统计',
-    ],
-  },
+];
+
+/** 模版设计规则 */
+const TEMPLATE_DESIGN_RULES: string[] = [
+  '字段唯一标识（Key）在模板内必须唯一，留空时系统按控件类型自动生成',
+  '数字型字段自动参与汇总统计；文本、日期、下拉仅作展示不合计',
+  '下拉单选的预设选项用逗号分隔（如：正常, 待维修, 报废）',
+  '发布后遵循「只增不减」规范：字段不可物理删除，仅可停用；停用后历史数据完整保留、新填报不再要求',
+  '草稿与已发布状态可继续追加字段；待审批、已停用状态的字段配置为只读',
+  '汇总指标、明细行、交叉表可在同一模板中混合搭配',
 ];
 
 const FIELD_TYPE_LEGEND: Array<{ label: string; desc: string }> = [
@@ -97,23 +106,6 @@ const FIELD_TYPE_LEGEND: Array<{ label: string; desc: string }> = [
   { label: '多行文本', desc: '填写较长的文字说明' },
   { label: '二维交叉表', desc: '在行 × 列交叉单元格中填写' },
 ];
-
-const GuideFieldList: React.FC<{ title: string; fields: GuideField[] }> = ({ title, fields }) => (
-  <div>
-    <div className="text-[11px] font-semibold text-ink mb-1.5">{title}</div>
-    <ul className="space-y-1">
-      {fields.map((f) => (
-        <li key={f.label} className="text-[12px] leading-[1.6] text-mute flex items-baseline gap-1">
-          <span className="text-body">
-            {f.label}
-            {f.required && <span className="text-[#9F2F2D] font-bold"> *</span>}
-          </span>
-          {f.note && <span className="text-[11px] text-faint">（{f.note}）</span>}
-        </li>
-      ))}
-    </ul>
-  </div>
-);
 
 export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) => {
   const isHQ = user?.role === 'department_report_admin' || user?.role === 'super_admin';
@@ -300,7 +292,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
               <div className="space-y-2.5 text-[12px] leading-[1.7]">
                 <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
                   <div className="font-semibold text-ink mb-1">报表填报</div>
-                  <div className="text-mute">在「报表填报」查看收到的下发任务，点击进入填报。支持汇总指标和明细行填写，交叉表可编辑单元格。</div>
+                  <div className="text-mute">在「报表填报」查看收到的下发任务，点击进入填报。支持汇总指标和明细行填写，交叉表可编辑单元格。明细区「导入Excel」可直接导入真实表格：自动跳过标题/说明/落款行并定位表头，表头按字段标签模糊匹配，数字、日期与下拉值自动规范化。</div>
                 </div>
                 <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
                   <div className="font-semibold text-ink mb-1">审批流程</div>
@@ -310,43 +302,72 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
             </section>
           )}
 
-          {/* 模板填报说明 */}
+          {/* 模版制定说明 */}
           <section>
             <h3 className="flex items-center gap-2 text-[14px] font-semibold text-ink mb-2.5">
               <Grid3x3 className="w-4 h-4 text-ink" />
-              <span>模板填报说明</span>
+              <span>模版制定说明</span>
             </h3>
             <div className="space-y-3">
-              {TEMPLATE_GUIDES.map((guide) => (
+              {/* 三种数据区域 */}
+              {DATA_REGION_GUIDES.map((region) => (
                 <div
-                  key={guide.name}
+                  key={region.name}
                   className="rounded-[12px] overflow-hidden"
                   style={{ border: '1px solid var(--hairline)' }}
                 >
                   <div className="px-4 py-2.5 bg-canvas flex items-center justify-between gap-2">
-                    <span className="text-[13px] font-semibold text-ink">{guide.name}</span>
+                    <span className="text-[13px] font-semibold text-ink">{region.name}</span>
                     <span className="shrink-0 text-[10px] font-bold text-mute bg-line px-2 py-0.5 rounded-full">
-                      {guide.period}
+                      {region.tag}
                     </span>
                   </div>
-                  <div className="px-4 py-3 space-y-2.5">
-                    <p className="text-[12px] text-mute leading-[1.6]">{guide.purpose}</p>
-                    {guide.summaryFields && (
-                      <GuideFieldList title="汇总指标" fields={guide.summaryFields} />
-                    )}
-                    {guide.detailFields && (
-                      <GuideFieldList title="明细行（可添加多行）" fields={guide.detailFields} />
-                    )}
-                    {guide.matrix && (
-                      <div className="text-[12px] text-mute leading-[1.6]">
-                        填报区域为交叉表格，行、列由模板预定义。
+                  <div className="px-4 py-3 space-y-1.5">
+                    {region.rows.map((row) => (
+                      <div key={row.label} className="text-[12px] leading-[1.6] flex gap-2">
+                        <span className="font-semibold text-body shrink-0 w-14">{row.label}</span>
+                        <span className="text-mute">{row.desc}</span>
                       </div>
-                    )}
-                    <ul className="space-y-1 pt-1" style={{ borderTop: '1px dashed var(--hairline)' }}>
-                      {guide.tips.map((tip) => (
-                        <li key={tip} className="text-[11px] text-mute leading-[1.6] flex gap-1.5">
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* 创建字段的三种方式 */}
+              <div className="rounded-[12px] px-4 py-3 bg-canvas">
+                <div className="text-[11px] font-semibold text-ink mb-1.5">创建字段的三种方式（模版编辑器右上角）</div>
+                <div className="space-y-1.5">
+                  {FIELD_CREATION_WAYS.map((w, i) => (
+                    <div key={w.name} className="text-[12px] leading-[1.6] flex items-start gap-2">
+                      <span className="shrink-0 w-4 h-4 rounded-full bg-ink text-white text-[9px] font-bold flex items-center justify-center tabular-nums mt-[2px]">{i + 1}</span>
+                      <span className="text-mute">
+                        <span className="font-semibold text-body">{w.name}</span>：{w.desc}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 完整设计示例 */}
+              {TEMPLATE_DESIGN_EXAMPLES.map((ex) => (
+                <div
+                  key={ex.name}
+                  className="rounded-[12px] overflow-hidden"
+                  style={{ border: '1px solid var(--hairline)' }}
+                >
+                  <div className="px-4 py-2.5 bg-canvas flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-semibold text-ink">示例：{ex.name}</span>
+                    <span className="shrink-0 text-[10px] font-bold text-mute bg-line px-2 py-0.5 rounded-full">
+                      {ex.period}
+                    </span>
+                  </div>
+                  <div className="px-4 py-3">
+                    <div className="text-[11px] font-semibold text-ink mb-1.5">{ex.structure}</div>
+                    <ul className="space-y-1">
+                      {ex.points.map((p) => (
+                        <li key={p} className="text-[11px] text-mute leading-[1.6] flex gap-1.5">
                           <Zap className="w-3 h-3 text-faint shrink-0 mt-[3px]" />
-                          <span>{tip}</span>
+                          <span>{p}</span>
                         </li>
                       ))}
                     </ul>
@@ -370,6 +391,16 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
                   </div>
                 </div>
               </div>
+
+              {/* 模版设计规则 */}
+              <div className="rounded-[12px] px-4 py-3 bg-canvas">
+                <div className="text-[11px] font-semibold text-ink mb-1.5">模版设计规则</div>
+                <ul className="space-y-1 list-disc pl-4">
+                  {TEMPLATE_DESIGN_RULES.map((r) => (
+                    <li key={r} className="text-[11px] text-mute leading-[1.6]">{r}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </section>
 
@@ -380,7 +411,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
               <span>使用提示</span>
             </h3>
             <ul className="space-y-1.5 text-[12px] text-mute leading-[1.7] list-disc pl-5">
+              <li>月报/季报/年报模板可在「模板管理 → 周期计划」配置自动下发：模板审批发布后，系统每日按设定时间自动向目标分公司生成本期任务，也可在弹窗中「立即执行一次」手动触发补发</li>
+              <li>「模板管理 → 数据导入」支持按模板批量导入 Excel：「历史归档」直接成为已签收数据并计入汇总；「期初预填」为已下发任务生成草稿，由分公司经办人核对后提交</li>
+              <li>填报被驳回/签收退回或模板被驳回时，工作台顶部会出现红色「退回提醒」，左侧导航对应菜单也会显示红色角标；修改后重新提交即可消除</li>
               <li>退回的报表可在原任务页面直接修改并重新提交</li>
+              <li>填报、复核、审核与查看页面的汇总/明细/交叉表数据区均支持全屏展示：点击数据区右上角全屏按钮铺满屏幕（按 Esc 或再次点击退出），宽表数据可完整展开查看</li>
               <li>已签收的报表状态为「已签收」，可在汇总报表中查看</li>
               <li>逾期任务会在列表中标记「已逾期」</li>
               <li>一次性下发的任务会标注「⚡ 一次性」徽章</li>

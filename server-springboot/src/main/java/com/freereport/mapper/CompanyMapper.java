@@ -18,6 +18,11 @@ public interface CompanyMapper {
     List<Company> findAll();
 
     /**
+     * 根据编码查询机构（数据导入按 company_code 定位）。
+     */
+    Company findByCode(@Param("code") String code);
+
+    /**
      * 根据 ID 查询机构。
      */
     Company findById(@Param("id") Long id);

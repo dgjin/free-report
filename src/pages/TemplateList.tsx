@@ -16,12 +16,17 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  Upload,
 } from '../components/icons';
 import { api, useTemplatesPaged, useAssignmentTargets, getStoredUser } from '../services/api';
 import { toast, confirmDialog } from '../utils/toast';
 import { ReportTemplate } from '../types';
 import { getInitialTemplateFields } from '../utils/templateFields';
 import { getTemplateLifecycleView } from '../utils/templateLifecycle';
+import { getClientAccess } from '../utils/access';
+import { currentPeriodLabel, isSchedulablePeriodType } from '../utils/periodSchedule';
+import { TemplateScheduleModal } from '../components/TemplateScheduleModal';
+import { TemplateDataImportModal } from '../components/TemplateDataImportModal';
 import { mutate } from 'swr';
 
 const PAGE_SIZE = 20;
@@ -53,9 +58,16 @@ export const TemplateList: React.FC = () => {
   const [assigning, setAssigning] = useState(false);
   const [lifecycleActionId, setLifecycleActionId] = useState<number | null>(null);
   const lifecycleActionIdRef = useRef<number | null>(null);
+  const [scheduleTemplate, setScheduleTemplate] = useState<ReportTemplate | null>(null);
+  const [importTemplate, setImportTemplate] = useState<ReportTemplate | null>(null);
 
   const navigate = useNavigate();
   const currentUser = getStoredUser();
+  const access = currentUser ? getClientAccess(currentUser) : null;
+
+  /** 是否可管理该模板（本部门报表管理员）：周期计划与数据导入入口可见性 */
+  const canManageTemplate = (t: ReportTemplate) =>
+    !!access?.canManageTemplates && t.owner_department_id === currentUser?.company_id;
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,16 +89,35 @@ export const TemplateList: React.FC = () => {
     }
   };
 
-  const openAssignModal = (t: ReportTemplate) => {
+  const openAssignModal = async (t: ReportTemplate) => {
     setSelectedTemplate(t);
-    setAssignTitle(`${new Date().getFullYear()}年${new Date().getMonth() + 1}月${t.name}`);
-    setPeriodLabel(`${new Date().getFullYear()}年${String(new Date().getMonth() + 1).padStart(2, '0')}月`);
+    // 按 period_type 生成本期周期标签（月→yyyy年MM月、季→yyyy年Qn、年→yyyy年）
+    const label = currentPeriodLabel(t.period_type);
+    setAssignTitle(`${label}${t.name}`);
+    setPeriodLabel(label);
     setIsOneTime(false);
 
-    // Default deadline 7 days from today
-    const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    setDeadline(d);
-    setSelectedBranchIds(branches.map((b) => b.id)); // select all branches by default
+    // 默认：7 天后截止、全选分公司；若已有周期计划配置则带出截止偏移与目标分公司
+    let deadlineDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    let branchIds = branches.map((b) => b.id);
+    if (isSchedulablePeriodType(t.period_type) && canManageTemplate(t)) {
+      try {
+        const s = await api.getTemplateSchedule(t.id);
+        if (s.deadline_offset_days > 0) {
+          deadlineDate = new Date(Date.now() + s.deadline_offset_days * 24 * 60 * 60 * 1000);
+        }
+        const validTargets = (s.target_company_ids || []).filter((id) =>
+          branches.some((b) => b.id === id),
+        );
+        if (validTargets.length > 0) {
+          branchIds = validTargets;
+        }
+      } catch {
+        // 无计划配置或不可读时保持默认
+      }
+    }
+    setDeadline(deadlineDate.toISOString().split('T')[0]);
+    setSelectedBranchIds(branchIds);
     setAssignModalOpen(true);
   };
 
@@ -256,6 +287,26 @@ export const TemplateList: React.FC = () => {
                       >
                         <CheckCircle className="w-3.5 h-3.5" />
                         <span>提交审批</span>
+                      </button>
+                    )}
+
+                    {isSchedulablePeriodType(t.period_type) && canManageTemplate(t) && (
+                      <button
+                        onClick={() => setScheduleTemplate(t)}
+                        className="h-9 px-4 bg-canvas hover:bg-line text-ink font-medium text-xs rounded-md transition-colors flex items-center gap-1.5"
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>周期计划</span>
+                      </button>
+                    )}
+
+                    {canManageTemplate(t) && (
+                      <button
+                        onClick={() => setImportTemplate(t)}
+                        className="h-9 px-4 bg-canvas hover:bg-line text-ink font-medium text-xs rounded-md transition-colors flex items-center gap-1.5"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>数据导入</span>
                       </button>
                     )}
 
@@ -537,6 +588,26 @@ export const TemplateList: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Schedule Config Modal */}
+      {scheduleTemplate && (
+        <TemplateScheduleModal
+          template={scheduleTemplate}
+          branches={branches}
+          onClose={() => setScheduleTemplate(null)}
+        />
+      )}
+
+      {/* Data Import Modal */}
+      {importTemplate && (
+        <TemplateDataImportModal
+          template={importTemplate}
+          onClose={() => setImportTemplate(null)}
+          onImported={async () => {
+            await mutate('/api/assignments');
+          }}
+        />
       )}
     </div>
   );

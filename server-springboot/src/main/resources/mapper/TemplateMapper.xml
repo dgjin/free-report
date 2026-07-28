@@ -199,4 +199,23 @@
         WHERE id = #{id}
     </update>
 
+    <!-- 查询部门被数转办驳回的模板（最新审批记录为 rejected 且模板处于草稿） -->
+    <select id="findRejectedTemplatesForDepartment" resultType="java.util.Map">
+        SELECT 'template_rejected' AS kind,
+               t.id AS template_id,
+               t.name AS title,
+               ta.comment,
+               u.display_name AS rejected_by_name,
+               ta.updated_at AS rejected_at
+        FROM report_templates t
+        JOIN template_approvals ta ON ta.template_id = t.id
+        JOIN (SELECT template_id, MAX(id) AS max_id FROM template_approvals GROUP BY template_id) latest
+          ON latest.max_id = ta.id
+        LEFT JOIN users u ON u.id = ta.reviewed_by
+        WHERE t.owner_department_id = #{companyId}
+          AND t.status = 'draft'
+          AND ta.status = 'rejected'
+        ORDER BY ta.updated_at DESC
+    </select>
+
 </mapper>

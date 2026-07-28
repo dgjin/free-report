@@ -5,6 +5,8 @@ import com.freereport.dto.CreateTemplateRequest;
 import com.freereport.entity.TemplateApproval;
 import com.freereport.security.AuthUser;
 import com.freereport.security.SecurityUtils;
+import com.freereport.service.AutoAssignService;
+import com.freereport.service.TemplateScheduleService;
 import com.freereport.service.TemplateService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -18,10 +20,15 @@ import java.util.Map;
 public class TemplateController {
 
     private final TemplateService templateService;
+    private final TemplateScheduleService templateScheduleService;
+    private final AutoAssignService autoAssignService;
     private final SecurityUtils securityUtils;
 
-    public TemplateController(TemplateService templateService, SecurityUtils securityUtils) {
+    public TemplateController(TemplateService templateService, TemplateScheduleService templateScheduleService,
+                              AutoAssignService autoAssignService, SecurityUtils securityUtils) {
         this.templateService = templateService;
+        this.templateScheduleService = templateScheduleService;
+        this.autoAssignService = autoAssignService;
         this.securityUtils = securityUtils;
     }
 
@@ -145,5 +152,28 @@ public class TemplateController {
         AuthUser user = securityUtils.getCurrentUser();
         String comment = body != null ? body.get("comment") : null;
         return templateService.rejectTemplate(user, id, comment);
+    }
+
+    // ---- 周期下发计划 ----
+
+    @GetMapping("/{id}/schedule")
+    public Map<String, Object> getTemplateSchedule(@PathVariable Long id) {
+        AuthUser user = securityUtils.getCurrentUser();
+        return templateScheduleService.getSchedule(user, id);
+    }
+
+    @PutMapping("/{id}/schedule")
+    public Map<String, Object> saveTemplateSchedule(@PathVariable Long id,
+                                                    @RequestBody Map<String, Object> body) {
+        securityUtils.requireDepartmentReportAdmin();
+        AuthUser user = securityUtils.getCurrentUser();
+        return templateScheduleService.saveSchedule(user, id, body);
+    }
+
+    @PostMapping("/{id}/schedule/run")
+    public Map<String, Object> runTemplateSchedule(@PathVariable Long id) {
+        securityUtils.requireDepartmentReportAdmin();
+        AuthUser user = securityUtils.getCurrentUser();
+        return autoAssignService.runForTemplate(user, id);
     }
 }

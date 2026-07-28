@@ -8,6 +8,11 @@
         SELECT * FROM companies ORDER BY id
     </select>
 
+    <!-- 根据编码查询机构（数据导入按 company_code 定位） -->
+    <select id="findByCode" resultType="com.freereport.entity.Company">
+        SELECT * FROM companies WHERE code = #{code}
+    </select>
+
     <!-- 根据 ID 查询机构 -->
     <select id="findById" resultType="com.freereport.entity.Company">
         SELECT * FROM companies WHERE id = #{id}

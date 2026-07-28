@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileSpreadsheet } from '../icons';
 import { ReportTemplateField } from '../../types';
+import { FullscreenButton, fullscreenSectionClass, useFullscreen } from '../FullscreenToggle';
 
 interface SummaryFormProps {
   fields: ReportTemplateField[];
@@ -11,11 +12,12 @@ interface SummaryFormProps {
 
 /** 汇总字段表单区（一、汇总指标数据） */
 export const SummaryForm: React.FC<SummaryFormProps> = ({ fields, values, isReadOnly, onChange }) => {
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
   if (fields.length === 0) return null;
 
   return (
     <div
-      className="bg-white rounded-[12px] p-6 sm:p-7 space-y-5"
+      className={`bg-white p-6 sm:p-7 space-y-5 ${fullscreenSectionClass(isFullscreen, 'rounded-[12px]')}`}
       style={{ boxShadow: 'var(--sh-panel)' }}
     >
       <div
@@ -33,6 +35,7 @@ export const SummaryForm: React.FC<SummaryFormProps> = ({ fields, values, isRead
             <p className="text-[11px] text-mute mt-0.5">请按要求填写分公司整体汇总考核数据</p>
           </div>
         </div>
+        <FullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

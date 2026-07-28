@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { CheckSquare, Plus, Trash2, Upload, Download, X } from '../icons';
 import { toast } from '../../utils/toast';
 import { ReportTemplateField } from '../../types';
+import { parseDetailRows, type DetailImportField } from '../../utils/detailImport';
+import { FullscreenButton, fullscreenSectionClass, useFullscreen } from '../FullscreenToggle';
 
 interface DetailTableProps {
   fields: ReportTemplateField[];
@@ -27,9 +29,10 @@ export const DetailTable: React.FC<DetailTableProps> = ({
   const [importMapping, setImportMapping] = useState<
     Array<{ excelHeader: string; matchedFieldId: number | null; fieldLabel: string }>
   >([]);
-  const [importPreviewRows, setImportPreviewRows] = useState<Array<Record<string, string>>>([]);
   const [importAllRows, setImportAllRows] = useState<Array<Record<string, string>>>([]);
+  const [importNotes, setImportNotes] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   if (fields.length === 0) return null;
 
@@ -57,9 +60,10 @@ export const DetailTable: React.FC<DetailTableProps> = ({
     try {
       const { read, utils } = await import('xlsx');
       const buffer = await file.arrayBuffer();
-      const workbook = read(buffer, { type: 'array' });
+      // cellDates: true → 日期单元格解析为 Date，便于统一归一为 YYYY-MM-DD
+      const workbook = read(buffer, { type: 'array', cellDates: true });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawRows: string[][] = utils.sheet_to_json(worksheet, {
+      const rawRows: unknown[][] = utils.sheet_to_json(worksheet, {
         header: 1,
         defval: '',
       });
@@ -69,45 +73,37 @@ export const DetailTable: React.FC<DetailTableProps> = ({
         return;
       }
 
-      const headers = rawRows[0].map((h) => String(h).trim());
-      const dataRows = rawRows.slice(1).filter((r) =>
-        r.some((cell) => String(cell).trim() !== '')
-      );
-
-      if (dataRows.length === 0) {
-        toast('Excel 文件中未找到有效数据行', 'error');
-        return;
-      }
-
-      // 匹配表头与明细字段
-      const mapping = headers.map((header) => {
-        const matched = fields.find((f) => {
-          const a = f.field_label.trim();
-          const b = header;
-          return a === b || a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
-        });
+      // 字段引用（含 select 选项，用于值归一）
+      const fieldRefs: DetailImportField[] = fields.map((f) => {
+        const config =
+          typeof f.field_config === 'string'
+            ? JSON.parse(f.field_config || '{}')
+            : f.field_config || {};
         return {
-          excelHeader: header,
-          matchedFieldId: matched?.id ?? null,
-          fieldLabel: matched?.field_label ?? '',
+          id: f.id,
+          field_label: f.field_label,
+          field_type: f.field_type,
+          options: f.field_type === 'select' ? (config.options || []) : undefined,
         };
       });
 
-      setImportMapping(mapping);
+      // 智能解析：自动定位表头、过滤落款/空行、按类型规范化值
+      const result = parseDetailRows(rawRows, fieldRefs);
 
-      // 构建所有导入行
-      const allRows: Array<Record<string, string>> = dataRows.map((row) => {
-        const obj: Record<string, string> = {};
-        mapping.forEach((m, idx) => {
-          if (m.matchedFieldId !== null) {
-            obj[m.matchedFieldId] = String(row[idx] ?? '');
-          }
-        });
-        return obj;
-      });
+      if (result.rows.length === 0) {
+        const matchedCount = result.mapping.filter((m) => m.matchedFieldId !== null).length;
+        toast(
+          matchedCount === 0
+            ? '未找到匹配的字段，请检查 Excel 表头是否与字段名称一致'
+            : 'Excel 文件中未找到有效数据行',
+          'error'
+        );
+        return;
+      }
 
-      setImportAllRows(allRows);
-      setImportPreviewRows(allRows.slice(0, 5));
+      setImportMapping(result.mapping);
+      setImportAllRows(result.rows);
+      setImportNotes(result.notes);
       setImportModalOpen(true);
     } catch (err: any) {
       toast(err.message || 'Excel 解析失败', 'error');
@@ -118,10 +114,19 @@ export const DetailTable: React.FC<DetailTableProps> = ({
     }
   };
 
+  /** 删除预览中的某一行（导入前剔除不需要的数据） */
+  const removeImportRow = (index: number) => {
+    setImportAllRows((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   const confirmImport = () => {
     const matchedCount = importMapping.filter((m) => m.matchedFieldId !== null).length;
     if (matchedCount === 0) {
       toast('未找到匹配的字段，请检查 Excel 表头是否与字段名称一致', 'error');
+      return;
+    }
+    if (importAllRows.length === 0) {
+      toast('没有可导入的数据行', 'error');
       return;
     }
 
@@ -133,8 +138,8 @@ export const DetailTable: React.FC<DetailTableProps> = ({
 
     setImportModalOpen(false);
     setImportAllRows([]);
-    setImportPreviewRows([]);
     setImportMapping([]);
+    setImportNotes([]);
     toast(`成功导入 ${importAllRows.length} 行数据`, 'success');
   };
 
@@ -169,7 +174,7 @@ export const DetailTable: React.FC<DetailTableProps> = ({
   return (
     <>
       <div
-        className="bg-white rounded-[12px] p-6 sm:p-7 space-y-5"
+        className={`bg-white p-6 sm:p-7 space-y-5 ${fullscreenSectionClass(isFullscreen, 'rounded-[12px]')}`}
         style={{ boxShadow: 'var(--sh-panel)' }}
       >
         <div
@@ -188,37 +193,40 @@ export const DetailTable: React.FC<DetailTableProps> = ({
             </div>
           </div>
 
-          {!isReadOnly && (
-            <div className="flex items-center space-x-2 flex-wrap">
-              <button
-                type="button"
-                onClick={downloadTemplate}
-                className="h-9 px-3 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>下载模板</span>
-              </button>
-              <label className="h-9 px-3 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5 cursor-pointer">
-                <Upload className="w-3.5 h-3.5" />
-                <span>{importing ? '解析中...' : '导入Excel'}</span>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={handleFileSelect}
-                  disabled={importing}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={addDetailRow}
-                className="h-9 px-3 bg-ink hover:bg-inkhover text-white font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>添加一行明细</span>
-              </button>
-            </div>
-          )}
+          <div className="flex items-center space-x-2 flex-wrap">
+            {!isReadOnly && (
+              <>
+                <button
+                  type="button"
+                  onClick={downloadTemplate}
+                  className="h-9 px-3 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>下载模板</span>
+                </button>
+                <label className="h-9 px-3 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{importing ? '解析中...' : '导入Excel'}</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                    disabled={importing}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={addDetailRow}
+                  className="h-9 px-3 bg-ink hover:bg-inkhover text-white font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>添加一行明细</span>
+                </button>
+              </>
+            )}
+            <FullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+          </div>
         </div>
 
         <div
@@ -315,7 +323,7 @@ export const DetailTable: React.FC<DetailTableProps> = ({
       {/* Excel 导入预览弹窗 */}
       {importModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[90] flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.35)' }}
         >
           <div
@@ -330,7 +338,7 @@ export const DetailTable: React.FC<DetailTableProps> = ({
               <div className="space-y-0.5">
                 <h2 className="text-base font-bold text-ink tracking-[-0.01em]">Excel 数据导入预览</h2>
                 <p className="text-[11px] text-mute">
-                  共识别到 <span className="tabular-nums">{importAllRows.length}</span> 行数据，以下展示前 <span className="tabular-nums">{importPreviewRows.length}</span> 行预览
+                  共识别到 <span className="tabular-nums">{importAllRows.length}</span> 行数据，可在下方逐行删除不需要的数据
                 </p>
               </div>
               <button
@@ -370,6 +378,13 @@ export const DetailTable: React.FC<DetailTableProps> = ({
                   <p className="text-[11px] text-[#9F2F2D]">
                     部分 Excel 列未匹配到对应字段（灰色标记），这些数据将被忽略。
                   </p>
+                )}
+                {importNotes.length > 0 && (
+                  <ul className="text-[11px] text-mute space-y-0.5 list-disc pl-4">
+                    {importNotes.map((note, idx) => (
+                      <li key={idx}>{note}</li>
+                    ))}
+                  </ul>
                 )}
               </div>
 
@@ -423,10 +438,11 @@ export const DetailTable: React.FC<DetailTableProps> = ({
                           </th>
                         );
                       })}
+                      <th className="p-2.5 w-16 text-center">操作</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {importPreviewRows.map((row, idx) => (
+                    {importAllRows.map((row, idx) => (
                       <tr key={idx} className="hover:bg-hoverbg">
                         <td
                           className="p-2.5 text-center text-mute font-mono tabular-nums"
@@ -445,16 +461,29 @@ export const DetailTable: React.FC<DetailTableProps> = ({
                             )}
                           </td>
                         ))}
+                        <td
+                          className="p-2 text-center"
+                          style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--hairline)' }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => removeImportRow(idx)}
+                            className="p-1.5 text-faint hover:text-[#9F2F2D] hover:bg-[#FDEBEC] rounded-full transition-colors"
+                            title="删除本行，不参与导入"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </td>
                       </tr>
                     ))}
-                    {importAllRows.length > importPreviewRows.length && (
+                    {importAllRows.length === 0 && (
                       <tr>
                         <td
-                          colSpan={fields.length + 1}
-                          className="p-2.5 text-center text-[11px] text-mute"
+                          colSpan={fields.length + 2}
+                          className="p-6 text-center text-[12px] text-faint"
                           style={{ borderTop: '1px solid var(--hairline)' }}
                         >
-                          … 还有 <span className="tabular-nums">{importAllRows.length - importPreviewRows.length}</span> 行数据未展示 …
+                          所有行均已删除，请取消后重新选择文件
                         </td>
                       </tr>
                     )}
@@ -478,7 +507,10 @@ export const DetailTable: React.FC<DetailTableProps> = ({
               <button
                 type="button"
                 onClick={confirmImport}
-                disabled={importMapping.filter((m) => m.matchedFieldId !== null).length === 0}
+                disabled={
+                  importMapping.filter((m) => m.matchedFieldId !== null).length === 0 ||
+                  importAllRows.length === 0
+                }
                 className="h-11 px-5 bg-ink hover:bg-inkhover text-white font-semibold text-xs rounded-md transition-colors disabled:opacity-50"
               >
                 确认导入 (<span className="tabular-nums">{importAllRows.length}</span> 行)

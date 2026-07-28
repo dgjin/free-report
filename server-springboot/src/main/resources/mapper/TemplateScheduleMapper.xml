@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.freereport.mapper.TemplateScheduleMapper">
+
+    <!-- 根据模板 ID 查询计划 -->
+    <select id="findByTemplateId" resultType="com.freereport.entity.ReportTemplateSchedule">
+        SELECT * FROM report_template_schedules WHERE template_id = #{templateId}
+    </select>
+
+    <!-- 查询所有已启用且模板已发布的计划（调度器扫描用） -->
+    <select id="findEnabledWithPublishedTemplate" resultType="com.freereport.entity.ReportTemplateSchedule">
+        SELECT s.* FROM report_template_schedules s
+        JOIN report_templates t ON t.id = s.template_id
+        WHERE s.enabled = 1 AND t.status = 'published'
+    </select>
+
+    <!-- 插入或更新计划（按 template_id 唯一键） -->
+    <insert id="upsert" parameterType="com.freereport.entity.ReportTemplateSchedule"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO report_template_schedules
+            (template_id, enabled, issue_month, issue_day, deadline_offset_days, target_company_ids)
+        VALUES
+            (#{templateId}, #{enabled}, #{issueMonth}, #{issueDay}, #{deadlineOffsetDays}, #{targetCompanyIds})
+        ON DUPLICATE KEY UPDATE
+            enabled = VALUES(enabled),
+            issue_month = VALUES(issue_month),
+            issue_day = VALUES(issue_day),
+            deadline_offset_days = VALUES(deadline_offset_days),
+            target_company_ids = VALUES(target_company_ids)
+    </insert>
+
+    <!-- 更新最近已生成分期标签 -->
+    <update id="updateLastPeriodLabel">
+        UPDATE report_template_schedules
+        SET last_period_label = #{lastPeriodLabel}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

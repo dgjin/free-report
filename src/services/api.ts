@@ -10,6 +10,12 @@ import {
   PendingReceipt,
   AggregationResponse,
   TemplateApproval,
+  RejectedReminder,
+  TemplateSchedule,
+  TemplateScheduleSaveBody,
+  ScheduleRunResult,
+  DataImportRowPayload,
+  DataImportResult,
 } from '../types';
 
 const TOKEN_KEY = 'free_report_token';
@@ -114,6 +120,9 @@ export const api = {
     return request(`/api/users/${id}/organization-role`, { method: 'PUT', body: JSON.stringify({ company_id, role }) });
   },
   async getPendingReceipts(): Promise<PendingReceipt[]> { return request('/api/receipts/pending'); },
+
+  // Reminders
+  async getRejectedReminders(): Promise<RejectedReminder[]> { return request('/api/reminders/rejected'); },
   async processReceipt(id: number, action: 'received' | 'returned', comment = ''): Promise<any> {
     return request(`/api/receipts/${id}/action`, { method: 'POST', body: JSON.stringify({ action, comment }) });
   },
@@ -204,6 +213,28 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ reason }),
     });
+  },
+
+  // Template Schedules（周期自动下发计划）
+  async getTemplateSchedule(id: number): Promise<TemplateSchedule> {
+    return request<TemplateSchedule>(`/api/templates/${id}/schedule`);
+  },
+  async saveTemplateSchedule(
+    id: number,
+    body: TemplateScheduleSaveBody,
+  ): Promise<{ message: string; schedule: TemplateSchedule }> {
+    return request(`/api/templates/${id}/schedule`, { method: 'PUT', body: JSON.stringify(body) });
+  },
+  async runTemplateSchedule(id: number): Promise<ScheduleRunResult> {
+    return request(`/api/templates/${id}/schedule/run`, { method: 'POST' });
+  },
+
+  // Data Import（数据初始化导入）
+  async importTemplateData(
+    id: number,
+    body: { mode: 'archive' | 'prefill'; period_label: string; rows: DataImportRowPayload[] },
+  ): Promise<DataImportResult> {
+    return request(`/api/templates/${id}/data-import`, { method: 'POST', body: JSON.stringify(body) });
   },
 
   // Template Approvals
@@ -316,6 +347,7 @@ export const swrKeys = {
   targets: '/api/companies/targets',
   pendingApprovals: '/api/approvals/pending',
   pendingReceipts: '/api/receipts/pending',
+  rejectedReminders: '/api/reminders/rejected',
 };
 
 export function useTemplates() {
@@ -350,4 +382,8 @@ export function usePendingApprovals() {
 
 export function usePendingReceipts() {
   return useSWR<PendingReceipt[]>(swrKeys.pendingReceipts, swrFetcher, { revalidateOnFocus: false });
+}
+
+export function useRejectedReminders(enabled = true) {
+  return useSWR<RejectedReminder[]>(enabled ? swrKeys.rejectedReminders : null, swrFetcher, { revalidateOnFocus: false });
 }
