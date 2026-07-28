@@ -18,11 +18,6 @@ import {
   Eye,
   X,
   UserCheck,
-  HelpCircle,
-  BookOpen,
-  Shield,
-  Workflow,
-  Zap,
 } from '../components/icons';
 import { api, getStoredUser, swrKeys, swrFetcher } from '../services/api';
 import { UserInfo, ReportTemplate, ReportAssignment, PendingApprovalTask, Company, PendingReceipt, ReportSubmissionDetail } from '../types';
@@ -56,7 +51,6 @@ export const Dashboard: React.FC = () => {
   const [receiptComment, setReceiptComment] = useState('');
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 2500);
@@ -154,15 +148,6 @@ export const Dashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              onClick={() => setHelpOpen(true)}
-              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-md text-body bg-white hover:bg-hoverbg text-[13px] font-medium transition-colors"
-              style={{ border: '1px solid var(--hairline)' }}
-            >
-              <HelpCircle className="w-4 h-4 text-mute" />
-              <span className="hidden sm:inline">使用帮助</span>
-            </button>
-
             {user?.role === 'department_report_admin' ? (
               <button
                 onClick={() => navigate('/templates')}
@@ -641,143 +626,6 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Help Modal */}
-      {helpOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.35)' }}
-          onClick={() => setHelpOpen(false)}
-        >
-          <div
-            className="bg-white rounded-[12px] max-w-2xl w-full max-h-[85vh] overflow-y-auto"
-            style={{ boxShadow: 'var(--sh-overlay)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="sticky top-0 bg-white px-7 py-5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--hairline)' }}>
-              <h2 className="flex items-center gap-2 text-[18px] font-bold text-ink tracking-[-0.02em]">
-                <BookOpen className="w-5 h-5 text-ink" />
-                <span>系统使用指南</span>
-              </h2>
-              <button
-                onClick={() => setHelpOpen(false)}
-                className="p-1.5 rounded-full text-mute hover:text-ink hover:bg-canvas transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="px-7 py-6 space-y-7">
-              {/* Role-based guide */}
-              <section>
-                <h3 className="flex items-center gap-2 text-[15px] font-semibold text-ink mb-3">
-                  <Shield className="w-4 h-4 text-ink" />
-                  <span>角色与权限</span>
-                </h3>
-                <div className="space-y-2 text-[13px] text-body leading-[1.7]">
-                  <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-28">超级管理员</span><span className="text-mute">全局只读视图，可管理机构与用户，不可填报或签收</span></div>
-                  <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-28">部门报表管理员</span><span className="text-mute">设计模板、下发任务、签收报表、查看汇总（仅限本部门）</span></div>
-                  <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-28">分公司经办人</span><span className="text-mute">填写并提交报表数据</span></div>
-                  <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-28">复核人 / 审批人</span><span className="text-mute">查看填报信息，进行审批操作（不可填报）</span></div>
-                </div>
-              </section>
-
-              {/* Workflow */}
-              <section>
-                <h3 className="flex items-center gap-2 text-[15px] font-semibold text-ink mb-3">
-                  <Workflow className="w-4 h-4 text-ink" />
-                  <span>三级审批流程</span>
-                </h3>
-                <div className="bg-canvas rounded-[12px] p-4 space-y-2 text-[13px]">
-                  {[
-                    { step: '1', label: '经办人填报', desc: '分公司经办人填写报表数据并提交' },
-                    { step: '2', label: '复核人审核', desc: '复核人检查数据准确性，通过或退回' },
-                    { step: '3', label: '审批人终审', desc: '审批人最终确认，通过后流转至发起部门' },
-                    { step: '4', label: '部门签收', desc: '发起部门确认接收已审批的报表' },
-                  ].map((s) => (
-                    <div key={s.step} className="flex items-start gap-3">
-                      <span className="shrink-0 w-6 h-6 rounded-full bg-ink text-white text-[11px] font-bold flex items-center justify-center tabular-nums">{s.step}</span>
-                      <div>
-                        <span className="font-semibold text-ink">{s.label}</span>
-                        <span className="text-mute ml-2">{s.desc}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[12px] text-mute mt-2">退回的报表可修改后重新提交，流程从头开始</p>
-              </section>
-
-              {/* HQ guide */}
-              {isHQ && (
-                <section>
-                  <h3 className="flex items-center gap-2 text-[15px] font-semibold text-ink mb-3">
-                    <FileSpreadsheet className="w-4 h-4 text-ink" />
-                    <span>总部/部门操作指南</span>
-                  </h3>
-                  <div className="space-y-3 text-[13px] text-body leading-[1.7]">
-                    <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
-                      <div className="font-semibold text-ink mb-1">模板管理</div>
-                      <div className="text-mute">在「模板管理」页面创建报表模板，支持文本、数字、日期、下拉选择、多行文本及二维交叉表字段。模板发布后方可下发。</div>
-                    </div>
-                    <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
-                      <div className="font-semibold text-ink mb-1">下发任务</div>
-                      <div className="text-mute">在「下发管理」页面选择已发布模板，指定目标分公司、周期与截止日期。支持「一次性下发」用于补充调查场景（不受周期去重约束）。</div>
-                    </div>
-                    <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
-                      <div className="font-semibold text-ink mb-1">强制收回</div>
-                      <div className="text-mute">在「下发管理」列表中，对未汇总的任务可执行「收回」操作。收回后任务终止，审批记录自动取消，需填写收回原因。</div>
-                    </div>
-                    <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
-                      <div className="font-semibold text-ink mb-1">签收报表</div>
-                      <div className="text-mute">在工作台「待签收任务」区块查看已审批的报表，确认后签收或退回。退回需填写原因。</div>
-                    </div>
-                    <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
-                      <div className="font-semibold text-ink mb-1">汇总报表</div>
-                      <div className="text-mute">在「汇总报表」页面查看多机构对比、明细数据与填报进度，支持导出 Excel（含机构对比、明细、进度三张表）。</div>
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {/* Branch guide */}
-              {!isHQ && (
-                <section>
-                  <h3 className="flex items-center gap-2 text-[15px] font-semibold text-ink mb-3">
-                    <FileSpreadsheet className="w-4 h-4 text-ink" />
-                    <span>分公司操作指南</span>
-                  </h3>
-                  <div className="space-y-3 text-[13px] text-body leading-[1.7]">
-                    <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
-                      <div className="font-semibold text-ink mb-1">报表填报</div>
-                      <div className="text-mute">在「报表填报」页面查看收到的下发任务，点击进入填报。支持汇总指标和明细行填写，交叉表可编辑单元格。</div>
-                    </div>
-                    <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
-                      <div className="font-semibold text-ink mb-1">审批流程</div>
-                      <div className="text-mute">经办人提交后，复核人和审批人依次在「审批中心」处理。可查看填报详情并附审批意见。退回后经办人可修改重提。</div>
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {/* Tips */}
-              <section>
-                <h3 className="flex items-center gap-2 text-[15px] font-semibold text-ink mb-3">
-                  <Zap className="w-4 h-4 text-ink" />
-                  <span>使用提示</span>
-                </h3>
-                <ul className="space-y-2 text-[13px] text-mute leading-[1.7] list-disc pl-5">
-                  <li>退回的报表可在原任务页面直接修改并重新提交</li>
-                  <li>已签收的报表状态为「已签收」，可在汇总报表中查看</li>
-                  <li>逾期任务会在列表中标记「已逾期」</li>
-                  <li>一次性下发的任务会标注「⚡ 一次性」徽章</li>
-                  <li>汇总报表仅统计已审批通过的填报数据</li>
-                </ul>
-              </section>
-            </div>
           </div>
         </div>
       )}

@@ -124,12 +124,14 @@
         DELETE FROM report_submission_data WHERE submission_id = #{submissionId}
     </delete>
 
-    <!-- 批量插入提交明细数据 -->
+    <!-- 批量插入提交明细数据（numeric_value 冗余列同步填充，支持 SQL 聚合） -->
     <insert id="insertSubmissionDataBatch" parameterType="java.util.List">
-        INSERT INTO report_submission_data (submission_id, field_id, row_index, value)
+        INSERT INTO report_submission_data (submission_id, field_id, row_index, value, numeric_value)
         VALUES
         <foreach collection="list" item="item" separator=",">
-            (#{item.submissionId}, #{item.fieldId}, #{item.rowIndex}, #{item.value})
+            (#{item.submissionId}, #{item.fieldId}, #{item.rowIndex}, #{item.value},
+             CASE WHEN #{item.value} REGEXP '^-?[0-9]+\\.?[0-9]*$'
+                  THEN CAST(#{item.value} AS DECIMAL(18,4)) ELSE NULL END)
         </foreach>
     </insert>
 

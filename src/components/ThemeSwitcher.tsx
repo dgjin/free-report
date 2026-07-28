@@ -12,7 +12,7 @@ const STORAGE_KEY = 'free_report_theme';
 
 const THEMES: { id: ThemeName; label: string; canvas: string; ink: string }[] = [
   { id: 'warm', label: '暖白主题', canvas: '#F7F6F3', ink: '#111111' },
-  { id: 'blue', label: '海蓝主题', canvas: '#F3F6FA', ink: '#123E5F' },
+  { id: 'blue', label: '海蓝主题', canvas: '#F0F5FA', ink: '#003775' },
 ];
 
 const currentTheme = (): ThemeName =>

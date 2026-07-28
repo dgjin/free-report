@@ -5,17 +5,25 @@ import com.freereport.entity.ReportSubmission;
 import com.freereport.exception.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Component
 public class SecurityUtils {
-    private final HttpServletRequest request;
 
-    public SecurityUtils(HttpServletRequest request) {
-        this.request = request;
+    /**
+     * 通过 RequestContextHolder 获取当前线程绑定的请求，避免构造器注入 HttpServletRequest 代理。
+     */
+    private HttpServletRequest currentRequest() {
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attrs == null) {
+            throw new DomainException("当前线程无请求上下文", 500);
+        }
+        return attrs.getRequest();
     }
 
     public AuthUser getCurrentUser() {
-        AuthUser user = (AuthUser) request.getAttribute("authUser");
+        AuthUser user = (AuthUser) currentRequest().getAttribute("authUser");
         if (user == null) {
             throw new DomainException("未登录", 401);
         }
@@ -31,11 +39,16 @@ public class SecurityUtils {
         return "department_report_admin".equals(user.getRole()) && "department".equals(user.getCompanyLevel());
     }
 
+    public boolean isDigitalAdmin() {
+        return "digital_admin".equals(getCurrentUser().getRole());
+    }
+
     public boolean canReadTemplate(Long ownerDepartmentId) {
         AuthUser user = getCurrentUser();
-        return "super_admin".equals(user.getRole()) ||
-               ("department_report_admin".equals(user.getRole()) && "department".equals(user.getCompanyLevel())
-                && user.getCompanyId().equals(ownerDepartmentId));
+        if ("super_admin".equals(user.getRole())) return true;
+        if (isDigitalAdmin()) return true;
+        return "department_report_admin".equals(user.getRole()) && "department".equals(user.getCompanyLevel())
+                && user.getCompanyId().equals(ownerDepartmentId);
     }
 
     public boolean canManageTemplate(Long ownerDepartmentId) {
@@ -75,6 +88,12 @@ public class SecurityUtils {
     public void requireSuperAdmin() {
         if (!isSuperAdmin()) {
             throw new DomainException("仅超级管理员可执行此操作", 403);
+        }
+    }
+
+    public void requireDigitalAdmin() {
+        if (!isDigitalAdmin()) {
+            throw new DomainException("仅数智化转型办公室管理员可执行此操作", 403);
         }
     }
 }

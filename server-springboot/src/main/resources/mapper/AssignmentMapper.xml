@@ -48,6 +48,37 @@
         </choose>
     </select>
 
+    <!-- 根据用户过滤分页查询下发任务 -->
+    <select id="findForUserPaged" resultType="com.freereport.entity.ReportAssignment">
+        <choose>
+            <when test="role == 'super_admin'">
+                SELECT * FROM report_assignments ORDER BY id DESC
+            </when>
+            <when test="role == 'department_report_admin'">
+                SELECT * FROM report_assignments WHERE issuer_department_id = #{companyId} ORDER BY id DESC
+            </when>
+            <otherwise>
+                SELECT * FROM report_assignments WHERE assigned_to_company_id = #{companyId} ORDER BY id DESC
+            </otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 根据用户过滤统计下发任务总数 -->
+    <select id="countForUser" resultType="long">
+        <choose>
+            <when test="role == 'super_admin'">
+                SELECT COUNT(*) FROM report_assignments
+            </when>
+            <when test="role == 'department_report_admin'">
+                SELECT COUNT(*) FROM report_assignments WHERE issuer_department_id = #{companyId}
+            </when>
+            <otherwise>
+                SELECT COUNT(*) FROM report_assignments WHERE assigned_to_company_id = #{companyId}
+            </otherwise>
+        </choose>
+    </select>
+
     <!-- 根据模板和周期查询下发任务 -->
     <select id="findByTemplateAndPeriod" resultType="com.freereport.entity.ReportAssignment">
         SELECT * FROM report_assignments

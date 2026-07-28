@@ -2,6 +2,7 @@ package com.freereport.controller;
 
 import com.freereport.dto.AssignTemplateRequest;
 import com.freereport.dto.CreateTemplateRequest;
+import com.freereport.entity.TemplateApproval;
 import com.freereport.security.AuthUser;
 import com.freereport.security.SecurityUtils;
 import com.freereport.service.TemplateService;
@@ -24,9 +25,16 @@ public class TemplateController {
         this.securityUtils = securityUtils;
     }
 
+    /**
+     * 模板列表：传 page/size 时返回分页封装 { data, total, page, size }，否则返回完整数组（兼容旧调用）。
+     */
     @GetMapping
-    public List<Map<String, Object>> listTemplates() {
+    public Object listTemplates(@RequestParam(required = false) Integer page,
+                                @RequestParam(required = false) Integer size) {
         AuthUser user = securityUtils.getCurrentUser();
+        if (page != null && size != null) {
+            return templateService.getTemplatesForUserPaged(user, page, size);
+        }
         return templateService.getTemplatesForUser(user);
     }
 
@@ -104,5 +112,38 @@ public class TemplateController {
         boolean isOneTime = Boolean.TRUE.equals(req.getIsOneTime());
         return templateService.assignTemplate(user, id, req.getCompanyIds(),
                 req.getTitle(), req.getPeriodLabel(), deadline, isOneTime);
+    }
+
+    // ---- 模板审批 ----
+
+    @PostMapping("/{id}/submit-approval")
+    public Map<String, Object> submitForApproval(@PathVariable Long id) {
+        securityUtils.requireDepartmentReportAdmin();
+        AuthUser user = securityUtils.getCurrentUser();
+        return templateService.submitForApproval(user, id);
+    }
+
+    @GetMapping("/pending-approvals")
+    public List<TemplateApproval> getPendingApprovals() {
+        securityUtils.requireDigitalAdmin();
+        return templateService.getPendingApprovals();
+    }
+
+    @PostMapping("/{id}/approve")
+    public Map<String, Object> approveTemplate(@PathVariable Long id,
+                                                @RequestBody(required = false) Map<String, String> body) {
+        securityUtils.requireDigitalAdmin();
+        AuthUser user = securityUtils.getCurrentUser();
+        String comment = body != null ? body.get("comment") : null;
+        return templateService.approveTemplate(user, id, comment);
+    }
+
+    @PostMapping("/{id}/reject")
+    public Map<String, Object> rejectTemplate(@PathVariable Long id,
+                                               @RequestBody(required = false) Map<String, String> body) {
+        securityUtils.requireDigitalAdmin();
+        AuthUser user = securityUtils.getCurrentUser();
+        String comment = body != null ? body.get("comment") : null;
+        return templateService.rejectTemplate(user, id, comment);
     }
 }

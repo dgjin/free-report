@@ -9,12 +9,21 @@ import {
   PendingApprovalTask,
   PendingReceipt,
   AggregationResponse,
+  TemplateApproval,
 } from '../types';
 
 const TOKEN_KEY = 'free_report_token';
 const USER_KEY = 'free_report_user';
 
 export type TemplateMetadataUpdate = Partial<Pick<ReportTemplate, 'name' | 'description' | 'period_type'>>;
+
+/** 分页接口统一响应封装（后端 ?page=&size= 参数启用） */
+export interface PagedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  size: number;
+}
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -62,7 +71,7 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     if (res.status === 401) {
       removeToken();
-      window.location.href = '/login';
+      window.dispatchEvent(new Event('auth:unauthorized'));
     }
     throw new Error(data?.error || '请求服务出现异常');
   }
@@ -112,6 +121,10 @@ export const api = {
   // Templates
   async getTemplates(): Promise<ReportTemplate[]> {
     return request<ReportTemplate[]>('/api/templates');
+  },
+
+  async getTemplatesPaged(page = 1, size = 20): Promise<PagedResponse<ReportTemplate>> {
+    return request<PagedResponse<ReportTemplate>>(`/api/templates?page=${page}&size=${size}`);
   },
 
   async getTemplateDetail(id: number): Promise<ReportTemplate> {
@@ -193,9 +206,33 @@ export const api = {
     });
   },
 
+  // Template Approvals
+  async submitTemplateForApproval(templateId: number): Promise<{ message: string; template: ReportTemplate }> {
+    return request(`/api/templates/${templateId}/submit-approval`, { method: 'POST' });
+  },
+  async getPendingTemplateApprovals(): Promise<TemplateApproval[]> {
+    return request('/api/templates/pending-approvals');
+  },
+  async approveTemplate(templateId: number, comment?: string): Promise<{ message: string; template: ReportTemplate }> {
+    return request(`/api/templates/${templateId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ comment }),
+    });
+  },
+  async rejectTemplate(templateId: number, comment?: string): Promise<{ message: string; template: ReportTemplate }> {
+    return request(`/api/templates/${templateId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ comment }),
+    });
+  },
+
   // Assignments
   async getAssignments(): Promise<ReportAssignment[]> {
     return request<ReportAssignment[]>('/api/assignments');
+  },
+
+  async getAssignmentsPaged(page = 1, size = 20): Promise<PagedResponse<ReportAssignment>> {
+    return request<PagedResponse<ReportAssignment>>(`/api/assignments?page=${page}&size=${size}`);
   },
 
   async getAssignmentDetail(id: number): Promise<ReportAssignment> {
@@ -283,6 +320,16 @@ export const swrKeys = {
 
 export function useTemplates() {
   return useSWR<ReportTemplate[]>(swrKeys.templates, swrFetcher, { revalidateOnFocus: false });
+}
+
+/** 分页模板列表 hook：page 变化触发重新请求 */
+export function useTemplatesPaged(page: number, size = 20) {
+  return useSWR<PagedResponse<ReportTemplate>>(`/api/templates?page=${page}&size=${size}`, swrFetcher, { revalidateOnFocus: false });
+}
+
+/** 分页下发任务列表 hook：page 变化触发重新请求（注意：概览统计/筛选需全量数据时请用 useAssignments） */
+export function useAssignmentsPaged(page: number, size = 20) {
+  return useSWR<PagedResponse<ReportAssignment>>(`/api/assignments?page=${page}&size=${size}`, swrFetcher, { revalidateOnFocus: false });
 }
 
 export function useAssignments() {

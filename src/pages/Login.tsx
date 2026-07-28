@@ -37,6 +37,7 @@ export const Login: React.FC = () => {
     { username: 'hq_admin', role: '总部管理员', company: '业务综合管理部' },
     { username: 'office_admin', role: '总部管理员', company: '办公室' },
     { username: 'risk_admin', role: '总部管理员', company: '风险管理部' },
+    { username: 'digital_admin', role: '模板审批', company: '数智化转型办公室' },
     { username: 'bj_handler', role: '经办人', company: '北京分公司' },
     { username: 'bj_reviewer', role: '复核人', company: '北京分公司' },
     { username: 'bj_approver', role: '审批人', company: '北京分公司' },

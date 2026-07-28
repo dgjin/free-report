@@ -5,7 +5,7 @@ import {
   Table, FileText, GridFour, Hash, Question, ClockCounterClockwise, Tray, Stack, SquaresFour, ListBullets,
   ListPlus, Lock, SignOut, List, ChatCircle, Plus, Power, ArrowsClockwise, ArrowCounterClockwise, FloppyDisk,
   MagnifyingGlass, PaperPlaneRight, Shield, ShieldCheck, SlidersHorizontal, Trash, TrendUp, TextT, Upload,
-  User, UserCheck, FlowArrow, X, XCircle, Lightning, Palette,
+  User, UserCheck, FlowArrow, X, XCircle, Lightning, Palette, CaretRight, CaretLeft,
 } from '@phosphor-icons/react';
 
 /**
@@ -101,6 +101,10 @@ export const XIcon = bold(X);
 export { XIcon as X };
 export const XCircleIcon = bold(XCircle);
 export { XCircleIcon as XCircle };
+export const ChevronRightIcon = bold(CaretRight);
+export { ChevronRightIcon as ChevronRight };
+export const ChevronLeftIcon = bold(CaretLeft);
+export { ChevronLeftIcon as ChevronLeft };
 export const Zap = bold(Lightning);
 export const PaletteIcon = bold(Palette);
 export { PaletteIcon as Palette };

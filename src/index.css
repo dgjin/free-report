@@ -60,28 +60,28 @@
   --font-mono:  'Geist Mono', 'SF Mono', 'JetBrains Mono', 'Menlo', monospace;
 }
 
-/* Cool blue theme — same structure, cool-tinted neutrals + deep sea-blue ink */
+/* Cool blue theme — COAMC 深邃海蓝色 (#003775) */
 [data-theme='blue'] {
-  --bg:        #F3F6FA;
+  --bg:        #F0F5FA;
   --surface:   #FFFFFF;
-  --hover:     #F6F9FC;
-  --text:      #123E5F;
-  --text-body: #32434F;
-  --text-2:    #647A8C;
-  --text-3:    #94A7B5;
-  --text-4:    #B8C5CF;
-  --faint:     #DFE7EF;
-  --hairline:  #DFE7EF;
+  --hover:     #E8F0F8;
+  --text:      #003775;
+  --text-body: #2C3E50;
+  --text-2:    #5A7090;
+  --text-3:    #8AA0B8;
+  --text-4:    #B8C8D8;
+  --faint:     #D5DFEB;
+  --hairline:  #D5DFEB;
 
-  --accent:    #123E5F;
-  --indigo:    #123E5F;
-  --ink-hover: #1E5B85;
-  --grad-cta:  #123E5F;
+  --accent:    #003775;
+  --indigo:    #003775;
+  --ink-hover: #00427F;
+  --grad-cta:  #003775;
 
-  --sel:             rgba(18,62,95,0.10);
-  --focus:           rgba(18,62,95,0.40);
-  --scrollbar:       rgba(18,62,95,0.16);
-  --scrollbar-hover: rgba(18,62,95,0.28);
+  --sel:             rgba(0,55,117,0.10);
+  --focus:           rgba(0,55,117,0.40);
+  --scrollbar:       rgba(0,55,117,0.16);
+  --scrollbar-hover: rgba(0,55,117,0.28);
 }
 
 /* 语义色映射进 Tailwind 主题（inline 保持 var() 引用，支持运行时切主题）
@@ -177,6 +177,18 @@ button:active { transform: scale(0.98); }
 }
 .toast-slide-in { animation: toast-slide-in 0.28s var(--ease-reveal); }
 .toast-pop-in { animation: toast-pop-in 0.22s var(--ease-reveal); }
+
+/* 帮助抽屉动画 */
+@keyframes drawer-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes scrim-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.drawer-slide-in { animation: drawer-slide-in 0.3s var(--ease-reveal); }
+.scrim-fade-in { animation: scrim-fade-in 0.25s ease-out; }
 
 /* Quiet scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }

@@ -41,7 +41,7 @@
     <!-- 根据用户角色过滤查询模板 -->
     <select id="findForUser" resultType="com.freereport.entity.ReportTemplate">
         <choose>
-            <when test="role == 'super_admin'">
+            <when test="role == 'super_admin' or role == 'digital_admin'">
                 SELECT * FROM report_templates ORDER BY id DESC
             </when>
             <when test="role == 'department_report_admin' and companyLevel == 'department'">
@@ -49,6 +49,37 @@
             </when>
             <otherwise>
                 SELECT * FROM report_templates WHERE 1 = 0
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 根据用户角色过滤分页查询模板 -->
+    <select id="findForUserPaged" resultType="com.freereport.entity.ReportTemplate">
+        <choose>
+            <when test="role == 'super_admin' or role == 'digital_admin'">
+                SELECT * FROM report_templates ORDER BY id DESC
+            </when>
+            <when test="role == 'department_report_admin' and companyLevel == 'department'">
+                SELECT * FROM report_templates WHERE owner_department_id = #{companyId} ORDER BY id DESC
+            </when>
+            <otherwise>
+                SELECT * FROM report_templates WHERE 1 = 0
+            </otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 根据用户角色过滤统计模板总数 -->
+    <select id="countForUser" resultType="long">
+        <choose>
+            <when test="role == 'super_admin' or role == 'digital_admin'">
+                SELECT COUNT(*) FROM report_templates
+            </when>
+            <when test="role == 'department_report_admin' and companyLevel == 'department'">
+                SELECT COUNT(*) FROM report_templates WHERE owner_department_id = #{companyId}
+            </when>
+            <otherwise>
+                SELECT 0
             </otherwise>
         </choose>
     </select>
@@ -132,5 +163,40 @@
     <select id="findMaxSortOrder" resultType="java.lang.Integer">
         SELECT MAX(sort_order) FROM report_template_fields WHERE template_id = #{templateId}
     </select>
+
+    <!-- 插入模板审批记录 -->
+    <insert id="insertTemplateApproval" parameterType="com.freereport.entity.TemplateApproval"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO template_approvals (template_id, submitted_by, status, comment)
+        VALUES (#{templateId}, #{submittedBy}, #{status}, #{comment})
+    </insert>
+
+    <!-- 查询模板的最新审批记录 -->
+    <select id="findLatestApprovalByTemplateId" resultType="com.freereport.entity.TemplateApproval">
+        SELECT * FROM template_approvals
+        WHERE template_id = #{templateId}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <!-- 查询所有待审批的模板审批记录 -->
+    <select id="findPendingApprovals" resultType="com.freereport.entity.TemplateApproval">
+        SELECT ta.*, t.name as template_name, c.name as department_name, u.display_name as submitted_by_name
+        FROM template_approvals ta
+        JOIN report_templates t ON ta.template_id = t.id
+        JOIN companies c ON t.owner_department_id = c.id
+        JOIN users u ON ta.submitted_by = u.id
+        WHERE ta.status = 'pending'
+        ORDER BY ta.created_at ASC
+    </select>
+
+    <!-- 更新审批记录状态 -->
+    <update id="updateApprovalStatus">
+        UPDATE template_approvals
+        SET status = #{status},
+            reviewed_by = #{reviewedBy},
+            comment = #{comment}
+        WHERE id = #{id}
+    </update>
 
 </mapper>

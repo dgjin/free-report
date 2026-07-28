@@ -2,6 +2,7 @@ export type CompanyLevel = 'headquarter' | 'department' | 'branch';
 export type Role =
   | 'super_admin'
   | 'department_report_admin'
+  | 'digital_admin'
   | 'branch_admin'
   | 'handler'
   | 'reviewer'
@@ -19,7 +20,7 @@ export interface UserInfo {
 }
 
 export type PeriodType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
-export type TemplateStatus = 'draft' | 'published' | 'archived';
+export type TemplateStatus = 'draft' | 'pending_approval' | 'published' | 'archived';
 
 export type FieldType = 'text' | 'number' | 'date' | 'select' | 'textarea';
 export type DataType = 'summary' | 'detail' | 'matrix';
@@ -228,6 +229,20 @@ export interface AggregationResponse {
   summary: Record<string, { total: number; count: number; average: number }>;
   detail_rows: Array<Record<string, any>>;
   detail_summary: Record<string, { total: number; count: number; average: number }>;
+}
+
+export interface TemplateApproval {
+  id: number;
+  template_id: number;
+  template_name?: string;
+  department_name?: string;
+  submitted_by: number;
+  submitted_by_name?: string;
+  reviewed_by?: number;
+  status: 'pending' | 'approved' | 'rejected';
+  comment?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /** Statuses that count as "approved" for aggregation statistics */

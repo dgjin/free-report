@@ -1,25 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  FileSpreadsheet,
-  ArrowLeft,
-  Save,
-  Send,
-  Plus,
-  Trash2,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  History,
-  Building2,
-  UserCheck,
-  CheckSquare,
-  XCircle,
-  Upload,
-  X,
-  Download,
-  Grid3x3,
-} from '../components/icons';
+import { ArrowLeft, XCircle } from '../components/icons';
 import { api, getStoredUser } from '../services/api';
 import { toast, confirmDialog } from '../utils/toast';
 import {
@@ -30,6 +11,11 @@ import {
 } from '../types';
 import { getSubmissionWorkflowView } from '../utils/submissionWorkflow';
 import { getClientAccess } from '../utils/access';
+import { SummaryForm } from '../components/report/SummaryForm';
+import { DetailTable } from '../components/report/DetailTable';
+import { CrossTable, MatrixGroup } from '../components/report/CrossTable';
+import { ApprovalTimeline } from '../components/report/ApprovalTimeline';
+import { ReportActions } from '../components/report/ReportActions';
 
 export const ReportFill: React.FC = () => {
   const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -49,16 +35,6 @@ export const ReportFill: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
-
-  // Excel Import State
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
-  const [importMapping, setImportMapping] = useState<
-    Array<{ excelHeader: string; matchedFieldId: number | null; fieldLabel: string }>
-  >([]);
-  const [importPreviewRows, setImportPreviewRows] = useState<Array<Record<string, string>>>([]);
-  const [importAllRows, setImportAllRows] = useState<Array<Record<string, string>>>([]);
-  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     if (assignmentId) {
@@ -125,12 +101,8 @@ export const ReportFill: React.FC = () => {
   const matrixFields = fields.filter((f) => f.data_type === 'matrix');
 
   // Group matrix fields by their row_label (each group = one cross-tab table)
-  const matrixGroups = useMemo(() => {
-    const groups: Array<{
-      rowLabel: string;
-      rowOptions: string[];
-      columns: ReportTemplateField[];
-    }> = [];
+  const matrixGroups = useMemo<MatrixGroup[]>(() => {
+    const groups: MatrixGroup[] = [];
     const groupMap = new Map<string, number>();
 
     matrixFields.forEach((field) => {
@@ -180,23 +152,6 @@ export const ReportFill: React.FC = () => {
     setSummaryForm((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  const handleDetailChange = (rowIndex: number, fieldId: number, value: string) => {
-    setDetailRows((prev) => {
-      const copy = [...prev];
-      copy[rowIndex] = { ...copy[rowIndex], [fieldId]: value };
-      return copy;
-    });
-  };
-
-  const addDetailRow = () => {
-    setDetailRows((prev) => [...prev, {}]);
-  };
-
-  const removeDetailRow = (index: number) => {
-    if (detailRows.length <= 1) return;
-    setDetailRows((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
   const handleSave = async (isSubmit: boolean) => {
     if (!assignment) return;
 
@@ -227,128 +182,6 @@ export const ReportFill: React.FC = () => {
     }
   };
 
-  // ── Excel Import ──
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImporting(true);
-    try {
-      const { read, utils } = await import('xlsx');
-      const buffer = await file.arrayBuffer();
-      const workbook = read(buffer, { type: 'array' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawRows: string[][] = utils.sheet_to_json(worksheet, {
-        header: 1,
-        defval: '',
-      });
-
-      if (rawRows.length < 2) {
-        toast('Excel 文件数据不足，至少需要包含表头和一行数据', 'error');
-        return;
-      }
-
-      const headers = rawRows[0].map((h) => String(h).trim());
-      const dataRows = rawRows.slice(1).filter((r) =>
-        r.some((cell) => String(cell).trim() !== '')
-      );
-
-      if (dataRows.length === 0) {
-        toast('Excel 文件中未找到有效数据行', 'error');
-        return;
-      }
-
-      // 匹配表头与 detailFields
-      const mapping = headers.map((header) => {
-        const matched = detailFields.find((f) => {
-          const a = f.field_label.trim();
-          const b = header;
-          return a === b || a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
-        });
-        return {
-          excelHeader: header,
-          matchedFieldId: matched?.id ?? null,
-          fieldLabel: matched?.field_label ?? '',
-        };
-      });
-
-      setImportMapping(mapping);
-
-      // 构建所有导入行
-      const allRows: Array<Record<string, string>> = dataRows.map((row) => {
-        const obj: Record<string, string> = {};
-        mapping.forEach((m, idx) => {
-          if (m.matchedFieldId !== null) {
-            obj[m.matchedFieldId] = String(row[idx] ?? '');
-          }
-        });
-        return obj;
-      });
-
-      setImportAllRows(allRows);
-      setImportPreviewRows(allRows.slice(0, 5));
-      setImportModalOpen(true);
-    } catch (err: any) {
-      toast(err.message || 'Excel 解析失败', 'error');
-    } finally {
-      setImporting(false);
-      // reset file input
-      e.target.value = '';
-    }
-  };
-
-  const confirmImport = () => {
-    const matchedCount = importMapping.filter((m) => m.matchedFieldId !== null).length;
-    if (matchedCount === 0) {
-      toast('未找到匹配的字段，请检查 Excel 表头是否与字段名称一致', 'error');
-      return;
-    }
-
-    if (importMode === 'replace') {
-      setDetailRows(importAllRows);
-    } else {
-      setDetailRows((prev) => [...prev, ...importAllRows]);
-    }
-
-    setImportModalOpen(false);
-    setImportAllRows([]);
-    setImportPreviewRows([]);
-    setImportMapping([]);
-    toast(`成功导入 ${importAllRows.length} 行数据`, 'success');
-  };
-
-  const downloadTemplate = async () => {
-    if (detailFields.length === 0) {
-      toast('当前模板暂无明细字段，无法生成导入模板', 'error');
-      return;
-    }
-    try {
-      const { utils, writeFile } = await import('xlsx');
-      const headers = detailFields.map((f) => f.field_label);
-      // 生成一行示例数据提示
-      const sampleRow = detailFields.map((f) => {
-        const config =
-          typeof f.field_config === 'string'
-            ? JSON.parse(f.field_config || '{}')
-            : f.field_config || {};
-        if (f.field_type === 'date') return '2026-07-23';
-        if (f.field_type === 'number') return '100.5';
-        if (f.field_type === 'select') {
-          return (config.options || ['示例选项'])[0];
-        }
-        return '示例文本';
-      });
-      const aoa = [headers, sampleRow];
-      const worksheet = utils.aoa_to_sheet(aoa);
-      const workbook = utils.book_new();
-      utils.book_append_sheet(workbook, worksheet, '导入模板');
-      const safeName = (assignment?.title || '报表').replace(/[\\/:*?"<>|]/g, '_');
-      writeFile(workbook, `${safeName}_导入模板.xlsx`);
-    } catch (err: any) {
-      toast(err.message || '模板下载失败', 'error');
-    }
-  };
-
   if (loading || !assignment) {
     return (
       <div className="max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)]">
@@ -363,6 +196,12 @@ export const ReportFill: React.FC = () => {
 
   const isRejected = submission?.status === 'rejected' || submission?.status === 'returned';
 
+  // 区块序号：汇总 → 明细 → 交叉表
+  const detailSectionNum = summaryFields.length > 0 ? '二' : '一';
+  const matrixSectionNum = summaryFields.length > 0
+    ? (detailFields.length > 0 ? '三' : '二')
+    : (detailFields.length > 0 ? '二' : '一');
+
   // Status badge: muted pastel semantics (done=green / progress=blue / warn=red)
   const getStatusBadgeClass = (status?: string) => {
     if (status === 'approved' || status === 'completed' || status === 'signed') {
@@ -371,13 +210,6 @@ export const ReportFill: React.FC = () => {
     if (status === 'rejected' || status === 'returned') {
       return 'bg-[#FDEBEC] text-[#9F2F2D]';
     }
-    return 'bg-[#E1F3FE] text-[#1F6C9F]';
-  };
-
-  // Approval row badge by approval status
-  const getApprovalBadgeClass = (status?: string) => {
-    if (status === 'approved') return 'bg-[#EDF3EC] text-[#346538]';
-    if (status === 'rejected') return 'bg-[#FDEBEC] text-[#9F2F2D]';
     return 'bg-[#E1F3FE] text-[#1F6C9F]';
   };
 
@@ -424,27 +256,12 @@ export const ReportFill: React.FC = () => {
           </div>
 
           {!isReadOnly && (
-            <div className="flex items-center space-x-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleSave(false)}
-                disabled={saving || submitting}
-                className="h-11 px-5 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                <span>{saving ? '保存草稿中...' : '保存为草稿'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSave(true)}
-                disabled={saving || submitting}
-                className="h-11 px-5 bg-ink hover:bg-inkhover text-white font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5 disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-                <span>{submitting ? '提交中...' : '提交至下发部门'}</span>
-              </button>
-            </div>
+            <ReportActions
+              saving={saving}
+              submitting={submitting}
+              onSave={() => handleSave(false)}
+              onSubmit={() => handleSave(true)}
+            />
           )}
         </div>
       </div>
@@ -466,344 +283,32 @@ export const ReportFill: React.FC = () => {
         </div>
       )}
 
-      {/* Summary Form Section (汇总字段) */}
-      {summaryFields.length > 0 && (
-        <div
-          className="bg-white rounded-[12px] p-6 sm:p-7 space-y-5"
-          style={{ boxShadow: 'var(--sh-panel)' }}
-        >
-          <div
-            className="flex items-center justify-between pb-4"
-            style={{ borderBottom: '1px solid var(--hairline)' }}
-          >
-            <div className="flex items-center space-x-2.5">
-              <div className="p-1.5 bg-canvas text-ink rounded-[10px]">
-                <FileSpreadsheet className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-ink tracking-[-0.01em]">
-                  一、汇总指标数据 (Summary Data)
-                </h2>
-                <p className="text-[11px] text-mute mt-0.5">请按要求填写分公司整体汇总考核数据</p>
-              </div>
-            </div>
-          </div>
+      {/* 汇总字段表单区 */}
+      <SummaryForm
+        fields={summaryFields}
+        values={summaryForm}
+        isReadOnly={isReadOnly}
+        onChange={handleSummaryChange}
+      />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {summaryFields.map((field) => {
-              const val = summaryForm[field.id] || '';
-              const config =
-                typeof field.field_config === 'string'
-                  ? JSON.parse(field.field_config || '{}')
-                  : field.field_config || {};
+      {/* 明细数据表格区（含 Excel 导入/导出） */}
+      <DetailTable
+        fields={detailFields}
+        rows={detailRows}
+        isReadOnly={isReadOnly}
+        sectionNumber={detailSectionNum}
+        templateTitle={assignment.title}
+        onRowsChange={setDetailRows}
+      />
 
-              return (
-                <div key={field.id} className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-ink">
-                    {field.field_label}
-                    {config.required && <span className="text-[#9F2F2D] ml-1">*</span>}
-                  </label>
-
-                  {field.field_type === 'select' ? (
-                    <select
-                      disabled={isReadOnly}
-                      value={val}
-                      onChange={(e) => handleSummaryChange(field.id, e.target.value)}
-                      className="w-full h-11 px-3.5 bg-canvas rounded-[12px] text-xs text-ink focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60 disabled:text-mute"
-                    >
-                      <option value="">-- 请选择 --</option>
-                      {(config.options || []).map((opt: string) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  ) : field.field_type === 'textarea' ? (
-                    <textarea
-                      disabled={isReadOnly}
-                      rows={2}
-                      value={val}
-                      onChange={(e) => handleSummaryChange(field.id, e.target.value)}
-                      placeholder="请输入..."
-                      className="w-full px-3.5 py-2.5 bg-canvas rounded-[12px] text-xs text-ink placeholder:text-faint focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60 disabled:text-mute"
-                    />
-                  ) : (
-                    <input
-                      type={
-                        field.field_type === 'number'
-                          ? 'number'
-                          : field.field_type === 'date'
-                          ? 'date'
-                          : 'text'
-                      }
-                      disabled={isReadOnly}
-                      value={val}
-                      onChange={(e) => handleSummaryChange(field.id, e.target.value)}
-                      placeholder="请输入..."
-                      className={`w-full h-11 px-3.5 bg-canvas rounded-[12px] text-xs text-ink placeholder:text-faint focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60 disabled:text-mute ${
-                        field.field_type === 'number' ? 'tabular-nums' : ''
-                      }`}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 2. Detail Grid Section (明细字段) */}
-      {detailFields.length > 0 && (
-        <div
-          className="bg-white rounded-[12px] p-6 sm:p-7 space-y-5"
-          style={{ boxShadow: 'var(--sh-panel)' }}
-        >
-          <div
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4"
-            style={{ borderBottom: '1px solid var(--hairline)' }}
-          >
-            <div className="flex items-center space-x-2.5">
-              <div className="p-1.5 bg-canvas text-ink rounded-[10px]">
-                <CheckSquare className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-ink tracking-[-0.01em]">
-                  {summaryFields.length > 0 ? '二' : '一'}、明细清单填写 (Detail Rows)
-                </h2>
-                <p className="text-[11px] text-mute mt-0.5">支持多行表格展开添加，系统将自动对数值类型汇总计算</p>
-              </div>
-            </div>
-
-            {!isReadOnly && (
-              <div className="flex items-center space-x-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={downloadTemplate}
-                  className="h-9 px-3 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>下载模板</span>
-                </button>
-                <label className="h-9 px-3 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5 cursor-pointer">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{importing ? '解析中...' : '导入Excel'}</span>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={handleFileSelect}
-                    disabled={importing}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={addDetailRow}
-                  className="h-9 px-3 bg-ink hover:bg-inkhover text-white font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>添加一行明细</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div
-            className="overflow-x-auto rounded-[12px]"
-            style={{ border: '1px solid var(--hairline)' }}
-          >
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-canvas text-ink font-semibold">
-                  <th className="p-3 w-12 text-center tabular-nums">#</th>
-                  {detailFields.map((df) => (
-                    <th key={df.id} className="p-3 min-w-[140px]">
-                      {df.field_label}
-                    </th>
-                  ))}
-                  {!isReadOnly && <th className="p-3 w-16 text-center">操作</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {detailRows.map((row, rowIndex) => (
-                  <tr key={rowIndex} className="hover:bg-hoverbg">
-                    <td
-                      className="p-3 text-center text-mute font-mono font-semibold tabular-nums"
-                      style={{ borderTop: rowIndex === 0 ? 'none' : '1px solid var(--hairline)' }}
-                    >
-                      {rowIndex + 1}
-                    </td>
-
-                    {detailFields.map((df, dfIdx) => {
-                      const val = row[df.id] || '';
-                      const config =
-                        typeof df.field_config === 'string'
-                          ? JSON.parse(df.field_config || '{}')
-                          : df.field_config || {};
-
-                      return (
-                        <td
-                          key={df.id}
-                          className="p-2"
-                          style={{ borderTop: rowIndex === 0 && dfIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
-                        >
-                          {df.field_type === 'select' ? (
-                            <select
-                              disabled={isReadOnly}
-                              value={val}
-                              onChange={(e) => handleDetailChange(rowIndex, df.id, e.target.value)}
-                              className="w-full h-9 px-2.5 bg-canvas rounded-[10px] text-xs text-ink focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60"
-                            >
-                              <option value="">-- 选择 --</option>
-                              {(config.options || []).map((opt: string) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              type={df.field_type === 'number' ? 'number' : 'text'}
-                              disabled={isReadOnly}
-                              value={val}
-                              onChange={(e) => handleDetailChange(rowIndex, df.id, e.target.value)}
-                              placeholder="..."
-                              className={`w-full h-9 px-2.5 bg-canvas rounded-[10px] text-xs text-ink placeholder:text-faint focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none disabled:opacity-60 ${
-                                df.field_type === 'number' ? 'tabular-nums' : ''
-                              }`}
-                            />
-                          )}
-                        </td>
-                      );
-                    })}
-
-                    {!isReadOnly && (
-                      <td
-                        className="p-2 text-center"
-                        style={{ borderTop: rowIndex === 0 ? 'none' : '1px solid var(--hairline)' }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => removeDetailRow(rowIndex)}
-                          className="p-1.5 text-faint hover:text-[#9F2F2D] hover:bg-[#FDEBEC] rounded-full transition-colors"
-                          title="删除本行"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Matrix Cross-Tab Section (交叉表字段) */}
-      {matrixGroups.length > 0 && matrixGroups.map((group, groupIdx) => {
-        const sectionNum = summaryFields.length > 0 ? (detailFields.length > 0 ? '三' : '二') : (detailFields.length > 0 ? '二' : '一');
-        return (
-          <div
-            key={groupIdx}
-            className="bg-white rounded-[12px] p-6 sm:p-7 space-y-5"
-            style={{ boxShadow: 'var(--sh-panel)' }}
-          >
-            <div
-              className="flex items-center justify-between pb-4"
-              style={{ borderBottom: '1px solid var(--hairline)' }}
-            >
-              <div className="flex items-center space-x-2.5">
-                <div className="p-1.5 bg-canvas text-ink rounded-[10px]">
-                  <Grid3x3 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-ink tracking-[-0.01em]">
-                    {sectionNum}、{group.rowLabel}交叉表 (Cross-Tab)
-                  </h2>
-                  <p className="text-[11px] text-mute mt-0.5">固定行 × 动态列，数值列将自动合计</p>
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="overflow-x-auto rounded-[12px]"
-              style={{ border: '1px solid var(--hairline)' }}
-            >
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-canvas text-ink font-semibold">
-                    <th className="p-3 min-w-[120px]">{group.rowLabel}</th>
-                    {group.columns.map((col) => (
-                      <th key={col.id} className="p-3 min-w-[100px] text-center">{col.field_label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.rowOptions.map((rowOpt, rowIdx) => (
-                    <tr key={rowIdx} className="hover:bg-hoverbg">
-                      <td
-                        className="p-3 font-semibold text-ink"
-                        style={{ borderTop: rowIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
-                      >
-                        {rowOpt}
-                      </td>
-                      {group.columns.map((col, colIdx) => {
-                        const val = detailRows[rowIdx]?.[col.id] || '';
-                        const colType = col.field_type;
-                        return (
-                          <td
-                            key={col.id}
-                            className="p-2 text-center"
-                            style={{ borderTop: rowIdx === 0 && colIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
-                          >
-                            {isReadOnly ? (
-                              <span className="text-body font-mono tabular-nums">
-                                {val || <span className="text-line">—</span>}
-                              </span>
-                            ) : colType === 'select' ? (
-                              <select disabled={isReadOnly} value={val}
-                                onChange={(e) => handleMatrixChange(rowIdx, col.id, e.target.value)}
-                                className="w-full h-9 px-2.5 bg-canvas rounded-[10px] text-xs text-ink focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none">
-                                <option value="">-- 选择 --</option>
-                              </select>
-                            ) : (
-                              <input type={colType === 'number' ? 'number' : colType === 'date' ? 'date' : 'text'}
-                                disabled={isReadOnly} value={val}
-                                onChange={(e) => handleMatrixChange(rowIdx, col.id, e.target.value)}
-                                placeholder="..."
-                                className={`w-full h-9 px-2.5 bg-canvas rounded-[10px] text-xs text-center text-ink placeholder:text-faint focus:ring-1 focus:ring-ink focus:bg-white focus:outline-none ${
-                                  colType === 'number' ? 'tabular-nums' : ''
-                                }`} />
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-                {/* Summary row for number columns */}
-                {group.columns.some((c) => c.field_type === 'number') && (
-                  <tfoot>
-                    <tr className="bg-canvas font-bold text-ink">
-                      <td className="p-3" style={{ borderTop: '2px solid var(--hairline)' }}>合计</td>
-                      {group.columns.map((col) => {
-                        if (col.field_type !== 'number') {
-                          return <td key={col.id} className="p-3 text-center text-line" style={{ borderTop: '2px solid var(--hairline)' }}>—</td>;
-                        }
-                        const total = group.rowOptions.reduce((sum, _, idx) => {
-                          const v = detailRows[idx]?.[col.id];
-                          return v && !isNaN(Number(v)) ? sum + Number(v) : sum;
-                        }, 0);
-                        return <td key={col.id} className="p-3 text-center text-ink font-mono tabular-nums" style={{ borderTop: '2px solid var(--hairline)' }}>{total.toLocaleString()}</td>;
-                      })}
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </div>
-        );
-      })}
+      {/* 交叉表/矩阵数据区 */}
+      <CrossTable
+        groups={matrixGroups}
+        rows={detailRows}
+        isReadOnly={isReadOnly}
+        sectionNumber={matrixSectionNum}
+        onChange={handleMatrixChange}
+      />
 
       {/* Comment input */}
       {!isReadOnly && (
@@ -822,252 +327,8 @@ export const ReportFill: React.FC = () => {
         </div>
       )}
 
-      {/* 3. Approval Flow Records Tracker */}
-      {submission && submission.approvals && submission.approvals.length > 0 && (
-        <div
-          className="bg-white rounded-[12px] p-6 sm:p-7"
-          style={{ boxShadow: 'var(--sh-panel)' }}
-        >
-          <div
-            className="flex items-center justify-between pb-4"
-            style={{ borderBottom: '1px solid var(--hairline)' }}
-          >
-            <div className="flex items-center space-x-2.5">
-              <div className="p-1.5 bg-canvas text-ink rounded-[10px]">
-                <UserCheck className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-ink tracking-[-0.01em]">三级审批流程监控 (Approval History)</h2>
-                <p className="text-[11px] text-mute mt-0.5">经办提交 → 复核审核 → 审批终审</p>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            {submission.approvals.map((app, idx) => {
-              const levelNames: Record<string, string> = {
-                handler: '1. 经办人提交',
-                reviewer: '2. 复核人审核',
-                approver: '3. 审批人终审',
-              };
-
-              const isAppApproved = app.status === 'approved';
-              const isAppRejected = app.status === 'rejected';
-
-              return (
-                <div
-                  key={app.id || idx}
-                  className="apple-row px-1 py-4 flex items-start justify-between gap-3"
-                >
-                  <div className="space-y-1.5 min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-semibold text-ink tracking-[-0.01em]">
-                        {levelNames[app.approval_level]}
-                      </span>
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${getApprovalBadgeClass(app.status)}`}
-                      >
-                        {isAppApproved ? '通过' : isAppRejected ? '驳回' : '等候中'}
-                      </span>
-                    </div>
-
-                    <div className="text-xs text-mute">
-                      处理人: <span className="font-semibold text-ink">{app.approver_name}</span>
-                    </div>
-
-                    {app.comment && (
-                      <div
-                        className="text-xs text-body bg-canvas px-3 py-2 rounded-[10px]"
-                        style={{ border: '1px solid var(--hairline)' }}
-                      >
-                        "{app.comment}"
-                      </div>
-                    )}
-
-                    <div className="text-[10px] text-faint tabular-nums">{app.updated_at || app.created_at}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Excel Import Modal */}
-      {importModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.35)' }}
-        >
-          <div
-            className="bg-white rounded-[12px] max-w-4xl w-full max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-150"
-            style={{ boxShadow: 'var(--sh-overlay)' }}
-          >
-            {/* Modal Header */}
-            <div
-              className="flex items-center justify-between p-5 sm:p-6 shrink-0"
-              style={{ borderBottom: '1px solid var(--hairline)' }}
-            >
-              <div className="space-y-0.5">
-                <h2 className="text-base font-bold text-ink tracking-[-0.01em]">Excel 数据导入预览</h2>
-                <p className="text-[11px] text-mute">
-                  共识别到 <span className="tabular-nums">{importAllRows.length}</span> 行数据，以下展示前 <span className="tabular-nums">{importPreviewRows.length}</span> 行预览
-                </p>
-              </div>
-              <button
-                onClick={() => setImportModalOpen(false)}
-                className="text-faint hover:text-ink p-1 rounded-full hover:bg-canvas"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
-              {/* Field Mapping */}
-              <div className="space-y-2.5">
-                <h3 className="text-xs font-semibold text-ink">字段匹配结果</h3>
-                <div className="flex flex-wrap gap-2">
-                  {importMapping.map((m, idx) => (
-                    <span
-                      key={idx}
-                      className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${
-                        m.matchedFieldId !== null
-                          ? 'bg-line text-ink'
-                          : 'bg-canvas text-faint line-through'
-                      }`}
-                    >
-                      <span>Excel: {m.excelHeader}</span>
-                      {m.matchedFieldId !== null && (
-                        <>
-                          <span className="text-faint">→</span>
-                          <span>{m.fieldLabel}</span>
-                        </>
-                      )}
-                    </span>
-                  ))}
-                </div>
-                {importMapping.some((m) => m.matchedFieldId === null) && (
-                  <p className="text-[11px] text-[#9F2F2D]">
-                    部分 Excel 列未匹配到对应字段（灰色标记），这些数据将被忽略。
-                  </p>
-                )}
-              </div>
-
-              {/* Import Mode */}
-              <div className="flex items-center space-x-4 flex-wrap gap-y-2">
-                <span className="text-xs font-semibold text-ink">导入方式:</span>
-                <label className="flex items-center space-x-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="importMode"
-                    value="append"
-                    checked={importMode === 'append'}
-                    onChange={() => setImportMode('append')}
-                    className="accent-ink"
-                  />
-                  <span className="text-xs text-ink">追加到现有数据后</span>
-                </label>
-                <label className="flex items-center space-x-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="importMode"
-                    value="replace"
-                    checked={importMode === 'replace'}
-                    onChange={() => setImportMode('replace')}
-                    className="accent-ink"
-                  />
-                  <span className="text-xs text-ink">覆盖现有明细数据</span>
-                </label>
-              </div>
-
-              {/* Preview Table */}
-              <div
-                className="overflow-x-auto rounded-[12px]"
-                style={{ border: '1px solid var(--hairline)' }}
-              >
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-canvas text-ink font-semibold">
-                      <th className="p-2.5 w-10 text-center tabular-nums">#</th>
-                      {detailFields.map((df) => {
-                        const isMapped = importMapping.some((m) => m.matchedFieldId === df.id);
-                        return (
-                          <th
-                            key={df.id}
-                            className={`p-2.5 min-w-[120px] ${!isMapped ? 'text-faint' : ''}`}
-                          >
-                            {df.field_label}
-                            {!isMapped && (
-                              <span className="ml-1 text-[10px] text-faint">(未匹配)</span>
-                            )}
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {importPreviewRows.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-hoverbg">
-                        <td
-                          className="p-2.5 text-center text-mute font-mono tabular-nums"
-                          style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--hairline)' }}
-                        >
-                          {idx + 1}
-                        </td>
-                        {detailFields.map((df, dfIdx) => (
-                          <td
-                            key={df.id}
-                            className="p-2 text-body tabular-nums"
-                            style={{ borderTop: idx === 0 && dfIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
-                          >
-                            {row[df.id] || (
-                              <span className="text-line">—</span>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                    {importAllRows.length > importPreviewRows.length && (
-                      <tr>
-                        <td
-                          colSpan={detailFields.length + 1}
-                          className="p-2.5 text-center text-[11px] text-mute"
-                          style={{ borderTop: '1px solid var(--hairline)' }}
-                        >
-                          … 还有 <span className="tabular-nums">{importAllRows.length - importPreviewRows.length}</span> 行数据未展示 …
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div
-              className="p-5 sm:p-6 flex justify-end space-x-3 shrink-0"
-              style={{ borderTop: '1px solid var(--hairline)' }}
-            >
-              <button
-                type="button"
-                onClick={() => setImportModalOpen(false)}
-                className="h-11 px-5 bg-canvas hover:bg-line text-ink font-semibold text-xs rounded-md transition-colors"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={confirmImport}
-                disabled={importMapping.filter((m) => m.matchedFieldId !== null).length === 0}
-                className="h-11 px-5 bg-ink hover:bg-inkhover text-white font-semibold text-xs rounded-md transition-colors disabled:opacity-50"
-              >
-                确认导入 (<span className="tabular-nums">{importAllRows.length}</span> 行)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 审批流程时间线 */}
+      {submission && <ApprovalTimeline approvals={submission.approvals} />}
     </div>
   );
 };

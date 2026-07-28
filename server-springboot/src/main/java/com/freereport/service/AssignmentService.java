@@ -65,6 +65,32 @@ public class AssignmentService {
     public List<Map<String, Object>> getAssignmentsForUser(AuthUser user) {
         List<ReportAssignment> assignments = assignmentMapper.findForUser(
                 user.getCompanyId(), user.getRole(), user.getCompanyLevel());
+        return enrichAssignments(assignments);
+    }
+
+    /**
+     * 分页返回当前用户的下发任务列表：{ data, total, page, size }。
+     */
+    public Map<String, Object> getAssignmentsForUserPaged(AuthUser user, int page, int size) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        long total = assignmentMapper.countForUser(
+                user.getCompanyId(), user.getRole(), user.getCompanyLevel());
+        List<ReportAssignment> assignments = total == 0 ? Collections.emptyList()
+                : assignmentMapper.findForUserPaged(user.getCompanyId(), user.getRole(), user.getCompanyLevel(),
+                        safeSize, (safePage - 1) * safeSize);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("data", enrichAssignments(assignments));
+        result.put("total", total);
+        result.put("page", safePage);
+        result.put("size", safeSize);
+        return result;
+    }
+
+    /**
+     * 批量补充 template_name、company_name、issuer_department_name、assigned_by_name、最新提交信息，避免 N+1。
+     */
+    private List<Map<String, Object>> enrichAssignments(List<ReportAssignment> assignments) {
         if (assignments.isEmpty()) {
             return new ArrayList<>();
         }

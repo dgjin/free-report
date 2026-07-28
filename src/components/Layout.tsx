@@ -14,11 +14,13 @@ import {
   X,
   RefreshCw,
   Shield,
+  HelpCircle,
 } from './icons';
 import { api, getStoredUser, removeToken } from '../services/api';
 import { toast } from '../utils/toast';
 import { useRevealObserver } from '../utils/reveal';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { HelpDrawer } from './HelpDrawer';
 import { UserInfo } from '../types';
 import { getClientAccess } from '../utils/access';
 import { mutate } from 'swr';
@@ -29,6 +31,7 @@ export const Layout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [accountSwitchOpen, setAccountSwitchOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
+  const [helpOpen, setHelpOpen] = useState<boolean>(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -46,7 +49,10 @@ export const Layout: React.FC = () => {
     try {
       const res = await api.getMe();
       setUser(res.user);
-      if (res.user.company_level === 'branch') {
+      if (res.user.role === 'digital_admin') {
+        const pendingTemplates = await api.getPendingTemplateApprovals();
+        setPendingCount(pendingTemplates.length);
+      } else if (res.user.company_level === 'branch') {
         const pending = await api.getPendingApprovals();
         setPendingCount(pending.length);
       }
@@ -92,6 +98,7 @@ export const Layout: React.FC = () => {
     handler: '经办人',
     reviewer: '复核人',
     approver: '审批人',
+    digital_admin: '数智化转型办公室',
   };
 
   const quickAccounts = import.meta.env.DEV ? [
@@ -99,6 +106,7 @@ export const Layout: React.FC = () => {
     { username: 'hq_admin', label: '报表管理员', company: '业务综合管理部' },
     { username: 'office_admin', label: '报表管理员', company: '办公室' },
     { username: 'risk_admin', label: '报表管理员', company: '风险管理部' },
+    { username: 'digital_admin', label: '模板审批', company: '数智化转型办公室' },
     { username: 'bj_handler', label: '经办人', company: '北京分公司' },
     { username: 'bj_reviewer', label: '复核人', company: '北京分公司' },
     { username: 'bj_approver', label: '审批人', company: '北京分公司' },
@@ -150,6 +158,13 @@ export const Layout: React.FC = () => {
 
           {/* Right Profile & Quick Switcher */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setHelpOpen(true)}
+              className="p-2 rounded-full text-mute hover:text-ink hover:bg-canvas transition-colors"
+              title="使用帮助"
+            >
+              <HelpCircle className="w-[18px] h-[18px]" />
+            </button>
             <ThemeSwitcher />
             {/* Quick Switch Demo Button */}
             {import.meta.env.DEV && (
@@ -291,6 +306,30 @@ export const Layout: React.FC = () => {
                 </>
               )}
 
+              {/* Digital Admin Routes */}
+              {access?.isDigitalAdmin && (
+                <>
+                  <Link to="/approvals" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/approvals') || location.pathname.startsWith('/template-approvals'))}>
+                    <div className="flex items-center gap-3">
+                      <CheckSquare className={navIconClass(location.pathname.startsWith('/approvals') || location.pathname.startsWith('/template-approvals'))} />
+                      <span>审批中心</span>
+                    </div>
+                    {pendingCount > 0 && (
+                      <span className="text-[#9F2F2D] bg-[#FDEBEC] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </Link>
+
+                  <Link to="/templates" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/templates'))}>
+                    <div className="flex items-center gap-3">
+                      <FileSpreadsheet className={navIconClass(location.pathname.startsWith('/templates'))} />
+                      <span>模板管理</span>
+                    </div>
+                  </Link>
+                </>
+              )}
+
               {access?.canManageOrganizations && (
                 <Link to="/organizations" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/organizations'))}>
                   <div className="flex items-center gap-3">
@@ -310,7 +349,7 @@ export const Layout: React.FC = () => {
               )}
 
               {/* Branch Specific Routes */}
-              {!isHQ && !access?.isSuperAdmin && (
+              {!isHQ && !access?.isSuperAdmin && !access?.isDigitalAdmin && (
                 <>
                   <Link to="/fill" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/fill'))}>
                     <div className="flex items-center gap-3">
@@ -356,6 +395,9 @@ export const Layout: React.FC = () => {
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
+
+      {/* Help drawer — 顶部栏固定入口，全页面可用 */}
+      <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} user={user} />
     </div>
   );
 };

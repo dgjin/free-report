@@ -14,10 +14,12 @@ import {
 import { api, getStoredUser } from '../services/api';
 import { PendingApprovalTask, ReportSubmissionDetail, UserInfo } from '../types';
 import { SubmissionDetailTables } from '../components/SubmissionDetailTables';
+import { TemplateApprovalPanel } from './TemplateApprovalList';
 
 export const ApprovalList: React.FC = () => {
   const [pendingTasks, setPendingTasks] = useState<PendingApprovalTask[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [templateCount, setTemplateCount] = useState<number>(0);
 
   // Review Modal State
   const [selectedTask, setSelectedTask] = useState<PendingApprovalTask | null>(null);
@@ -30,13 +32,22 @@ export const ApprovalList: React.FC = () => {
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  const isDigitalAdmin = user?.role === 'digital_admin';
+  const [activeTab, setActiveTab] = useState<'submissions' | 'templates'>(
+    getStoredUser()?.role === 'digital_admin' ? 'templates' : 'submissions'
+  );
+
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
   useEffect(() => {
-    loadPendingTasks();
+    if (!isDigitalAdmin) {
+      loadPendingTasks();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const loadPendingTasks = async () => {
@@ -98,20 +109,51 @@ export const ApprovalList: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="t-serif text-[32px] text-ink">
-            三级审批中心
+            审批中心
           </h1>
           <p className="text-sm text-mute mt-1.5 tracking-[-0.01em] max-w-xl">
-            作为分公司复核人或审批人，核查填报数据的完整性与准确性，进行终审或退回修正。
+            {isDigitalAdmin
+              ? '审核各部门提交的报表模板，审批通过后模板发布并可下发至各分公司。'
+              : '作为分公司复核人或审批人，核查填报数据的完整性与准确性，进行终审或退回修正。'}
           </p>
         </div>
 
         <div className="px-3.5 py-1.5 bg-[rgba(17,17,17,0.08)] text-ink rounded-full text-xs font-medium shrink-0 tabular-nums">
-          待您处理任务: {pendingTasks.length} 件
+          待您处理任务: {activeTab === 'templates' ? templateCount : pendingTasks.length} 件
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-1 p-1 bg-canvas rounded-full w-fit" style={{ border: '1px solid var(--hairline)' }}>
+        {!isDigitalAdmin && (
+          <button
+            onClick={() => setActiveTab('submissions')}
+            className={`h-8 px-4 rounded-full text-[13px] font-medium transition-colors ${
+              activeTab === 'submissions' ? 'bg-ink text-white' : 'text-mute hover:text-ink'
+            }`}
+          >
+            填报审批
+          </button>
+        )}
+        {isDigitalAdmin && (
+          <button
+            onClick={() => setActiveTab('templates')}
+            className={`h-8 px-4 rounded-full text-[13px] font-medium transition-colors ${
+              activeTab === 'templates' ? 'bg-ink text-white' : 'text-mute hover:text-ink'
+            }`}
+          >
+            模板审批
+          </button>
+        )}
+      </div>
+
+      {/* Template Approval Tab */}
+      {activeTab === 'templates' && isDigitalAdmin && (
+        <TemplateApprovalPanel onCountChange={setTemplateCount} />
+      )}
+
       {/* Task List — unified panel with hairline dividers */}
-      {loading ? (
+      {activeTab === 'submissions' && (loading ? (
         <div className="py-16 text-center text-sm text-mute">正在获取审批列表...</div>
       ) : pendingTasks.length === 0 ? (
         <div className="bg-white rounded-[12px] py-16 text-center" style={{ boxShadow: 'var(--sh-card)' }}>
@@ -164,7 +206,7 @@ export const ApprovalList: React.FC = () => {
             </div>
           ))}
         </div>
-      )}
+      ))}
 
       {/* Review & Approve Modal */}
       {selectedTask && (

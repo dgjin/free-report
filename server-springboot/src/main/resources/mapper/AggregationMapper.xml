@@ -3,15 +3,40 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.freereport.mapper.AggregationMapper">
 
-    <!-- 聚合指定任务下所有数值字段 -->
+    <!-- 聚合指定任务下所有数值字段（使用 numeric_value 冗余列，免逐行 CAST） -->
     <select id="sumNumericFieldsByAssignment" resultType="java.util.Map">
-        SELECT f.field_name, SUM(CAST(d.value AS DECIMAL(30,6))) AS total
+        SELECT f.field_name, SUM(d.numeric_value) AS total
         FROM report_submissions s
         JOIN report_submission_data d ON d.submission_id = s.id
         JOIN report_template_fields f ON f.id = d.field_id
         WHERE s.assignment_id = #{assignmentId}
           AND s.status IN ('pending_receipt', 'received')
           AND f.field_type = 'number'
+        GROUP BY f.field_name
+    </select>
+
+    <!-- 按模板 + 周期聚合 summary 区数值字段（SQL 下沉汇总） -->
+    <select id="sumNumericFieldsByTemplateAndPeriod" resultType="java.util.Map">
+        SELECT f.field_name AS fieldName,
+               SUM(d.numeric_value) AS total,
+               COUNT(DISTINCT s.id) AS cnt
+        FROM report_submission_data d
+        JOIN report_submissions s ON d.submission_id = s.id
+        JOIN report_template_fields f ON f.id = d.field_id
+        JOIN report_assignments a ON s.assignment_id = a.id
+        INNER JOIN (
+            SELECT assignment_id, MAX(version) AS max_version
+            FROM report_submissions
+            WHERE status IN ('pending_receipt', 'received')
+            GROUP BY assignment_id
+        ) latest ON s.assignment_id = latest.assignment_id AND s.version = latest.max_version
+        WHERE a.template_id = #{templateId}
+          AND a.period_label = #{periodLabel}
+          AND s.status IN ('pending_receipt', 'received')
+          AND f.field_type = 'number'
+          AND f.data_type = 'summary'
+          AND f.status = 'active'
+          AND d.row_index = 0
         GROUP BY f.field_name
     </select>
 

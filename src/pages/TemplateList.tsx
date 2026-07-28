@@ -14,16 +14,24 @@ import {
   ListPlus,
   Power,
   RotateCcw,
+  ChevronLeft,
+  ChevronRight,
 } from '../components/icons';
-import { api, useTemplates, useAssignmentTargets } from '../services/api';
+import { api, useTemplatesPaged, useAssignmentTargets, getStoredUser } from '../services/api';
 import { toast, confirmDialog } from '../utils/toast';
 import { ReportTemplate } from '../types';
 import { getInitialTemplateFields } from '../utils/templateFields';
 import { getTemplateLifecycleView } from '../utils/templateLifecycle';
 import { mutate } from 'swr';
 
+const PAGE_SIZE = 20;
+
 export const TemplateList: React.FC = () => {
-  const { data: templates = [], isLoading: loading, mutate: reloadTemplates } = useTemplates();
+  const [page, setPage] = useState(1);
+  const { data: pagedData, isLoading: loading, mutate: reloadTemplates } = useTemplatesPaged(page, PAGE_SIZE);
+  const templates = pagedData?.data ?? [];
+  const total = pagedData?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const { data: branches = [] } = useAssignmentTargets();
 
   // Modals state
@@ -47,6 +55,7 @@ export const TemplateList: React.FC = () => {
   const lifecycleActionIdRef = useRef<number | null>(null);
 
   const navigate = useNavigate();
+  const currentUser = getStoredUser();
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,6 +122,17 @@ export const TemplateList: React.FC = () => {
       setSelectedBranchIds(selectedBranchIds.filter((bId) => bId !== id));
     } else {
       setSelectedBranchIds([...selectedBranchIds, id]);
+    }
+  };
+
+  const handleSubmitApproval = async (t: ReportTemplate) => {
+    if (!(await confirmDialog('提交后模板将进入审批流程，审批通过前不能编辑或下发。确认提交？'))) return;
+    try {
+      const res = await api.submitTemplateForApproval(t.id);
+      toast(res.message, 'success');
+      await reloadTemplates();
+    } catch (err: any) {
+      toast(err.message || '提交审批失败', 'error');
     }
   };
 
@@ -191,11 +211,13 @@ export const TemplateList: React.FC = () => {
                       </span>
                       <span
                         className={`px-2.5 py-1 text-[11px] font-medium rounded-full ${
-                          lifecycle.isArchived
-                            ? 'text-mute bg-line'
-                            : lifecycle.canWrite
-                              ? 'text-ink bg-line'
-                              : 'text-mute bg-line'
+                          t.status === 'pending_approval'
+                            ? 'text-[#956400] bg-[#FBF3DB]'
+                            : lifecycle.isArchived
+                              ? 'text-mute bg-line'
+                              : lifecycle.canWrite
+                                ? 'text-ink bg-line'
+                                : 'text-mute bg-line'
                         }`}
                       >
                         {lifecycle.statusLabel}
@@ -227,9 +249,19 @@ export const TemplateList: React.FC = () => {
                       <span>设计字段</span>
                     </button>
 
+                    {lifecycle.canSubmitApproval && (
+                      <button
+                        onClick={() => handleSubmitApproval(t)}
+                        className="h-9 px-4 bg-[#1F6C9F] hover:bg-[#1a5a85] text-white font-medium text-xs rounded-md transition-colors flex items-center gap-1.5"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span>提交审批</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => openAssignModal(t)}
-                      disabled={!lifecycle.canWrite}
+                      disabled={!lifecycle.canAssign}
                       className="h-9 px-4 bg-ink hover:bg-inkhover text-white font-medium text-xs rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Send className="w-3.5 h-3.5" />
@@ -256,6 +288,33 @@ export const TemplateList: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && total > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-mute tabular-nums">
+            共 {total} 个模板 · 第 {page} / {totalPages} 页
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              aria-label="上一页"
+              className="h-8 w-8 bg-white border border-line rounded-md text-ink flex items-center justify-center transition-colors hover:bg-hoverbg disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              aria-label="下一页"
+              className="h-8 w-8 bg-white border border-line rounded-md text-ink flex items-center justify-center transition-colors hover:bg-hoverbg disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       )}
 

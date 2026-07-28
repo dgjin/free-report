@@ -2,6 +2,7 @@ package com.freereport.mapper;
 
 import com.freereport.entity.ReportTemplate;
 import com.freereport.entity.ReportTemplateField;
+import com.freereport.entity.TemplateApproval;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -44,6 +45,22 @@ public interface TemplateMapper {
     List<ReportTemplate> findForUser(@Param("companyId") Long companyId,
                                      @Param("role") String role,
                                      @Param("companyLevel") String companyLevel);
+
+    /**
+     * 根据用户角色过滤分页查询模板（LIMIT/OFFSET）。
+     */
+    List<ReportTemplate> findForUserPaged(@Param("companyId") Long companyId,
+                                          @Param("role") String role,
+                                          @Param("companyLevel") String companyLevel,
+                                          @Param("limit") int limit,
+                                          @Param("offset") int offset);
+
+    /**
+     * 根据用户角色过滤统计模板总数（与 findForUser 相同过滤条件）。
+     */
+    long countForUser(@Param("companyId") Long companyId,
+                      @Param("role") String role,
+                      @Param("companyLevel") String companyLevel);
 
     /**
      * 插入模板，返回生成 ID。
@@ -100,4 +117,29 @@ public interface TemplateMapper {
      * 查询模板下最大 sort_order。
      */
     Integer findMaxSortOrder(@Param("templateId") Long templateId);
+
+    // ---- 模板审批 ----
+
+    /**
+     * 插入模板审批记录。
+     */
+    long insertTemplateApproval(TemplateApproval approval);
+
+    /**
+     * 查询模板的最新审批记录。
+     */
+    TemplateApproval findLatestApprovalByTemplateId(@Param("templateId") Long templateId);
+
+    /**
+     * 查询所有待审批的模板审批记录（含模板名称、部门名称、提交人名称）。
+     */
+    List<TemplateApproval> findPendingApprovals();
+
+    /**
+     * 更新审批记录状态。
+     */
+    int updateApprovalStatus(@Param("id") Long id,
+                              @Param("status") String status,
+                              @Param("reviewedBy") Long reviewedBy,
+                              @Param("comment") String comment);
 }

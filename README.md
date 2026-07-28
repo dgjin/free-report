@@ -69,9 +69,12 @@ mysql -u freereport -p freereport < sql/004_department_reporting.sql
 mysql -u freereport -p freereport < sql/005_department_admin_backfill.sql
 mysql -u freereport -p freereport < sql/006_performance_indexes.sql
 mysql -u freereport -p freereport < sql/007_recall_and_onetime.sql
+mysql -u freereport -p freereport < sql/008_template_approval.sql
 ```
 
 所有演示账号初始密码为 `123456`。正式使用前必须修改或删除演示账号。
+
+模板审批流程：部门报表管理员创建模板后为草稿状态，需提交数智化转型办公室（演示账号 `digital_admin`）审批，通过发布后方可下发填报任务。
 
 ## 3. 启动
 

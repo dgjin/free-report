@@ -41,6 +41,22 @@ public interface AssignmentMapper {
                                        @Param("companyLevel") String companyLevel);
 
     /**
+     * 根据用户过滤分页查询下发任务（LIMIT/OFFSET）。
+     */
+    List<ReportAssignment> findForUserPaged(@Param("companyId") Long companyId,
+                                            @Param("role") String role,
+                                            @Param("companyLevel") String companyLevel,
+                                            @Param("limit") int limit,
+                                            @Param("offset") int offset);
+
+    /**
+     * 根据用户过滤统计下发任务总数（与 findForUser 相同过滤条件）。
+     */
+    long countForUser(@Param("companyId") Long companyId,
+                      @Param("role") String role,
+                      @Param("companyLevel") String companyLevel);
+
+    /**
      * 根据模板和周期查询下发任务。
      */
     List<ReportAssignment> findByTemplateAndPeriod(@Param("templateId") Long templateId,

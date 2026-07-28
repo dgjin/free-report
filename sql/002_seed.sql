@@ -6,7 +6,8 @@ INSERT IGNORE INTO companies (id,name,code,parent_id,level,address,contact,phone
 (5,'办公室','HQ-OFFICE',1,'department',NULL,NULL,NULL,'active'),
 (6,'业务综合管理部','HQ-BUSINESS',1,'department',NULL,NULL,NULL,'active'),
 (7,'计划财务部','HQ-FINANCE',1,'department',NULL,NULL,NULL,'active'),
-(8,'风险管理部','HQ-RISK',1,'department',NULL,NULL,NULL,'active');
+(8,'风险管理部','HQ-RISK',1,'department',NULL,NULL,NULL,'active'),
+(9,'数智化转型办公室','HQ-DIGITAL',1,'department',NULL,NULL,NULL,'active');
 
 INSERT IGNORE INTO users (id,username,password_hash,display_name,company_id,role,status) VALUES
 (1,'admin','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','超级管理员',1,'super_admin','active'),
@@ -22,7 +23,8 @@ INSERT IGNORE INTO users (id,username,password_hash,display_name,company_id,role
 (11,'gz_approver','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','广州审批人',4,'approver','active'),
 (12,'hq_handler','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','业务综合管理部经办人',6,'handler','active'),
 (13,'office_admin','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','办公室报表管理员',5,'department_report_admin','active'),
-(14,'risk_admin','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','风险管理部报表管理员',8,'department_report_admin','active');
+(14,'risk_admin','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','风险管理部报表管理员',8,'department_report_admin','active'),
+(15,'digital_admin','$2b$10$GAr.BW5jLQH7lJZfS5sLW.C.Fl3mhWWAMJyfoDk0Uj2p02HJpyOlu','数智化转型办公室管理员',9,'digital_admin','active');
 
 INSERT IGNORE INTO report_templates (id,name,description,period_type,status,created_by,owner_department_id) VALUES
 (1,'月度销售与经营报表','汇总各分公司月度销售收入、利润及核心产品销售明细','monthly','published',2,6),

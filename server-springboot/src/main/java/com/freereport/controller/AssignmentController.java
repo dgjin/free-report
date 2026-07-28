@@ -22,9 +22,16 @@ public class AssignmentController {
         this.securityUtils = securityUtils;
     }
 
+    /**
+     * 下发任务列表：传 page/size 时返回分页封装 { data, total, page, size }，否则返回完整数组（兼容旧调用）。
+     */
     @GetMapping
-    public List<Map<String, Object>> listAssignments() {
+    public Object listAssignments(@RequestParam(required = false) Integer page,
+                                  @RequestParam(required = false) Integer size) {
         AuthUser user = securityUtils.getCurrentUser();
+        if (page != null && size != null) {
+            return assignmentService.getAssignmentsForUserPaged(user, page, size);
+        }
         return assignmentService.getAssignmentsForUser(user);
     }
 

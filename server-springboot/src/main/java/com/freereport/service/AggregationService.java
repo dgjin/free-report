@@ -130,10 +130,6 @@ public class AggregationService {
     
         // 构建 company_data 行
         List<Map<String, Object>> companyData = new ArrayList<>();
-        Map<String, Double> sumMap = new LinkedHashMap<>();
-        for (ReportTemplateField nf : numericFields) {
-            sumMap.put(nf.getFieldName(), 0.0);
-        }
         int submittedCount = 0;
         for (ReportAssignment a : assignments) {
             Map<String, Object> row = new LinkedHashMap<>();
@@ -157,7 +153,6 @@ public class AggregationService {
                 for (ReportTemplateField nf : numericFields) {
                     double num = parseDouble(submissionValues.get(nf.getId()));
                     values.put(nf.getFieldName(), String.valueOf(num));
-                    sumMap.merge(nf.getFieldName(), num, Double::sum);
                 }
                 for (ReportTemplateField tf : summaryFields) {
                     if (!"number".equals(tf.getFieldType())) {
@@ -170,9 +165,19 @@ public class AggregationService {
         }
     
         // summary: { field_name: { total, count, average } }
+        // total 由 SQL 下沉聚合（仅统计各任务最新已审批提交的 row_index=0 数据），替代 Java 循环累加；
+        // count/average 语义保持不变：缺失值按 0 计入平均。
+        Map<String, Double> sqlTotals = new HashMap<>();
+        if (!numericFields.isEmpty()) {
+            List<Map<String, Object>> aggRows =
+                    aggregationMapper.sumNumericFieldsByTemplateAndPeriod(templateId, periodLabel);
+            for (Map<String, Object> aggRow : aggRows) {
+                sqlTotals.put((String) aggRow.get("fieldName"), parseDouble(aggRow.get("total")));
+            }
+        }
         Map<String, Object> summary = new LinkedHashMap<>();
         for (ReportTemplateField nf : numericFields) {
-            double total = sumMap.getOrDefault(nf.getFieldName(), 0.0);
+            double total = sqlTotals.getOrDefault(nf.getFieldName(), 0.0);
             summary.put(nf.getFieldName(), Map.of(
                     "total", total,
                     "count", submittedCount,

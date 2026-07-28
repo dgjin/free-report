@@ -10,6 +10,8 @@ test('archived template view disables writes and offers enable', async () => {
     actionLabel: '重新启用',
     canWrite: false,
     canTransition: true,
+    canAssign: false,
+    canSubmitApproval: false,
     readOnlyMessage: '该报表模板已停用，字段配置为只读；历史任务和数据仍可正常查看与处理。',
   });
 });
@@ -22,21 +24,39 @@ test('published template view enables writes and offers disable', async () => {
     actionLabel: '停用',
     canWrite: true,
     canTransition: true,
+    canAssign: true,
+    canSubmitApproval: false,
     readOnlyMessage: null,
   };
 
   assert.deepEqual(getTemplateLifecycleView('published'), expected);
 });
 
-test('draft template view is read only and has no lifecycle action', async () => {
+test('draft template view is writable and can be submitted for approval', async () => {
   const { getTemplateLifecycleView } = await import('../src/utils/templateLifecycle');
   assert.deepEqual(getTemplateLifecycleView('draft'), {
     isArchived: false,
     statusLabel: '草稿',
     actionLabel: null,
+    canWrite: true,
+    canTransition: false,
+    canAssign: false,
+    canSubmitApproval: true,
+    readOnlyMessage: null,
+  });
+});
+
+test('pending approval template view is read only with approval notice', async () => {
+  const { getTemplateLifecycleView } = await import('../src/utils/templateLifecycle');
+  assert.deepEqual(getTemplateLifecycleView('pending_approval'), {
+    isArchived: false,
+    statusLabel: '待审批',
+    actionLabel: null,
     canWrite: false,
     canTransition: false,
-    readOnlyMessage: '草稿模板当前只读，尚未配置发布工作流。',
+    canAssign: false,
+    canSubmitApproval: false,
+    readOnlyMessage: '模板已提交数智化转型办公室审批，审批通过后可下发。',
   });
 });
 
@@ -81,9 +101,10 @@ test('template cards expose lifecycle status and guarded lifecycle actions', () 
   assert.match(source, /getTemplateLifecycleView\(t\.status\)/);
   assert.match(source, /\{lifecycle\.statusLabel\}/);
   assert.match(source, /\{lifecycle\.actionLabel\}/);
-  assert.match(source, /disabled=\{!lifecycle\.canWrite\}/);
+  assert.match(source, /disabled=\{!lifecycle\.canAssign\}/);
+  assert.match(source, /\{lifecycle\.canSubmitApproval && \(/);
   assert.match(source, /lifecycle\.isArchived \? api\.enableTemplate\(t\.id\) : api\.disableTemplate\(t\.id\)/);
-  assert.match(source, /confirm\('停用后不能编辑或新下发，历史任务和数据不受影响。确认停用？'\)/);
+  assert.match(source, /confirmDialog\('停用后不能编辑或新下发，历史任务和数据不受影响。确认停用？'\)/);
   assert.match(source, /if \(lifecycleActionIdRef\.current !== null \|\| !lifecycle\.canTransition\) return/);
   assert.match(source, /\{lifecycle\.canTransition && \(/);
   assert.match(source, /disabled=\{lifecycleActionId !== null\}/);

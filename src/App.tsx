@@ -1,9 +1,10 @@
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { getToken } from './services/api';
 import { ToastHost } from './utils/toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const TemplateList = lazy(() => import('./pages/TemplateList').then((m) => ({ default: m.TemplateList })));
@@ -21,6 +22,16 @@ const PageFallback = () => (
   </div>
 );
 
+const UnauthorizedHandler: React.FC = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const handler = () => navigate('/login');
+    window.addEventListener('auth:unauthorized', handler);
+    return () => window.removeEventListener('auth:unauthorized', handler);
+  }, [navigate]);
+  return null;
+};
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const token = getToken();
   if (!token) {
@@ -32,6 +43,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 export default function App() {
   return (
     <BrowserRouter>
+      <UnauthorizedHandler />
       <Suspense fallback={<PageFallback />}>
         <Routes>
           {/* Public Login Route */}
@@ -46,16 +58,17 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="templates" element={<TemplateList />} />
-            <Route path="templates/:id" element={<TemplateEditor />} />
-            <Route path="assignments" element={<AssignmentList />} />
-            <Route path="fill" element={<AssignmentList />} />
-            <Route path="fill/:assignmentId" element={<ReportFill />} />
-            <Route path="approvals" element={<ApprovalList />} />
-            <Route path="aggregation" element={<AggregationView />} />
-            <Route path="organizations" element={<OrganizationManagement />} />
-            <Route path="global-view" element={<GlobalReadOnlyView />} />
+            <Route index element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+            <Route path="templates" element={<ErrorBoundary><TemplateList /></ErrorBoundary>} />
+            <Route path="templates/:id" element={<ErrorBoundary><TemplateEditor /></ErrorBoundary>} />
+            <Route path="assignments" element={<ErrorBoundary><AssignmentList /></ErrorBoundary>} />
+            <Route path="fill" element={<ErrorBoundary><AssignmentList /></ErrorBoundary>} />
+            <Route path="fill/:assignmentId" element={<ErrorBoundary><ReportFill /></ErrorBoundary>} />
+            <Route path="approvals" element={<ErrorBoundary><ApprovalList /></ErrorBoundary>} />
+            <Route path="aggregation" element={<ErrorBoundary><AggregationView /></ErrorBoundary>} />
+            <Route path="organizations" element={<ErrorBoundary><OrganizationManagement /></ErrorBoundary>} />
+            <Route path="global-view" element={<ErrorBoundary><GlobalReadOnlyView /></ErrorBoundary>} />
+            <Route path="template-approvals" element={<Navigate to="/approvals" replace />} />
           </Route>
 
           {/* Fallback */}

@@ -5,6 +5,7 @@ import com.freereport.entity.Company;
 import com.freereport.entity.ReportAssignment;
 import com.freereport.entity.ReportTemplate;
 import com.freereport.entity.ReportTemplateField;
+import com.freereport.entity.TemplateApproval;
 import com.freereport.entity.User;
 import com.freereport.exception.DomainException;
 import com.freereport.mapper.AssignmentMapper;
@@ -53,6 +54,32 @@ public class TemplateService {
     public List<Map<String, Object>> getTemplatesForUser(AuthUser user) {
         List<ReportTemplate> templates = templateMapper.findForUser(
                 user.getCompanyId(), user.getRole(), user.getCompanyLevel());
+        return enrichTemplates(templates);
+    }
+
+    /**
+     * 分页返回当前用户可见的模板列表：{ data, total, page, size }。
+     */
+    public Map<String, Object> getTemplatesForUserPaged(AuthUser user, int page, int size) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        long total = templateMapper.countForUser(
+                user.getCompanyId(), user.getRole(), user.getCompanyLevel());
+        List<ReportTemplate> templates = total == 0 ? Collections.emptyList()
+                : templateMapper.findForUserPaged(user.getCompanyId(), user.getRole(), user.getCompanyLevel(),
+                        safeSize, (safePage - 1) * safeSize);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("data", enrichTemplates(templates));
+        result.put("total", total);
+        result.put("page", safePage);
+        result.put("size", safeSize);
+        return result;
+    }
+
+    /**
+     * 批量补充 field_count、assignment_count、created_by_name，避免 N+1。
+     */
+    private List<Map<String, Object>> enrichTemplates(List<ReportTemplate> templates) {
         if (templates.isEmpty()) {
             return new ArrayList<>();
         }
@@ -116,8 +143,8 @@ public class TemplateService {
         t.setName(name);
         t.setDescription(description != null ? description : "");
         t.setPeriodType(periodType);
-        // 创建即为已发布状态：当前无“发布草稿”入口，draft 无生命周期出口
-        t.setStatus("published");
+        // 创建即为草稿状态：需提交数智化转型办公室审批后才能发布下发
+        t.setStatus("draft");
         t.setCreatedBy(user.getId());
         t.setOwnerDepartmentId(user.getCompanyId());
         templateMapper.insertTemplate(t);
@@ -286,7 +313,7 @@ public class TemplateService {
 
     /**
      * 下发模板到目标公司：
-     * - 验证模板可写、目标公司有效、不能向本部门下发
+     * - 验证模板已发布（通过审批）、目标公司有效、不能向本部门下发
      * - 一次性下发：period_label 追加时间戳后缀，用 INSERT
      * - 常规下发：用 INSERT IGNORE 去重
      */
@@ -295,6 +322,7 @@ public class TemplateService {
                                               String title, String periodLabel, LocalDate deadline,
                                               boolean isOneTime) {
         ReportTemplate t = lockWritableTemplate(user, templateId);
+        assertTemplateAssignable(t.getStatus());
         List<Map<String, Object>> created = new ArrayList<>();
         if (companyIds == null) {
             companyIds = Collections.emptyList();
@@ -338,6 +366,99 @@ public class TemplateService {
         return result;
     }
 
+    // ---- 模板审批 ----
+
+    /**
+     * 提交模板审批：draft → pending_approval，创建审批记录。
+     */
+    @Transactional
+    public Map<String, Object> submitForApproval(AuthUser user, Long templateId) {
+        ReportTemplate t = templateMapper.findByIdForUpdate(templateId);
+        if (t == null) {
+            throw new DomainException("模板不存在", 404);
+        }
+        if (!canManageTemplate(user, t.getOwnerDepartmentId())) {
+            throw new DomainException("无权管理该模板", 404);
+        }
+        if (!"draft".equals(t.getStatus())) {
+            throw new DomainException("仅草稿状态的模板可以提交审批", 409);
+        }
+
+        templateMapper.setTemplateStatus(templateId, "pending_approval");
+
+        TemplateApproval approval = new TemplateApproval();
+        approval.setTemplateId(templateId);
+        approval.setSubmittedBy(user.getId());
+        approval.setStatus("pending");
+        templateMapper.insertTemplateApproval(approval);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "模板已提交审批，等待数智化转型办公室审核");
+        result.put("template", getTemplateDetail(templateId));
+        return result;
+    }
+
+    /**
+     * 审批通过：pending_approval → published。
+     */
+    @Transactional
+    public Map<String, Object> approveTemplate(AuthUser user, Long templateId, String comment) {
+        ReportTemplate t = templateMapper.findByIdForUpdate(templateId);
+        if (t == null) {
+            throw new DomainException("模板不存在", 404);
+        }
+        if (!"pending_approval".equals(t.getStatus())) {
+            throw new DomainException("该模板不在待审批状态", 409);
+        }
+
+        TemplateApproval approval = templateMapper.findLatestApprovalByTemplateId(templateId);
+        if (approval == null || !"pending".equals(approval.getStatus())) {
+            throw new DomainException("未找到待审批记录", 404);
+        }
+
+        templateMapper.setTemplateStatus(templateId, "published");
+        templateMapper.updateApprovalStatus(approval.getId(), "approved", user.getId(), comment);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "模板审批通过，已发布");
+        result.put("template", getTemplateDetail(templateId));
+        return result;
+    }
+
+    /**
+     * 审批驳回：pending_approval → draft。
+     */
+    @Transactional
+    public Map<String, Object> rejectTemplate(AuthUser user, Long templateId, String comment) {
+        ReportTemplate t = templateMapper.findByIdForUpdate(templateId);
+        if (t == null) {
+            throw new DomainException("模板不存在", 404);
+        }
+        if (!"pending_approval".equals(t.getStatus())) {
+            throw new DomainException("该模板不在待审批状态", 409);
+        }
+
+        TemplateApproval approval = templateMapper.findLatestApprovalByTemplateId(templateId);
+        if (approval == null || !"pending".equals(approval.getStatus())) {
+            throw new DomainException("未找到待审批记录", 404);
+        }
+
+        templateMapper.setTemplateStatus(templateId, "draft");
+        templateMapper.updateApprovalStatus(approval.getId(), "rejected", user.getId(), comment);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "模板已驳回");
+        result.put("template", getTemplateDetail(templateId));
+        return result;
+    }
+
+    /**
+     * 获取待审批模板列表（数转办视角）。
+     */
+    public List<TemplateApproval> getPendingApprovals() {
+        return templateMapper.findPendingApprovals();
+    }
+
     // ---- helpers ----
 
     private ReportTemplate lockWritableTemplate(AuthUser user, Long templateId) {
@@ -364,11 +485,17 @@ public class TemplateService {
     }
 
     private void assertTemplateWritable(String status) {
-        if ("draft".equals(status)) {
-            throw new DomainException("草稿模板尚未发布，不能编辑或下发", 409);
+        if ("pending_approval".equals(status)) {
+            throw new DomainException("模板正在等待数智化转型办公室审批，不能编辑或下发", 409);
         }
         if ("archived".equals(status)) {
             throw new DomainException("报表模板已停用，不能编辑或下发", 409);
+        }
+    }
+
+    private void assertTemplateAssignable(String status) {
+        if (!"published".equals(status)) {
+            throw new DomainException("模板尚未发布，不能下发。请先提交审批并通过", 409);
         }
     }
 
