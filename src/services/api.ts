@@ -17,6 +17,7 @@ import {
   DataImportRowPayload,
   DataImportResult,
 } from '../types';
+import type { AiQueryResponse } from '../utils/aiQuery';
 
 const TOKEN_KEY = 'free_report_token';
 const USER_KEY = 'free_report_user';
@@ -352,6 +353,21 @@ export const api = {
 
   async getAggregationHistory(templateId: number): Promise<any[]> {
     return request<any[]>(`/api/aggregations/history/${templateId}`);
+  },
+
+  // AI 智能问数
+  async getAiConfig(): Promise<{ enabled: boolean }> {
+    return request<{ enabled: boolean }>('/api/ai/config');
+  },
+
+  async aiQuery(
+    question: string,
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+  ): Promise<AiQueryResponse> {
+    return request<AiQueryResponse>('/api/ai/query', {
+      method: 'POST',
+      body: JSON.stringify({ question, history: history || [] }),
+    });
   },
 };
 

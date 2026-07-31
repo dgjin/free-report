@@ -92,4 +92,9 @@ public interface AssignmentMapper {
      * 根据模板 ID 列表统计每个模板的下发任务数。
      */
     List<Map<String, Object>> countByTemplateIds(@Param("templateIds") List<Long> templateIds);
+
+    /**
+     * 根据模板 ID 列表批量查询各模板的去重周期标签（智能问数上下文用，避免逐模板 N+1）。
+     */
+    List<Map<String, Object>> findPeriodLabelsByTemplateIds(@Param("templateIds") List<Long> templateIds);
 }

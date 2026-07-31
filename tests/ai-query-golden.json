@@ -1,0 +1,54 @@
+{
+  "description": "智能问数 golden 评测集：换模型/改 prompt 后运行 scripts/ai-query-eval.ts，校验查询计划是否仍按预期解析。期望字段均为宽松匹配，避免对措辞过拟合。",
+  "cases": [
+    {
+      "name": "明细台账-默认统计",
+      "question": "统计一下公务车的情况",
+      "expect": { "template_name_contains": "公务车" }
+    },
+    {
+      "name": "明细台账-记录数指标",
+      "question": "2026年Q3各分公司有多少台公务车？",
+      "expect": {
+        "template_name_contains": "公务车",
+        "dimension": "company",
+        "metrics_contain_any": ["_record_count"]
+      }
+    },
+    {
+      "name": "机构筛选",
+      "question": "北京分公司2026年Q3的公务车裸车价合计是多少",
+      "expect": {
+        "template_name_contains": "公务车",
+        "company_names_match": "北京"
+      }
+    },
+    {
+      "name": "平均聚合",
+      "question": "2026年Q3各分公司公务车裸车价的平均值",
+      "expect": {
+        "template_name_contains": "公务车",
+        "aggregation": "avg"
+      }
+    },
+    {
+      "name": "周期趋势",
+      "question": "公务车数量近几个季度的变化趋势",
+      "expect": {
+        "template_name_contains": "公务车",
+        "dimension": "period",
+        "chart_type": "line"
+      }
+    },
+    {
+      "name": "无关问题拒答",
+      "question": "今天天气怎么样？",
+      "expect": { "unanswerable": true }
+    },
+    {
+      "name": "清单外数据拒答",
+      "question": "查一下全体员工的工资明细",
+      "expect": { "unanswerable": true }
+    }
+  ]
+}

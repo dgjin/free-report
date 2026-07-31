@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Shield,
   HelpCircle,
+  Sparkles,
 } from './icons';
 import { api, getStoredUser, removeToken } from '../services/api';
 import { toast } from '../utils/toast';
@@ -364,6 +365,7 @@ export const Layout: React.FC = () => {
                   <NavItem to="/templates" active={location.pathname.startsWith('/templates')} icon={FileSpreadsheet} label="模板管理" badge={rejectedCount} />
                   <NavItem to="/assignments" active={location.pathname.startsWith('/assignments')} icon={Send} label="下发管理" />
                   <NavItem to="/aggregation" active={location.pathname.startsWith('/aggregation')} icon={BarChart3} label="汇总报表" />
+                  <NavItem to="/ai-query" active={location.pathname.startsWith('/ai-query')} icon={Sparkles} label="智能问数" />
                 </>
               )}
 
@@ -380,7 +382,10 @@ export const Layout: React.FC = () => {
               )}
 
               {access?.isSuperAdmin && (
-                <NavItem to="/global-view" active={location.pathname.startsWith('/global-view')} icon={Shield} label="全局查看" />
+                <>
+                  <NavItem to="/global-view" active={location.pathname.startsWith('/global-view')} icon={Shield} label="全局查看" />
+                  <NavItem to="/ai-query" active={location.pathname.startsWith('/ai-query')} icon={Sparkles} label="智能问数" />
+                </>
               )}
 
               {/* Branch Specific Routes */}

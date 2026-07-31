@@ -17,6 +17,7 @@ export default defineConfig(() => {
           manualChunks: {
             xlsx: ['xlsx'],
             motion: ['motion'],
+            recharts: ['recharts'],
             'lucide-react': ['lucide-react'],
             'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           },

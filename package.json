@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "npx vite --port 3000",
     "test": "node --import tsx --test tests/**/*.test.ts",
+    "ai:eval": "tsx scripts/ai-query-eval.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
@@ -20,6 +21,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-router-dom": "^7.18.1",
+    "recharts": "^2.15.4",
     "swr": "^2.4.2",
     "vite": "^6.2.3",
     "xlsx": "^0.18.5"

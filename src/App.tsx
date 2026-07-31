@@ -15,6 +15,7 @@ const ApprovalList = lazy(() => import('./pages/ApprovalList').then((m) => ({ de
 const AggregationView = lazy(() => import('./pages/AggregationView').then((m) => ({ default: m.AggregationView })));
 const OrganizationManagement = lazy(() => import('./pages/OrganizationManagement').then((m) => ({ default: m.OrganizationManagement })));
 const GlobalReadOnlyView = lazy(() => import('./pages/GlobalReadOnlyView').then((m) => ({ default: m.GlobalReadOnlyView })));
+const AiQuery = lazy(() => import('./pages/AiQuery').then((m) => ({ default: m.AiQuery })));
 
 const PageFallback = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -68,6 +69,7 @@ export default function App() {
             <Route path="aggregation" element={<ErrorBoundary><AggregationView /></ErrorBoundary>} />
             <Route path="organizations" element={<ErrorBoundary><OrganizationManagement /></ErrorBoundary>} />
             <Route path="global-view" element={<ErrorBoundary><GlobalReadOnlyView /></ErrorBoundary>} />
+            <Route path="ai-query" element={<ErrorBoundary><AiQuery /></ErrorBoundary>} />
             <Route path="template-approvals" element={<Navigate to="/approvals" replace />} />
           </Route>
 

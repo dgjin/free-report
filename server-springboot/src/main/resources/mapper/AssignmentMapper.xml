@@ -143,4 +143,24 @@
         </choose>
     </select>
 
+    <!-- 批量查询各模板的去重周期标签（智能问数上下文用） -->
+    <select id="findPeriodLabelsByTemplateIds" resultType="java.util.Map">
+        <choose>
+            <when test="templateIds != null and templateIds.size() > 0">
+                SELECT DISTINCT template_id, period_label
+                FROM report_assignments
+                WHERE period_label IS NOT NULL AND period_label != ''
+                  AND template_id IN
+                <foreach collection="templateIds" item="templateId" open="(" separator="," close=")">
+                    #{templateId}
+                </foreach>
+            </when>
+            <otherwise>
+                SELECT template_id, period_label
+                FROM report_assignments
+                WHERE 1 = 0
+            </otherwise>
+        </choose>
+    </select>
+
 </mapper>

@@ -42,6 +42,16 @@ jwt:
 cors:
   allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
 
+# 智能问数使用的大模型服务（OpenAI 兼容协议）
+# 生产：DeepSeek；测试：本地 Ollama（AI_BASE_URL=http://localhost:11434/v1 AI_MODEL=qwen2.5 AI_API_KEY=ollama）
+ai:
+  enabled: ${AI_ENABLED:true}
+  base-url: ${AI_BASE_URL:https://api.deepseek.com/v1}
+  api-key: ${AI_API_KEY:}
+  model: ${AI_MODEL:deepseek-chat}
+  timeout-seconds: ${AI_TIMEOUT:60}
+  reasoning-effort: ${AI_REASONING_EFFORT:}
+
 logging:
   level:
     com.freereport: info
