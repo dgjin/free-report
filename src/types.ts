@@ -32,6 +32,14 @@ export interface MatrixConfig {
   column_label: string;
 }
 
+/** 跨字段校验规则（仅汇总 number 字段可配，二选一） */
+export interface FieldValidation {
+  /** 等于这些汇总字段之和（field id） */
+  sum_of?: number[];
+  /** 等于该明细/交叉表数字列的合计（field id） */
+  detail_sum_of?: number;
+}
+
 export interface FieldConfig {
   required?: boolean;
   options?: string[];
@@ -39,6 +47,7 @@ export interface FieldConfig {
   min?: number;
   max?: number;
   matrix?: MatrixConfig;
+  validation?: FieldValidation;
 }
 
 export interface ReportTemplateField {
@@ -215,6 +224,8 @@ export interface AggregationResponse {
   template: ReportTemplate;
   summary_fields: ReportTemplateField[];
   detail_fields: ReportTemplateField[];
+  /** 交叉表列字段（data_type='matrix'），其单元格值与明细行同存于 detail_rows */
+  matrix_fields: ReportTemplateField[];
   company_data: Array<{
     company_id: number;
     company_name: string;
@@ -227,6 +238,7 @@ export interface AggregationResponse {
     values: Record<string, string>;
   }>;
   summary: Record<string, { total: number; count: number; average: number }>;
+  /** 明细/交叉表数据行：row_index 为库内真实行号（交叉表按此定位行选项），seq 为跨机构连续展示序号 */
   detail_rows: Array<Record<string, any>>;
   detail_summary: Record<string, { total: number; count: number; average: number }>;
 }

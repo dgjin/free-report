@@ -93,6 +93,27 @@ public class TemplateController {
         return templateService.disableTemplateField(user, id, fieldId);
     }
 
+    /**
+     * 更新字段（仅设计阶段未下发前允许）。
+     */
+    @PutMapping("/{id}/fields/{fieldId}")
+    public Map<String, Object> updateTemplateField(@PathVariable Long id, @PathVariable Long fieldId,
+                                                   @RequestBody Map<String, Object> body) {
+        securityUtils.requireDepartmentReportAdmin();
+        AuthUser user = securityUtils.getCurrentUser();
+        return templateService.updateTemplateField(user, id, fieldId, body);
+    }
+
+    /**
+     * 物理删除字段（仅设计阶段未下发前允许）。
+     */
+    @DeleteMapping("/{id}/fields/{fieldId}")
+    public Map<String, Object> deleteTemplateField(@PathVariable Long id, @PathVariable Long fieldId) {
+        securityUtils.requireDepartmentReportAdmin();
+        AuthUser user = securityUtils.getCurrentUser();
+        return templateService.deleteTemplateField(user, id, fieldId);
+    }
+
     @PostMapping("/{id}/matrix-fields")
     public Map<String, Object> addMatrixFields(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         securityUtils.requireDepartmentReportAdmin();

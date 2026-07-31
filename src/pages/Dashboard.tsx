@@ -121,7 +121,7 @@ export const Dashboard: React.FC = () => {
     : 'text-mute bg-line';
 
   return (
-    <div className="max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-[clamp(20px,3vw,32px)]">
+    <div className="max-w-[1280px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-[clamp(20px,3vw,32px)]">
       {/* Hero — editorial document header */}
       <section
         className="reveal bg-white rounded-[12px] px-[clamp(24px,4vw,40px)] py-[clamp(26px,4vw,40px)]"

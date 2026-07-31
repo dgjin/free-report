@@ -1,5 +1,6 @@
 package com.freereport.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.freereport.entity.Company;
 import com.freereport.entity.ReportAssignment;
@@ -118,7 +119,7 @@ public class TemplateService {
     }
 
     /**
-     * 返回模板详情（含字段列表与 created_by_name）。
+     * 返回模板详情（含字段列表、创建者姓名与下发任务数）。
      */
     public Map<String, Object> getTemplateDetail(Long id) {
         ReportTemplate t = templateMapper.findById(id);
@@ -130,6 +131,7 @@ public class TemplateService {
         m.put("fields", fields.stream().map(this::fieldToMap).collect(Collectors.toList()));
         User creator = userMapper.findById(t.getCreatedBy());
         m.put("created_by_name", creator != null ? creator.getDisplayName() : null);
+        m.put("assignment_count", countAssignments(id));
         return m;
     }
 
@@ -307,6 +309,133 @@ public class TemplateService {
         templateMapper.disableField(templateId, fieldId);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "字段已停用");
+        result.put("field", fieldToMap(target));
+        return result;
+    }
+
+    /**
+     * 更新模板字段：仅设计阶段（模板从未下发）允许。
+     * - field_name 修改需校验模板内唯一；data_type 不可变
+     * - field_config 合并更新（required/options），交叉表列联动 column_label
+     */
+    @Transactional
+    public Map<String, Object> updateTemplateField(AuthUser user, Long templateId, Long fieldId,
+                                                   Map<String, Object> updates) {
+        lockWritableTemplate(user, templateId);
+        assertNoAssignmentsYet(templateId);
+        List<ReportTemplateField> fields = templateMapper.findFieldsByTemplateId(templateId);
+        ReportTemplateField target = fields.stream()
+                .filter(f -> f.getId() != null && f.getId().equals(fieldId))
+                .findFirst().orElse(null);
+        if (target == null) {
+            throw new DomainException("字段不存在", 404);
+        }
+        if (!"active".equals(target.getStatus())) {
+            throw new DomainException("已停用字段不可编辑", 409);
+        }
+
+        String fieldLabel = updates.containsKey("field_label")
+                ? (String) updates.get("field_label") : target.getFieldLabel();
+        if (fieldLabel == null || fieldLabel.trim().isEmpty()) {
+            throw new DomainException("字段显示名称不能为空", 400);
+        }
+        fieldLabel = fieldLabel.trim();
+
+        String fieldName = updates.containsKey("field_name")
+                ? (String) updates.get("field_name") : target.getFieldName();
+        if (fieldName == null || fieldName.trim().isEmpty()) {
+            throw new DomainException("字段标识不能为空", 400);
+        }
+        fieldName = fieldName.trim();
+        if (!fieldName.equals(target.getFieldName())) {
+            ReportTemplateField dup = templateMapper.findFieldByName(templateId, fieldName);
+            if (dup != null && !fieldId.equals(dup.getId())) {
+                throw new DomainException("字段标识 \"" + fieldName + "\" 在该模板中已存在", 400);
+            }
+        }
+
+        String fieldType = updates.containsKey("field_type")
+                ? (String) updates.get("field_type") : target.getFieldType();
+        if (fieldType == null || fieldType.trim().isEmpty()) {
+            fieldType = target.getFieldType();
+        }
+
+        // field_config 合并更新：保留既有键（如 matrix），覆盖 required/options/min/max/validation
+        Map<String, Object> config = parseFieldConfig(target.getFieldConfig());
+        Object payloadConfig = updates.get("field_config");
+        if (payloadConfig instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> pc = (Map<String, Object>) payloadConfig;
+            if (pc.containsKey("required")) {
+                config.put("required", pc.get("required"));
+            }
+            if ("select".equals(fieldType)) {
+                if (pc.get("options") != null) {
+                    config.put("options", pc.get("options"));
+                }
+            } else {
+                config.remove("options");
+            }
+            // min/max 仅 number 类型有效；前端未传的键（undefined 序列化丢弃）视为清除
+            if ("number".equals(fieldType)) {
+                if (pc.containsKey("min")) {
+                    config.put("min", pc.get("min"));
+                } else {
+                    config.remove("min");
+                }
+                if (pc.containsKey("max")) {
+                    config.put("max", pc.get("max"));
+                } else {
+                    config.remove("max");
+                }
+            } else {
+                config.remove("min");
+                config.remove("max");
+            }
+            if (pc.get("validation") instanceof Map && !((Map<?, ?>) pc.get("validation")).isEmpty()) {
+                config.put("validation", pc.get("validation"));
+            } else {
+                config.remove("validation");
+            }
+        }
+        // 交叉表列：显示名称与 column_label 联动
+        Object matrix = config.get("matrix");
+        if (matrix instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> matrixMap = (Map<String, Object>) matrix;
+            matrixMap.put("column_label", fieldLabel);
+        }
+
+        String configJson = toJson(config);
+        templateMapper.updateField(templateId, fieldId, fieldName, fieldLabel, fieldType, configJson);
+
+        target.setFieldName(fieldName);
+        target.setFieldLabel(fieldLabel);
+        target.setFieldType(fieldType);
+        target.setFieldConfig(configJson);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "字段已更新");
+        result.put("field", fieldToMap(target));
+        return result;
+    }
+
+    /**
+     * 物理删除模板字段：仅设计阶段（模板从未下发）允许；下发后请使用停用。
+     */
+    @Transactional
+    public Map<String, Object> deleteTemplateField(AuthUser user, Long templateId, Long fieldId) {
+        lockWritableTemplate(user, templateId);
+        assertNoAssignmentsYet(templateId);
+        List<ReportTemplateField> fields = templateMapper.findFieldsByTemplateId(templateId);
+        ReportTemplateField target = fields.stream()
+                .filter(f -> f.getId() != null && f.getId().equals(fieldId))
+                .findFirst().orElse(null);
+        if (target == null) {
+            throw new DomainException("字段不存在", 404);
+        }
+        templateMapper.deleteField(templateId, fieldId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "字段已删除");
         result.put("field", fieldToMap(target));
         return result;
     }
@@ -490,6 +619,42 @@ public class TemplateService {
         }
         if ("archived".equals(status)) {
             throw new DomainException("报表模板已停用，不能编辑或下发", 409);
+        }
+    }
+
+    /**
+     * 统计模板的下发任务数（复用批量 COUNT 查询）。
+     */
+    private long countAssignments(Long templateId) {
+        List<Map<String, Object>> counts = assignmentMapper.countByTemplateIds(
+                Collections.singletonList(templateId));
+        long total = 0;
+        for (Map<String, Object> row : counts) {
+            total += ((Number) row.get("cnt")).longValue();
+        }
+        return total;
+    }
+
+    /**
+     * 设计阶段守卫：模板一旦下发过，字段即不可修改或物理删除（仅可停用），保证历史数据可溯。
+     */
+    private void assertNoAssignmentsYet(Long templateId) {
+        if (countAssignments(templateId) > 0) {
+            throw new DomainException("模板已下发，字段不可修改或删除；如需调整请使用「停用」", 409);
+        }
+    }
+
+    /**
+     * 解析字段配置 JSON，异常时返回空 Map。
+     */
+    private Map<String, Object> parseFieldConfig(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            return new LinkedHashMap<>();
         }
     }
 

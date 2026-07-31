@@ -2,6 +2,57 @@ import type { AggregationResponse, ReportTemplateField } from '../types';
 
 export type AggregationTab = 'institutions' | 'details' | 'matrix' | 'progress';
 
+export interface MatrixGroup {
+  rowLabel: string;
+  rowOptions: string[];
+  columns: ReportTemplateField[];
+}
+
+/**
+ * 交叉表分组：取自 matrix_fields（data_type='matrix'），按 field_config.matrix.row_label 归组。
+ * 容错：field_config 非法 JSON 或缺少行维度定义（row_label）的字段被跳过，不影响其余列。
+ */
+export function buildMatrixGroups(matrixFields: ReportTemplateField[] | undefined): MatrixGroup[] {
+  const groups: MatrixGroup[] = [];
+  const groupMap = new Map<string, number>();
+
+  (matrixFields || []).forEach((field) => {
+    let config: any = {};
+    try {
+      config = typeof field.field_config === 'string'
+        ? JSON.parse(field.field_config || '{}')
+        : field.field_config || {};
+    } catch {
+      return;
+    }
+    const matrix = config.matrix;
+    if (!matrix || !matrix.row_label) return;
+
+    const key = matrix.row_label;
+    if (!groupMap.has(key)) {
+      groupMap.set(key, groups.length);
+      groups.push({ rowLabel: key, rowOptions: matrix.row_options || [], columns: [] });
+    }
+    groups[groupMap.get(key)!].columns.push(field);
+  });
+
+  return groups;
+}
+
+/**
+ * 交叉表取值索引：按 company_id + 库内真实 row_index 定位单元格所在行。
+ * 使用 company_id（而非机构名）作键，保证同名机构不会互相串数据。
+ */
+export function buildMatrixRowIndex(
+  detailRows: Array<Record<string, any>> | undefined,
+): Map<string, Record<string, any>> {
+  const idx = new Map<string, Record<string, any>>();
+  (detailRows || []).forEach((r) => {
+    idx.set(`${r.company_id}#${r.row_index}`, r);
+  });
+  return idx;
+}
+
 export interface MetricCard {
   fieldName: string;
   fieldLabel: string;

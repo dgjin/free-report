@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CheckSquare, Plus, Trash2, Upload, Download, X } from '../icons';
 import { toast } from '../../utils/toast';
 import { ReportTemplateField } from '../../types';
-import { parseDetailRows, type DetailImportField } from '../../utils/detailImport';
+import { parseDetailRows, type DetailImportField, type DetailImportCellError } from '../../utils/detailImport';
 import { FullscreenButton, fullscreenSectionClass, useFullscreen } from '../FullscreenToggle';
 
 interface DetailTableProps {
@@ -31,6 +31,8 @@ export const DetailTable: React.FC<DetailTableProps> = ({
   >([]);
   const [importAllRows, setImportAllRows] = useState<Array<Record<string, string>>>([]);
   const [importNotes, setImportNotes] = useState<string[]>([]);
+  // 格式有问题的单元格（红框标注，不阻断导入，提交时兜底强校验）
+  const [importCellErrors, setImportCellErrors] = useState<DetailImportCellError[]>([]);
   const [importing, setImporting] = useState(false);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
@@ -73,7 +75,7 @@ export const DetailTable: React.FC<DetailTableProps> = ({
         return;
       }
 
-      // 字段引用（含 select 选项，用于值归一）
+      // 字段引用（含 select 选项与 number 范围，用于值归一与校验）
       const fieldRefs: DetailImportField[] = fields.map((f) => {
         const config =
           typeof f.field_config === 'string'
@@ -84,6 +86,8 @@ export const DetailTable: React.FC<DetailTableProps> = ({
           field_label: f.field_label,
           field_type: f.field_type,
           options: f.field_type === 'select' ? (config.options || []) : undefined,
+          min: typeof config.min === 'number' ? config.min : undefined,
+          max: typeof config.max === 'number' ? config.max : undefined,
         };
       });
 
@@ -104,6 +108,7 @@ export const DetailTable: React.FC<DetailTableProps> = ({
       setImportMapping(result.mapping);
       setImportAllRows(result.rows);
       setImportNotes(result.notes);
+      setImportCellErrors(result.cellErrors);
       setImportModalOpen(true);
     } catch (err: any) {
       toast(err.message || 'Excel 解析失败', 'error');
@@ -114,9 +119,14 @@ export const DetailTable: React.FC<DetailTableProps> = ({
     }
   };
 
-  /** 删除预览中的某一行（导入前剔除不需要的数据） */
+  /** 删除预览中的某一行（导入前剔除不需要的数据），单元格错误联动重算行号 */
   const removeImportRow = (index: number) => {
     setImportAllRows((prev) => prev.filter((_, idx) => idx !== index));
+    setImportCellErrors((prev) =>
+      prev
+        .filter((e) => e.rowIdx !== index)
+        .map((e) => (e.rowIdx > index ? { ...e, rowIdx: e.rowIdx - 1 } : e)),
+    );
   };
 
   const confirmImport = () => {
@@ -140,8 +150,12 @@ export const DetailTable: React.FC<DetailTableProps> = ({
     setImportAllRows([]);
     setImportMapping([]);
     setImportNotes([]);
+    setImportCellErrors([]);
     toast(`成功导入 ${importAllRows.length} 行数据`, 'success');
   };
+
+  // 预览单元格错误查找：`行下标#字段id` → 错误信息
+  const cellErrorMap = new Map(importCellErrors.map((e) => [`${e.rowIdx}#${e.fieldId}`, e.message]));
 
   const downloadTemplate = async () => {
     try {
@@ -386,6 +400,11 @@ export const DetailTable: React.FC<DetailTableProps> = ({
                     ))}
                   </ul>
                 )}
+                {importCellErrors.length > 0 && (
+                  <p className="text-[11px] text-[#9F2F2D]">
+                    {importCellErrors.length} 个单元格存在格式问题（红框标注），导入后请在表格中修正。
+                  </p>
+                )}
               </div>
 
               {/* Import Mode */}
@@ -450,17 +469,23 @@ export const DetailTable: React.FC<DetailTableProps> = ({
                         >
                           {idx + 1}
                         </td>
-                        {fields.map((df, dfIdx) => (
-                          <td
-                            key={df.id}
-                            className="p-2 text-body tabular-nums"
-                            style={{ borderTop: idx === 0 && dfIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
-                          >
-                            {row[df.id] || (
-                              <span className="text-line">—</span>
-                            )}
-                          </td>
-                        ))}
+                        {fields.map((df, dfIdx) => {
+                          const errMsg = cellErrorMap.get(`${idx}#${df.id}`);
+                          return (
+                            <td
+                              key={df.id}
+                              className={`p-2 text-body tabular-nums ${
+                                errMsg ? 'ring-1 ring-inset ring-[#9F2F2D] bg-[#FDEBEC]' : ''
+                              }`}
+                              title={errMsg}
+                              style={{ borderTop: idx === 0 && dfIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
+                            >
+                              {row[df.id] || (
+                                <span className="text-line">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
                         <td
                           className="p-2 text-center"
                           style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--hairline)' }}

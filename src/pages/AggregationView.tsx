@@ -4,7 +4,7 @@ import { BarChart3, Building2, FileSpreadsheet, Download, Copy, RefreshCw, Calcu
 import * as XLSX from 'xlsx';
 import { api } from '../services/api';
 import { AggregationResponse, ReportAssignment, ReportTemplate, ReportTemplateField, getSubmissionStatusLabel, APPROVED_SUBMISSION_STATUSES } from '../types';
-import { AggregationTab, filterInstitutionRows, filterDetailRows, buildMetricCards, getUncountedInstitutionCount, buildProgressData } from '../utils/aggregationView';
+import { AggregationTab, filterInstitutionRows, filterDetailRows, buildMetricCards, getUncountedInstitutionCount, buildProgressData, buildMatrixGroups, buildMatrixRowIndex } from '../utils/aggregationView';
 
 // Status style mapping — muted pastels for semantic states
 const STATUS_STYLES: Record<string, string> = {
@@ -127,7 +127,7 @@ export const AggregationView: React.FC = () => {
       const detHeaders = ['机构名称', '行号', '提交状态', ...aggregationData.detail_fields.map((f) => f.field_label)];
       const detRows = aggregationData.detail_rows.map((r) => [
         r.company_name ?? '',
-        r.row_index ?? '',
+        r.seq ?? r.row_index ?? '',
         getSubmissionStatusLabel(r.submission_status ?? ''),
         ...aggregationData.detail_fields.map((f) => r[f.field_name] ?? '-'),
       ]);
@@ -135,6 +135,28 @@ export const AggregationView: React.FC = () => {
       ws2['!cols'] = [{ wch: 16 }, { wch: 8 }, { wch: 10 }, ...aggregationData.detail_fields.map(() => ({ wch: 14 }))];
       XLSX.utils.book_append_sheet(wb, ws2, '明细数据');
     }
+
+    // Sheet: 交叉表（每个行维度分组一张表，机构 × 行选项 × 列字段）
+    matrixGroups.forEach((group, gIdx) => {
+      const mxHeaders = ['机构名称', group.rowLabel, ...group.columns.map((col) => col.field_label)];
+      const mxRows: Array<Array<string | number>> = [];
+      aggregationData.company_data.forEach((c) => {
+        group.rowOptions.forEach((rowOpt, rowIdx) => {
+          const detRow = matrixRowIndex.get(`${c.company_id}#${rowIdx + 1}`);
+          mxRows.push([
+            c.company_name,
+            rowOpt,
+            ...group.columns.map((col) => detRow?.[col.field_name] ?? '-'),
+          ]);
+        });
+      });
+      const wsM = XLSX.utils.aoa_to_sheet([mxHeaders, ...mxRows]);
+      wsM['!cols'] = [{ wch: 16 }, { wch: 14 }, ...group.columns.map(() => ({ wch: 14 }))];
+      // 工作表名需去除 Excel 非法字符（\ / ? * [ ] :）并限长 31 字符
+      const safeLabel = group.rowLabel.replace(/[\\/?*[\]:]/g, '-');
+      const sheetName = (matrixGroups.length > 1 ? `交叉表${gIdx + 1}-${safeLabel}` : `交叉表-${safeLabel}`).slice(0, 31);
+      XLSX.utils.book_append_sheet(wb, wsM, sheetName);
+    });
 
     // Sheet 3: 填报进度
     const progHeaders = ['机构名称', '机构编码', '任务状态', '提交状态', '版本'];
@@ -193,44 +215,20 @@ export const AggregationView: React.FC = () => {
     { key: 'progress', label: '填报进度', icon: TrendingUp },
   ];
 
-  // Matrix groups from detail_fields with data_type matrix
-  const matrixGroups = useMemo(() => {
-    if (!aggregationData) return [];
-    const groups: Array<{
-      rowLabel: string;
-      rowOptions: string[];
-      columns: ReportTemplateField[];
-    }> = [];
-    const groupMap = new Map<string, number>();
+  // 交叉表分组：取自 matrix_fields（data_type='matrix'），按 field_config.matrix.row_label 归组
+  const matrixGroups = useMemo(
+    () => buildMatrixGroups(aggregationData?.matrix_fields),
+    [aggregationData],
+  );
 
-    // Matrix fields are stored in detail_fields (they have data_type='matrix')
-    // but the aggregation API only returns summary_fields and detail_fields.
-    // Matrix fields with row_index > 0 are in detail_rows.
-    // We need to extract matrix config from detail_fields if available.
-    // Since the API may not separate matrix fields, we check field_config.
-    const allFields = [...(aggregationData.summary_fields || []), ...(aggregationData.detail_fields || [])];
-
-    allFields.forEach((field: any) => {
-      const config = typeof field.field_config === 'string'
-        ? JSON.parse(field.field_config || '{}')
-        : field.field_config || {};
-      const matrix = config.matrix;
-      // 容错：跳过配置残缺的矩阵字段（缺少行维度定义）
-      if (!matrix || !matrix.row_label) return;
-
-      const key = matrix.row_label;
-      if (!groupMap.has(key)) {
-        groupMap.set(key, groups.length);
-        groups.push({ rowLabel: key, rowOptions: matrix.row_options || [], columns: [] });
-      }
-      groups[groupMap.get(key)!].columns.push(field);
-    });
-
-    return groups;
-  }, [aggregationData]);
+  // 交叉表取值索引：按 company_id + 库内真实 row_index 定位单元格所在行（同名机构不会互相串数据）
+  const matrixRowIndex = useMemo(
+    () => buildMatrixRowIndex(aggregationData?.detail_rows),
+    [aggregationData],
+  );
 
   return (
-    <div className="reveal max-w-[1080px] mx-auto px-4 sm:px-[22px] py-[clamp(16px,3vw,28px)] space-y-4 sm:space-y-6">
+    <div className="reveal max-w-[1280px] mx-auto px-4 sm:px-[22px] py-[clamp(16px,3vw,28px)] space-y-4 sm:space-y-6">
       {/* Header — unified white panel */}
       <div className="bg-white rounded-[12px] sm:rounded-[12px] p-4 sm:p-6 flex flex-col gap-4" style={{ boxShadow: 'var(--sh-panel)' }}>
         <div className="min-w-0">
@@ -476,9 +474,7 @@ export const AggregationView: React.FC = () => {
                                   <td className="p-3 sm:p-4 font-semibold text-ink sticky left-0 bg-white z-10 hover:bg-hoverbg truncate">{c.company_name}</td>
                                   <td className="p-3 sm:p-4 text-body">{rowOpt}</td>
                                   {group.columns.map((col) => {
-                                    const detRow = aggregationData.detail_rows.find(
-                                      (r) => r.company_name === c.company_name && r.row_index === rowIdx + 1
-                                    );
+                                    const detRow = matrixRowIndex.get(`${c.company_id}#${rowIdx + 1}`);
                                     const val = detRow?.[col.field_name];
                                     return (
                                       <td key={col.id} className="p-3 sm:p-4 text-center tabular-nums">

@@ -51,6 +51,9 @@ export default function ExcelFieldImportModal({
   const [format, setFormat] = useState<TableFormat>('detail');
   const [fields, setFields] = useState<ParsedExcelField[]>([]);
   const [matrix, setMatrix] = useState<MatrixDetection | null>(null);
+  // 交叉表：被排除（不导入）的列下标 + 新行选项输入
+  const [excludedMatrixCols, setExcludedMatrixCols] = useState<Set<number>>(new Set());
+  const [newRowOption, setNewRowOption] = useState('');
   const [error, setError] = useState('');
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
@@ -61,6 +64,8 @@ export default function ExcelFieldImportModal({
     setFormat('detail');
     setFields([]);
     setMatrix(null);
+    setExcludedMatrixCols(new Set());
+    setNewRowOption('');
     setError('');
     setFileName('');
     setImporting(false);
@@ -79,6 +84,8 @@ export default function ExcelFieldImportModal({
     setFormat(a.format);
     setFields(a.fields);
     setMatrix(a.matrix ?? null);
+    setExcludedMatrixCols(new Set());
+    setNewRowOption('');
   }, []);
 
   const handleFileChange = useCallback(
@@ -115,6 +122,8 @@ export default function ExcelFieldImportModal({
       setFormat(re.format);
       setFields(re.fields);
       setMatrix(re.matrix ?? null);
+      setExcludedMatrixCols(new Set());
+      setNewRowOption('');
     },
     [analysis]
   );
@@ -128,6 +137,8 @@ export default function ExcelFieldImportModal({
       setFormat(re.format);
       setFields(re.fields);
       setMatrix(re.matrix ?? null);
+      setExcludedMatrixCols(new Set());
+      setNewRowOption('');
     },
     [analysis, format]
   );
@@ -157,18 +168,59 @@ export default function ExcelFieldImportModal({
     []
   );
 
+  /** 排除/恢复交叉表列（被排除的列不导入） */
+  const toggleMatrixColumn = useCallback((index: number) => {
+    setExcludedMatrixCols((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
+
+  const updateMatrixRowLabel = useCallback((label: string) => {
+    setMatrix((prev) => (prev ? { ...prev, row_label: label } : prev));
+  }, []);
+
+  const removeMatrixRowOption = useCallback((index: number) => {
+    setMatrix((prev) =>
+      prev ? { ...prev, row_options: prev.row_options.filter((_, i) => i !== index) } : prev
+    );
+  }, []);
+
+  const addMatrixRowOption = useCallback(() => {
+    const text = newRowOption.trim();
+    if (!text) return;
+    setMatrix((prev) => {
+      if (!prev) return prev;
+      if (prev.row_options.includes(text)) return prev;
+      return { ...prev, row_options: [...prev.row_options, text] };
+    });
+    setNewRowOption('');
+  }, [newRowOption]);
+
   const selectedFields = fields.filter((f) => !f.skipped);
 
   const handleImport = useCallback(async () => {
     let payload: ImportPayload;
     if (format === 'matrix' && matrix) {
+      const includedColumns = matrix.columns.filter((_, i) => !excludedMatrixCols.has(i));
+      if (!matrix.row_label.trim()) {
+        setError('请填写交叉表行维度名称');
+        return;
+      }
+      if (matrix.row_options.length === 0) {
+        setError('交叉表至少需要一个行选项');
+        return;
+      }
+      if (includedColumns.length === 0) return;
       payload = {
         format: 'matrix',
         fields: [],
         matrix: {
-          row_label: matrix.row_label,
+          row_label: matrix.row_label.trim(),
           row_options: matrix.row_options,
-          columns: matrix.columns.map((c) => ({
+          columns: includedColumns.map((c) => ({
             field_name: c.field_name,
             field_label: c.field_label,
             field_type: c.field_type,
@@ -205,7 +257,7 @@ export default function ExcelFieldImportModal({
       setError(err.message || '导入失败');
       setImporting(false);
     }
-  }, [format, matrix, selectedFields, onImport, reset, onClose]);
+  }, [format, matrix, excludedMatrixCols, selectedFields, onImport, reset, onClose]);
 
   if (!open) return null;
 
@@ -219,7 +271,10 @@ export default function ExcelFieldImportModal({
 
   const previewRows = analysis?.rows.slice(0, 8) ?? [];
   const headerRowOptions = analysis ? analysis.rows.slice(0, Math.min(10, analysis.rows.length)) : [];
-  const importCount = format === 'matrix' ? matrix?.columns.length ?? 0 : selectedFields.length;
+  const importCount =
+    format === 'matrix'
+      ? (matrix?.columns.filter((_, i) => !excludedMatrixCols.has(i)).length ?? 0)
+      : selectedFields.length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -387,25 +442,67 @@ export default function ExcelFieldImportModal({
               {format === 'matrix' && matrix && (
                 <div className="border border-line rounded-lg overflow-hidden">
                   <div className="px-3 py-2 bg-canvas border-b border-line text-xs font-medium text-mute">
-                    交叉表结构（行维度 × 列指标，行列结构将由模版预定义）
+                    交叉表结构（行维度 × 列指标，行列结构将由模版预定义，可在下方调整）
                   </div>
                   <div className="p-4 space-y-3">
-                    <div className="text-sm">
-                      <span className="font-semibold text-ink">行维度：{matrix.row_label}</span>
-                      <span className="ml-3 flex-inline gap-1 flex-wrap inline-flex align-middle">
-                        {matrix.row_options.map((opt) => (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-semibold text-ink shrink-0">行维度：</span>
+                      <input
+                        type="text"
+                        value={matrix.row_label}
+                        onChange={(e) => updateMatrixRowLabel(e.target.value)}
+                        placeholder="如：产品/区域"
+                        className="w-40 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="flex items-start gap-2 text-sm">
+                      <span className="font-medium text-body shrink-0 pt-0.5">
+                        行选项（{matrix.row_options.length}）：
+                      </span>
+                      <div className="flex gap-1.5 flex-wrap items-center">
+                        {matrix.row_options.map((opt, oi) => (
                           <span
-                            key={opt}
-                            className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs text-mute"
+                            key={`${opt}-${oi}`}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-mute"
                           >
                             {opt}
+                            <button
+                              type="button"
+                              onClick={() => removeMatrixRowOption(oi)}
+                              title="删除该行选项"
+                              className="text-faint hover:text-[#9F2F2D] leading-none"
+                            >
+                              ✕
+                            </button>
                           </span>
                         ))}
-                      </span>
+                        <input
+                          type="text"
+                          value={newRowOption}
+                          onChange={(e) => setNewRowOption(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addMatrixRowOption();
+                            }
+                          }}
+                          placeholder="新增行选项，回车添加"
+                          className="w-36 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={addMatrixRowOption}
+                          disabled={!newRowOption.trim()}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded text-body hover:bg-canvas transition-colors disabled:opacity-40"
+                        >
+                          添加
+                        </button>
+                      </div>
                     </div>
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="bg-canvas">
+                          <th className="px-3 py-2 text-center text-xs font-medium text-mute w-12">导入</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-mute w-12">#</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-mute">列标签</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-mute">字段名</th>
@@ -413,30 +510,45 @@ export default function ExcelFieldImportModal({
                         </tr>
                       </thead>
                       <tbody>
-                        {matrix.columns.map((col, index) => (
-                          <tr key={index} className="border-t border-gray-100">
-                            <td className="px-3 py-2 text-faint text-xs">{index + 1}</td>
-                            <td className="px-3 py-2 text-sm text-body">{col.field_label}</td>
-                            <td className="px-3 py-2 text-sm font-mono text-mute">{col.field_name}</td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={col.field_type}
-                                onChange={(e) =>
-                                  updateMatrixColumn(index, {
-                                    field_type: e.target.value as FieldType,
-                                  })
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              >
-                                {FIELD_TYPE_OPTIONS.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                          </tr>
-                        ))}
+                        {matrix.columns.map((col, index) => {
+                          const excluded = excludedMatrixCols.has(index);
+                          return (
+                            <tr
+                              key={index}
+                              className={`border-t border-gray-100 ${excluded ? 'opacity-50' : ''}`}
+                            >
+                              <td className="px-3 py-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={!excluded}
+                                  onChange={() => toggleMatrixColumn(index)}
+                                  className="accent-[#111]"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-faint text-xs">{index + 1}</td>
+                              <td className="px-3 py-2 text-sm text-body">{col.field_label}</td>
+                              <td className="px-3 py-2 text-sm font-mono text-mute">{col.field_name}</td>
+                              <td className="px-3 py-2">
+                                <select
+                                  value={col.field_type}
+                                  onChange={(e) =>
+                                    updateMatrixColumn(index, {
+                                      field_type: e.target.value as FieldType,
+                                    })
+                                  }
+                                  disabled={excluded}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-canvas"
+                                >
+                                  {FIELD_TYPE_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

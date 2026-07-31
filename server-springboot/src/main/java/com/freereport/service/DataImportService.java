@@ -40,15 +40,17 @@ public class DataImportService {
     private final SubmissionMapper submissionMapper;
     private final CompanyMapper companyMapper;
     private final SecurityUtils securityUtils;
+    private final ValidationService validationService;
 
     public DataImportService(TemplateMapper templateMapper, AssignmentMapper assignmentMapper,
                              SubmissionMapper submissionMapper, CompanyMapper companyMapper,
-                             SecurityUtils securityUtils) {
+                             SecurityUtils securityUtils, ValidationService validationService) {
         this.templateMapper = templateMapper;
         this.assignmentMapper = assignmentMapper;
         this.submissionMapper = submissionMapper;
         this.companyMapper = companyMapper;
         this.securityUtils = securityUtils;
+        this.validationService = validationService;
     }
 
     /**
@@ -72,7 +74,8 @@ public class DataImportService {
             throw new DomainException("导入数据为空", 400);
         }
 
-        Set<Long> validFieldIds = templateMapper.findFieldsByTemplateId(templateId).stream()
+        List<ReportTemplateField> templateFields = templateMapper.findFieldsByTemplateId(templateId);
+        Set<Long> validFieldIds = templateFields.stream()
                 .map(ReportTemplateField::getId).collect(Collectors.toSet());
 
         // ---- 全量校验（不写入） ----
@@ -85,7 +88,7 @@ public class DataImportService {
             Map<String, Object> summary = asMap(row.get("summary"));
             List<Map<String, Object>> details = asMapList(row.get("details"));
 
-            String error = validateRow(t, mode, periodLabel, companyCode, summary, details, validFieldIds);
+            String error = validateRow(t, mode, periodLabel, companyCode, summary, details, validFieldIds, templateFields);
             if (error != null) {
                 errors.add(errorItem(rowNo, companyCode, error));
                 continue;
@@ -120,11 +123,11 @@ public class DataImportService {
     }
 
     /**
-     * 行级校验：公司合法性、字段归属、目标状态可写。返回错误原因，合法返回 null。
+     * 行级校验：公司合法性、字段归属、值校验、目标状态可写。返回错误原因，合法返回 null。
      */
     private String validateRow(ReportTemplate t, String mode, String periodLabel, String companyCode,
                                Map<String, Object> summary, List<Map<String, Object>> details,
-                               Set<Long> validFieldIds) {
+                               Set<Long> validFieldIds, List<ReportTemplateField> templateFields) {
         if (companyCode.isEmpty()) {
             return "缺少分公司编码";
         }
@@ -141,6 +144,13 @@ public class DataImportService {
         String fieldError = validateFields(summary, details, validFieldIds);
         if (fieldError != null) {
             return fieldError;
+        }
+        // 值校验：archive 按提交标准全量（必填/单值/跨字段），prefill 仅类型/范围
+        List<String> valueErrors = "archive".equals(mode)
+                ? validationService.validateSubmissionData(templateFields, summary, details)
+                : validationService.validateValuesOnly(templateFields, summary, details);
+        if (!valueErrors.isEmpty()) {
+            return String.join("；", valueErrors);
         }
 
         ReportAssignment assignment = findAssignment(t.getId(), company.getId(), periodLabel);

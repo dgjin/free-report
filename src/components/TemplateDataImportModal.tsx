@@ -10,7 +10,10 @@ import {
   validateMappings,
   type ColumnTarget,
   type ImportFieldRef,
+  type ImportMatrixGroupRef,
 } from '../utils/dataImportMapping';
+import { parseFieldConfig } from '../utils/dataValidation';
+import { buildMatrixGroups } from '../utils/aggregationView';
 
 interface TemplateDataImportModalProps {
   template: ReportTemplate;
@@ -67,10 +70,28 @@ export const TemplateDataImportModal: React.FC<TemplateDataImportModalProps> = (
   }, [template.id]);
 
   const fieldRefs = useMemo<ImportFieldRef[]>(
-    () => fields.map((f) => ({ id: f.id, field_label: f.field_label, data_type: f.data_type })),
+    () =>
+      fields.map((f) => ({
+        id: f.id,
+        field_label: f.field_label,
+        data_type: f.data_type,
+        field_type: f.field_type,
+        config: parseFieldConfig(f),
+      })),
     [fields],
   );
   const fieldsById = useMemo(() => new Map(fieldRefs.map((f) => [f.id, f])), [fieldRefs]);
+
+  // 交叉表组：行维度标签 + 行选项 + 该组列字段 id（供行维度列映射与固定行定位）
+  const matrixGroupRefs = useMemo<ImportMatrixGroupRef[]>(
+    () =>
+      buildMatrixGroups(fields.filter((f) => f.data_type === 'matrix')).map((g) => ({
+        rowLabel: g.rowLabel,
+        rowOptions: g.rowOptions,
+        fieldIds: g.columns.map((c) => c.id),
+      })),
+    [fields],
+  );
 
   // prefill 模式可选周期：该模板已下发任务的 period_label
   const assignedPeriods = useMemo(() => {
@@ -96,11 +117,13 @@ export const TemplateDataImportModal: React.FC<TemplateDataImportModalProps> = (
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  /** 下载导入模板：首列分公司编码 + 汇总字段 + 明细字段标签 */
+  /** 下载导入模板：首列分公司编码 + 汇总字段 + 明细字段 +（交叉表模板）行维度列与交叉表列 */
   const handleDownloadTemplate = async () => {
     const summaryLabels = fields.filter((f) => f.data_type === 'summary').map((f) => f.field_label);
-    const detailLabels = fields.filter((f) => f.data_type !== 'summary').map((f) => f.field_label);
-    const header = ['分公司编码', ...summaryLabels, ...detailLabels];
+    const detailLabels = fields.filter((f) => f.data_type === 'detail').map((f) => f.field_label);
+    const matrixLabels = fields.filter((f) => f.data_type === 'matrix').map((f) => f.field_label);
+    const matrixRowLabels = matrixGroupRefs.map((g) => g.rowLabel);
+    const header = ['分公司编码', ...summaryLabels, ...detailLabels, ...matrixRowLabels, ...matrixLabels];
     const { utils, writeFile } = await import('xlsx');
     const ws = utils.aoa_to_sheet([header]);
     ws['!cols'] = header.map(() => ({ wch: 18 }));
@@ -132,7 +155,7 @@ export const TemplateDataImportModal: React.FC<TemplateDataImportModalProps> = (
       setFileName(file.name);
       setHeaders(headerRow);
       setDataRows(rows.slice(1) as string[][]);
-      setMappings(autoMapColumns(headerRow, fieldRefs));
+      setMappings(autoMapColumns(headerRow, fieldRefs, matrixGroupRefs));
       setClientErrors([]);
       setStep('mapping');
     } catch (err: any) {
@@ -142,7 +165,10 @@ export const TemplateDataImportModal: React.FC<TemplateDataImportModalProps> = (
   };
 
   const handleMappingChange = (colIdx: number, raw: string) => {
-    const value: ColumnTarget = raw === 'ignore' ? 'ignore' : raw === 'company' ? 'company' : Number(raw);
+    const value: ColumnTarget =
+      raw === 'ignore' || raw === 'company' || raw.startsWith('matrix_row_')
+        ? (raw as ColumnTarget)
+        : Number(raw);
     setMappings((prev) => prev.map((m, i) => (i === colIdx ? value : m)));
   };
 
@@ -151,9 +177,12 @@ export const TemplateDataImportModal: React.FC<TemplateDataImportModalProps> = (
     if (mappingError) return toast(mappingError, 'error');
     if (!periodLabel.trim()) return toast('请指定数据所属周期标签', 'error');
 
-    const { rows, errors } = buildImportRows(dataRows, mappings, fieldsById);
+    // archive 归档按提交标准全量校验；prefill 预填仅类型/范围（挡脏数据，不做必填）
+    const { rows, errors } = buildImportRows(dataRows, mappings, fieldsById, matrixGroupRefs, {
+      strict: mode === 'archive',
+    });
     setClientErrors(errors);
-    if (rows.length === 0) return;
+    if (errors.length > 0 || rows.length === 0) return;
 
     setImporting(true);
     try {
@@ -173,7 +202,8 @@ export const TemplateDataImportModal: React.FC<TemplateDataImportModalProps> = (
   };
 
   const summaryFields = fieldRefs.filter((f) => f.data_type === 'summary');
-  const detailFields = fieldRefs.filter((f) => f.data_type !== 'summary');
+  const detailFields = fieldRefs.filter((f) => f.data_type === 'detail');
+  const matrixColumnFields = fieldRefs.filter((f) => f.data_type === 'matrix');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.3)' }}>
@@ -300,6 +330,13 @@ export const TemplateDataImportModal: React.FC<TemplateDataImportModalProps> = (
                 <li>第一行：表头（首列固定为「分公司编码」，其余列为字段标签）</li>
                 <li>汇总字段每家公司只需在首行填写；明细字段每行一条</li>
                 <li>同一家公司多条明细时连续多行填写，公司编码可留空沿用上一行</li>
+                {matrixGroupRefs.length > 0 && (
+                  <li>
+                    交叉表数据：每行需填写「
+                    {matrixGroupRefs.map((g) => g.rowLabel).join('、')}
+                    」行维度值（须与模板行选项一致），交叉表列值按行维度定位
+                  </li>
+                )}
               </ul>
             </div>
           </div>
@@ -355,6 +392,34 @@ export const TemplateDataImportModal: React.FC<TemplateDataImportModalProps> = (
                               {detailFields.length > 0 && (
                                 <optgroup label="明细字段">
                                   {detailFields.map((f) => (
+                                    <option
+                                      key={f.id}
+                                      value={f.id}
+                                      disabled={mappings.some((x, xi) => xi !== ci && x === f.id)}
+                                    >
+                                      {f.field_label}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {matrixGroupRefs.length > 0 && (
+                                <optgroup label="交叉表行维度">
+                                  {matrixGroupRefs.map((g, gi) => (
+                                    <option
+                                      key={`matrix_row_${gi}`}
+                                      value={`matrix_row_${gi}`}
+                                      disabled={mappings.some(
+                                        (x, xi) => xi !== ci && x === `matrix_row_${gi}`,
+                                      )}
+                                    >
+                                      {g.rowLabel}（行维度列）
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {matrixColumnFields.length > 0 && (
+                                <optgroup label="交叉表列">
+                                  {matrixColumnFields.map((f) => (
                                     <option
                                       key={f.id}
                                       value={f.id}

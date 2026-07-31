@@ -62,7 +62,7 @@ export const AssignmentList: React.FC = () => {
   const isHQ = user?.role === 'department_report_admin' || user?.role === 'super_admin';
   const canFill = user ? getClientAccess(user).canFill : false;
 return (
-    <div className="reveal max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-6">
+    <div className="reveal max-w-[1280px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-6">
       {/* Page Header */}
       <div>
         <h1 className="t-serif text-[32px] text-ink">

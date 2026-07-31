@@ -1,5 +1,14 @@
 import { TemplateStatus } from '../types';
 
+/**
+ * 设计阶段字段维护（编辑/物理删除）判定：
+ * 仅草稿或已发布但「从未下发」的模板允许；一经下发字段只增不减（仅可停用），
+ * 保证历史填报数据完整可溯。与后端 assertNoAssignmentsYet 守卫口径一致。
+ */
+export function canMaintainTemplateFields(status: TemplateStatus, assignmentCount: number): boolean {
+  return (status === 'draft' || status === 'published') && assignmentCount === 0;
+}
+
 export function getTemplateLifecycleView(status: TemplateStatus) {
   if (status === 'archived') {
     return {

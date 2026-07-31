@@ -46,10 +46,12 @@ public class SubmissionService {
     private final CompanyMapper companyMapper;
     private final SecurityUtils securityUtils;
     private final ObjectMapper objectMapper;
+    private final ValidationService validationService;
 
     public SubmissionService(SubmissionMapper submissionMapper, AssignmentMapper assignmentMapper,
                              TemplateMapper templateMapper, ApprovalMapper approvalMapper, UserMapper userMapper,
-                             CompanyMapper companyMapper, SecurityUtils securityUtils, ObjectMapper objectMapper) {
+                             CompanyMapper companyMapper, SecurityUtils securityUtils, ObjectMapper objectMapper,
+                             ValidationService validationService) {
         this.submissionMapper = submissionMapper;
         this.assignmentMapper = assignmentMapper;
         this.templateMapper = templateMapper;
@@ -58,6 +60,7 @@ public class SubmissionService {
         this.companyMapper = companyMapper;
         this.securityUtils = securityUtils;
         this.objectMapper = objectMapper;
+        this.validationService = validationService;
     }
 
     /**
@@ -89,6 +92,17 @@ public class SubmissionService {
         ReportSubmission existing = submissionMapper.findLatestByAssignmentIdForUpdate(assignmentId);
         if (!canWriteSubmissionStatus(existing)) {
             throw new DomainException("该报表已提交，不能重复保存或提交，请刷新页面查看最新状态", 409);
+        }
+
+        // 提交时兜底强校验（草稿不校验）：必填、单值、跨字段规则
+        if (isSubmit) {
+            List<ReportTemplateField> templateFields = templateMapper.findFieldsByTemplateId(assignment.getTemplateId());
+            List<String> validationErrors = validationService.validateSubmissionData(templateFields, summary, details);
+            if (!validationErrors.isEmpty()) {
+                String joined = String.join("；", validationErrors.subList(0, Math.min(5, validationErrors.size())));
+                String suffix = validationErrors.size() > 5 ? " 等共 " + validationErrors.size() + " 项" : "";
+                throw new DomainException("提交校验未通过：" + joined + suffix, 400);
+            }
         }
 
         // 三级审批：submit 时查找公司内的复核人

@@ -10,12 +10,18 @@
  *   下拉值按选项归一（容忍空白与全半角差异）
  */
 
+import type { FieldType } from '../types';
+import { validateFieldValue } from './dataValidation';
+
 export interface DetailImportField {
   id: number;
   field_label: string;
   field_type?: string; // 'text' | 'number' | 'date' | 'select' | 'textarea'
   /** select 类型的候选选项（用于值归一） */
   options?: string[];
+  /** number 类型的取值范围（用于值校验） */
+  min?: number;
+  max?: number;
 }
 
 export interface DetailColumnMapping {
@@ -24,12 +30,21 @@ export interface DetailColumnMapping {
   fieldLabel: string;
 }
 
+export interface DetailImportCellError {
+  /** 错误所在行（0 基，指向返回的 rows 下标） */
+  rowIdx: number;
+  fieldId: number;
+  message: string;
+}
+
 export interface DetailImportResult {
   /** 表头所在行（0 基，相对于传入的 rawRows） */
   headerRowIndex: number;
   mapping: DetailColumnMapping[];
   /** 解析出的明细数据行（仅含已映射字段） */
   rows: Array<Record<string, string>>;
+  /** 规范化后仍不合法的单元格（number 非数字、date 非法、select 不在选项、超出范围） */
+  cellErrors: DetailImportCellError[];
   /** 跳过的落款/注释行数 */
   skippedFooter: number;
   /** 跳过的无映射值行数 */
@@ -184,7 +199,8 @@ export function detectHeaderRowIndex(rawRows: unknown[][], fields: DetailImportF
 }
 
 /**
- * 解析明细导入数据：自动定位表头 → 列映射 → 过滤落款/空行 → 值规范化。
+ * 解析明细导入数据：自动定位表头 → 列映射 → 过滤落款/空行 → 值规范化 → 值校验。
+ * 规范化后仍不合法的值记入 cellErrors（不阻断导入，由填报提交时兜底强校验）。
  */
 export function parseDetailRows(rawRows: unknown[][], fields: DetailImportField[]): DetailImportResult {
   const notes: string[] = [];
@@ -198,6 +214,7 @@ export function parseDetailRows(rawRows: unknown[][], fields: DetailImportField[
 
   const fieldsById = new Map<number, DetailImportField>(fields.map((f) => [f.id, f]));
   const rows: Array<Record<string, string>> = [];
+  const cellErrors: DetailImportCellError[] = [];
   let skippedFooter = 0;
   let skippedEmpty = 0;
 
@@ -210,22 +227,36 @@ export function parseDetailRows(rawRows: unknown[][], fields: DetailImportField[
       continue;
     }
     const record: Record<string, string> = {};
+    const rowErrors: Array<{ fieldId: number; message: string }> = [];
     let hasValue = false;
     mapping.forEach((m, ci) => {
       if (m.matchedFieldId === null) return;
-      const value = normalizeValue(cells[ci], fieldsById.get(m.matchedFieldId));
+      const field = fieldsById.get(m.matchedFieldId);
+      const value = normalizeValue(cells[ci], field);
       record[m.matchedFieldId] = value;
-      if (value !== '') hasValue = true;
+      if (value !== '') {
+        hasValue = true;
+        // 规范化后仍不合法的值记入 cellErrors（供预览标注，不再静默保留）
+        if (field?.field_type) {
+          const err = validateFieldValue(
+            { field_type: field.field_type as FieldType, field_label: field.field_label },
+            value,
+            { options: field.options, min: field.min, max: field.max },
+          );
+          if (err) rowErrors.push({ fieldId: m.matchedFieldId, message: err });
+        }
+      }
     });
     if (!hasValue) {
       skippedEmpty++;
       continue;
     }
+    rowErrors.forEach((e) => cellErrors.push({ rowIdx: rows.length, ...e }));
     rows.push(record);
   }
 
   if (skippedFooter > 0) notes.push(`已跳过落款/说明 ${skippedFooter} 行（填表人、联系电话、日期等）`);
   if (skippedEmpty > 0) notes.push(`已跳过无有效数据 ${skippedEmpty} 行`);
 
-  return { headerRowIndex, mapping, rows, skippedFooter, skippedEmpty, notes };
+  return { headerRowIndex, mapping, rows, cellErrors, skippedFooter, skippedEmpty, notes };
 }

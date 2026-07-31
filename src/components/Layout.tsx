@@ -10,6 +10,8 @@ import {
   UserCheck,
   Building2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Menu,
   X,
   RefreshCw,
@@ -33,6 +35,26 @@ export const Layout: React.FC = () => {
   const [accountSwitchOpen, setAccountSwitchOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
+  // 侧边栏收缩（仅桌面端生效，移动端保持 drawer 形态），状态持久化
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('reportnow-sidebar-collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem('reportnow-sidebar-collapsed', next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -130,15 +152,46 @@ export const Layout: React.FC = () => {
     { username: 'sh_approver', label: '审批人', company: '上海分公司' },
   ] : [];
 
-  const navLinkClass = (active: boolean) =>
-    `flex items-center justify-between px-3.5 py-2.5 rounded-[10px] text-[13px] font-medium transition-colors ${
-      active
-        ? 'bg-canvas text-ink font-semibold'
-        : 'text-mute hover:bg-canvas hover:text-ink'
-    }`;
-
   const navIconClass = (active: boolean) =>
     `w-4 h-4 ${active ? 'text-ink' : 'text-mute'}`;
+
+  /** 导航项：收缩态（桌面端）仅显示图标，角标转为右上角小圆点，title 兜底可发现性 */
+  const NavItem: React.FC<{
+    to: string;
+    active: boolean;
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    badge?: number;
+  }> = ({ to, active, icon: Icon, label, badge = 0 }) => (
+    <Link
+      to={to}
+      onClick={() => setMobileMenuOpen(false)}
+      title={label}
+      className={`relative flex items-center px-3.5 py-2.5 rounded-[10px] text-[13px] font-medium transition-colors ${
+        sidebarCollapsed ? 'md:justify-center md:px-0' : 'justify-between'
+      } ${
+        active
+          ? 'bg-canvas text-ink font-semibold'
+          : 'text-mute hover:bg-canvas hover:text-ink'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <Icon className={navIconClass(active)} />
+        <span className={sidebarCollapsed ? 'md:hidden' : ''}>{label}</span>
+      </div>
+      {badge > 0 && (
+        <span
+          className={`text-[#9F2F2D] bg-[#FDEBEC] font-bold rounded-full tabular-nums px-2 py-0.5 text-[10px] ${
+            sidebarCollapsed
+              ? 'md:absolute md:top-0.5 md:right-0.5 md:px-1 md:py-0 md:min-w-[16px] md:h-[16px] md:flex md:items-center md:justify-center md:text-[9px]'
+              : ''
+          }`}
+        >
+          {badge}
+        </span>
+      )}
+    </Link>
+  );
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
@@ -151,7 +204,7 @@ export const Layout: React.FC = () => {
           transition: 'border-color .3s',
         }}
       >
-        <div className="max-w-[1080px] mx-auto px-[22px] h-[54px] flex items-center justify-between gap-4">
+        <div className="max-w-[1280px] mx-auto px-[22px] h-[54px] flex items-center justify-between gap-4">
           {/* Logo & Mobile Menu Toggle */}
           <div className="flex items-center gap-3">
             <button
@@ -259,21 +312,26 @@ export const Layout: React.FC = () => {
       </header>
 
       {/* Main Container */}
-      <div className="max-w-[1080px] w-full mx-auto flex-1 flex">
+      <div className="max-w-[1280px] w-full mx-auto flex-1 flex">
         {/* Sidebar Navigation */}
         <aside
           className={`fixed inset-y-0 left-0 transform ${
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          } md:relative md:translate-x-0 transition duration-200 ease-in-out z-30 w-60 bg-white flex flex-col justify-between shrink-0 top-[54px] md:top-0`}
+          } md:relative md:translate-x-0 transition-[transform,width] duration-200 ease-in-out z-30 bg-white flex flex-col justify-between shrink-0 top-[54px] md:top-0 ${
+            sidebarCollapsed ? 'w-60 md:w-[64px]' : 'w-60'
+          }`}
           style={{ borderRight: '1px solid var(--hairline)' }}
         >
-          <div className="p-4 space-y-5">
+          <div className={`p-4 space-y-5 ${sidebarCollapsed ? 'md:px-2' : ''}`}>
             {/* View Context Badge */}
-            <div className="p-3 bg-canvas rounded-[12px] flex items-center gap-2.5">
+            <div
+              className={`p-3 bg-canvas rounded-[12px] flex items-center gap-2.5 ${sidebarCollapsed ? 'md:justify-center md:p-2' : ''}`}
+              title={sidebarCollapsed ? (user?.company_name || '') : undefined}
+            >
               <div className="p-1.5 rounded-[8px] text-white shrink-0" style={{ background: 'var(--grad-cta)' }}>
                 <Building2 className="w-3.5 h-3.5" />
               </div>
-              <div className="min-w-0">
+              <div className={`min-w-0 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
                 <div className="text-[10px] text-mute font-medium">当前控制视角</div>
                 <div className="text-[13px] font-semibold text-ink truncate">
                   {isHQ ? `${user?.company_name || '总部'}` : `${user?.company_name || '分公司'}`}
@@ -283,117 +341,53 @@ export const Layout: React.FC = () => {
 
             {/* Navigation Menu */}
             <nav className="space-y-0.5">
-              <div className="px-3.5 pb-2 text-[10px] font-bold text-faint uppercase tracking-wider">
-                功能导航
+              <div className={`flex items-center px-3.5 pb-2 ${sidebarCollapsed ? 'md:justify-center md:px-0' : 'justify-between'}`}>
+                <span className={`text-[10px] font-bold text-faint uppercase tracking-wider ${sidebarCollapsed ? 'md:hidden' : ''}`}>
+                  功能导航
+                </span>
+                <button
+                  onClick={toggleSidebar}
+                  className="hidden md:flex p-1 rounded-[6px] text-faint hover:text-ink hover:bg-canvas transition-colors"
+                  title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+                  aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+                >
+                  {sidebarCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+                </button>
               </div>
 
               {/* Common Dashboard */}
-              <Link to="/" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname === '/')}>
-                <div className="flex items-center gap-3">
-                  <LayoutDashboard className={navIconClass(location.pathname === '/')} />
-                  <span>工作台</span>
-                </div>
-              </Link>
+              <NavItem to="/" active={location.pathname === '/'} icon={LayoutDashboard} label="工作台" />
 
               {/* Headquarters Specific Routes */}
               {isHQ && (
                 <>
-                  <Link to="/templates" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/templates'))}>
-                    <div className="flex items-center gap-3">
-                      <FileSpreadsheet className={navIconClass(location.pathname.startsWith('/templates'))} />
-                      <span>模板管理</span>
-                    </div>
-                    {rejectedCount > 0 && (
-                      <span className="text-[#9F2F2D] bg-[#FDEBEC] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
-                        {rejectedCount}
-                      </span>
-                    )}
-                  </Link>
-
-                  <Link to="/assignments" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/assignments'))}>
-                    <div className="flex items-center gap-3">
-                      <Send className={navIconClass(location.pathname.startsWith('/assignments'))} />
-                      <span>下发管理</span>
-                    </div>
-                  </Link>
-
-                  <Link to="/aggregation" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/aggregation'))}>
-                    <div className="flex items-center gap-3">
-                      <BarChart3 className={navIconClass(location.pathname.startsWith('/aggregation'))} />
-                      <span>汇总报表</span>
-                    </div>
-                  </Link>
+                  <NavItem to="/templates" active={location.pathname.startsWith('/templates')} icon={FileSpreadsheet} label="模板管理" badge={rejectedCount} />
+                  <NavItem to="/assignments" active={location.pathname.startsWith('/assignments')} icon={Send} label="下发管理" />
+                  <NavItem to="/aggregation" active={location.pathname.startsWith('/aggregation')} icon={BarChart3} label="汇总报表" />
                 </>
               )}
 
               {/* Digital Admin Routes */}
               {access?.isDigitalAdmin && (
                 <>
-                  <Link to="/approvals" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/approvals') || location.pathname.startsWith('/template-approvals'))}>
-                    <div className="flex items-center gap-3">
-                      <CheckSquare className={navIconClass(location.pathname.startsWith('/approvals') || location.pathname.startsWith('/template-approvals'))} />
-                      <span>审批中心</span>
-                    </div>
-                    {pendingCount > 0 && (
-                      <span className="text-[#9F2F2D] bg-[#FDEBEC] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
-                        {pendingCount}
-                      </span>
-                    )}
-                  </Link>
-
-                  <Link to="/templates" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/templates'))}>
-                    <div className="flex items-center gap-3">
-                      <FileSpreadsheet className={navIconClass(location.pathname.startsWith('/templates'))} />
-                      <span>模板管理</span>
-                    </div>
-                  </Link>
+                  <NavItem to="/approvals" active={location.pathname.startsWith('/approvals') || location.pathname.startsWith('/template-approvals')} icon={CheckSquare} label="审批中心" badge={pendingCount} />
+                  <NavItem to="/templates" active={location.pathname.startsWith('/templates')} icon={FileSpreadsheet} label="模板管理" />
                 </>
               )}
 
               {access?.canManageOrganizations && (
-                <Link to="/organizations" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/organizations'))}>
-                  <div className="flex items-center gap-3">
-                    <Building2 className={navIconClass(location.pathname.startsWith('/organizations'))} />
-                    <span>机构管理</span>
-                  </div>
-                </Link>
+                <NavItem to="/organizations" active={location.pathname.startsWith('/organizations')} icon={Building2} label="机构管理" />
               )}
 
               {access?.isSuperAdmin && (
-                <Link to="/global-view" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/global-view'))}>
-                  <div className="flex items-center gap-3">
-                    <Shield className={navIconClass(location.pathname.startsWith('/global-view'))} />
-                    <span>全局查看</span>
-                  </div>
-                </Link>
+                <NavItem to="/global-view" active={location.pathname.startsWith('/global-view')} icon={Shield} label="全局查看" />
               )}
 
               {/* Branch Specific Routes */}
               {!isHQ && !access?.isSuperAdmin && !access?.isDigitalAdmin && (
                 <>
-                  <Link to="/fill" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/fill'))}>
-                    <div className="flex items-center gap-3">
-                      <FileSpreadsheet className={navIconClass(location.pathname.startsWith('/fill'))} />
-                      <span>报表填报</span>
-                    </div>
-                    {rejectedCount > 0 && (
-                      <span className="text-[#9F2F2D] bg-[#FDEBEC] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
-                        {rejectedCount}
-                      </span>
-                    )}
-                  </Link>
-
-                  <Link to="/approvals" onClick={() => setMobileMenuOpen(false)} className={navLinkClass(location.pathname.startsWith('/approvals'))}>
-                    <div className="flex items-center gap-3">
-                      <CheckSquare className={navIconClass(location.pathname.startsWith('/approvals'))} />
-                      <span>审批中心</span>
-                    </div>
-                    {pendingCount > 0 && (
-                      <span className="text-[#9F2F2D] bg-[#FDEBEC] text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
-                        {pendingCount}
-                      </span>
-                    )}
-                  </Link>
+                  <NavItem to="/fill" active={location.pathname.startsWith('/fill')} icon={FileSpreadsheet} label="报表填报" badge={rejectedCount} />
+                  <NavItem to="/approvals" active={location.pathname.startsWith('/approvals')} icon={CheckSquare} label="审批中心" badge={pendingCount} />
                 </>
               )}
             </nav>
@@ -401,8 +395,13 @@ export const Layout: React.FC = () => {
 
           {/* Quick Info Footer */}
           <div className="p-4 space-y-1" style={{ borderTop: '1px solid var(--hairline)' }}>
-            <div className="text-[11px] font-semibold text-ink">随手报 ReportNow v0.1.0</div>
-            <div className="text-[10px] text-faint">系统状态: 本地 MySQL 运行正常</div>
+            <div className={sidebarCollapsed ? 'md:hidden' : ''}>
+              <div className="text-[11px] font-semibold text-ink">随手报 ReportNow v0.1.0</div>
+              <div className="text-[10px] text-faint">系统状态: 本地 MySQL 运行正常</div>
+            </div>
+            {sidebarCollapsed && (
+              <div className="hidden md:block text-center text-[10px] text-faint">v0.1</div>
+            )}
           </div>
         </aside>
 

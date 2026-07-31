@@ -1,13 +1,9 @@
 import React from 'react';
 import { Grid3x3 } from '../icons';
-import { ReportTemplateField } from '../../types';
 import { FullscreenButton, fullscreenSectionClass, useFullscreen } from '../FullscreenToggle';
+import type { MatrixGroup } from '../../utils/aggregationView';
 
-export interface MatrixGroup {
-  rowLabel: string;
-  rowOptions: string[];
-  columns: ReportTemplateField[];
-}
+export type { MatrixGroup };
 
 interface CrossTableProps {
   groups: MatrixGroup[];

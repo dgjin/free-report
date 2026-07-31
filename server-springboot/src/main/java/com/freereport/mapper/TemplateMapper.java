@@ -115,6 +115,22 @@ public interface TemplateMapper {
                      @Param("fieldId") Long fieldId);
 
     /**
+     * 更新字段（仅设计阶段未下发前允许）。
+     */
+    int updateField(@Param("templateId") Long templateId,
+                    @Param("fieldId") Long fieldId,
+                    @Param("fieldName") String fieldName,
+                    @Param("fieldLabel") String fieldLabel,
+                    @Param("fieldType") String fieldType,
+                    @Param("fieldConfig") String fieldConfig);
+
+    /**
+     * 物理删除字段（仅设计阶段未下发前允许）。
+     */
+    int deleteField(@Param("templateId") Long templateId,
+                    @Param("fieldId") Long fieldId);
+
+    /**
      * 查询模板下最大 sort_order。
      */
     Integer findMaxSortOrder(@Param("templateId") Long templateId);

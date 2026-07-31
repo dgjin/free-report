@@ -137,3 +137,53 @@ test('mapDetailHeaders：单字段最多被一列占用', () => {
   assert.equal(mapping[0].matchedFieldId, 101);
   assert.equal(mapping[1].matchedFieldId, null);
 });
+
+// --- cellErrors（值校验标注，不阻断解析） ---
+
+test('公务用车统计表：规范化后全部合法，cellErrors 为空', () => {
+  const result = parseDetailRows(referenceVehicleRows(), FIELDS);
+  assert.deepEqual(result.cellErrors, []);
+});
+
+test('值校验：非数字/非法日期/无效选项/超范围记入 cellErrors，行仍保留', () => {
+  const fields: DetailImportField[] = [
+    { id: 301, field_label: '名称', field_type: 'text' },
+    { id: 302, field_label: '数量', field_type: 'number', min: 0 },
+    { id: 303, field_label: '购置日期', field_type: 'date' },
+    { id: 304, field_label: '类别', field_type: 'select', options: ['A类', 'B类'] },
+  ];
+  const rows: unknown[][] = [
+    ['名称', '数量', '购置日期', '类别'],
+    ['甲', '三个', '2024-13-40', 'C类'],
+    ['乙', '5', '2024-06-30', 'A类'],
+    ['丙', '-2', '', ''],
+  ];
+  const result = parseDetailRows(rows, fields);
+
+  // 有错的行不剔除（导入进入草稿态，提交时兜底校验）
+  assert.equal(result.rows.length, 3);
+  assert.equal(result.cellErrors.length, 4);
+
+  const keys = result.cellErrors.map((e) => `${e.rowIdx}#${e.fieldId}`);
+  assert.deepEqual(keys, ['0#302', '0#303', '0#304', '2#302']);
+  assert.match(result.cellErrors[0].message, /「数量」值「三个」不是有效数字/);
+  assert.match(result.cellErrors[1].message, /不是有效日期/);
+  assert.match(result.cellErrors[2].message, /「类别」值「C类」不在可选项内/);
+  assert.match(result.cellErrors[3].message, /「数量」值 -2 小于最小值 0/);
+});
+
+test('值校验：cellErrors 的 rowIdx 指向返回 rows 下标（跳过的空行不占位）', () => {
+  const fields: DetailImportField[] = [
+    { id: 401, field_label: '数量', field_type: 'number' },
+  ];
+  const rows: unknown[][] = [
+    ['数量'],
+    [''],
+    ['abc'],
+  ];
+  const result = parseDetailRows(rows, fields);
+  assert.equal(result.rows.length, 1);
+  assert.deepEqual(result.cellErrors, [
+    { rowIdx: 0, fieldId: 401, message: '「数量」值「abc」不是有效数字' },
+  ]);
+});

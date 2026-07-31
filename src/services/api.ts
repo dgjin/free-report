@@ -184,6 +184,25 @@ export const api = {
     });
   },
 
+  /** 更新字段（仅设计阶段未下发前允许，后端守卫） */
+  async updateField(
+    templateId: number,
+    fieldId: number,
+    field: Partial<ReportTemplateField>,
+  ): Promise<{ message: string; field: ReportTemplateField }> {
+    return request(`/api/templates/${templateId}/fields/${fieldId}`, {
+      method: 'PUT',
+      body: JSON.stringify(field),
+    });
+  },
+
+  /** 物理删除字段（仅设计阶段未下发前允许，后端守卫） */
+  async deleteField(templateId: number, fieldId: number): Promise<{ message: string; field: ReportTemplateField }> {
+    return request(`/api/templates/${templateId}/fields/${fieldId}`, {
+      method: 'DELETE',
+    });
+  },
+
   async addMatrixFields(
     templateId: number,
     data: { row_label: string; row_options: string[]; columns: Array<{ field_name: string; field_label: string; field_type: string }> },

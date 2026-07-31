@@ -159,6 +159,24 @@
           AND template_id = #{templateId}
     </update>
 
+    <!-- 更新字段（仅设计阶段未下发前允许） -->
+    <update id="updateField">
+        UPDATE report_template_fields
+        SET field_name = #{fieldName},
+            field_label = #{fieldLabel},
+            field_type = #{fieldType},
+            field_config = #{fieldConfig}
+        WHERE id = #{fieldId}
+          AND template_id = #{templateId}
+    </update>
+
+    <!-- 物理删除字段（仅设计阶段未下发前允许） -->
+    <delete id="deleteField">
+        DELETE FROM report_template_fields
+        WHERE id = #{fieldId}
+          AND template_id = #{templateId}
+    </delete>
+
     <!-- 查询模板下最大 sort_order -->
     <select id="findMaxSortOrder" resultType="java.lang.Integer">
         SELECT MAX(sort_order) FROM report_template_fields WHERE template_id = #{templateId}

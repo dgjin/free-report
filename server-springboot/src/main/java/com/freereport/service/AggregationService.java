@@ -83,6 +83,10 @@ public class AggregationService {
         List<ReportTemplateField> detailFields = allFields.stream()
                 .filter(f -> "detail".equals(f.getDataType()) && "active".equals(f.getStatus()))
                 .collect(Collectors.toList());
+        // 交叉表字段单独输出：其数据与明细行共用 row_index 空间，但列定义需按 field_config.matrix 分组渲染
+        List<ReportTemplateField> matrixFields = allFields.stream()
+                .filter(f -> "matrix".equals(f.getDataType()) && "active".equals(f.getStatus()))
+                .collect(Collectors.toList());
         // 汇总指标仅统计 summary 区的数值字段（detail/matrix 的数值字段不混入汇总区）
         List<ReportTemplateField> numericFields = allFields.stream()
                 .filter(f -> "summary".equals(f.getDataType()) && "number".equals(f.getFieldType())
@@ -186,11 +190,18 @@ public class AggregationService {
         }
     
         // 明细数据行：按提交逐行展开（row_index > 0 的每一行都输出），数值列逐行累计
+        // row_index 保留库内真实行号（交叉表按行号定位行选项），seq 为跨机构连续序号仅供列表展示
         List<Map<String, Object>> detailRows = new ArrayList<>();
         Map<String, Double> detailSumMap = new LinkedHashMap<>();
         for (ReportTemplateField nf : detailFields) {
             if ("number".equals(nf.getFieldType())) {
                 detailSumMap.put(nf.getFieldName(), 0.0);
+            }
+        }
+        // 交叉表数值列同样参与逐行累计（供前端交叉表合计行展示）
+        for (ReportTemplateField mf : matrixFields) {
+            if ("number".equals(mf.getFieldType())) {
+                detailSumMap.put(mf.getFieldName(), 0.0);
             }
         }
         int detailRowCount = 0;
@@ -206,7 +217,8 @@ public class AggregationService {
                 row.put("company_id", a.getAssignedToCompanyId());
                 row.put("company_name", c != null ? c.getName() : null);
                 row.put("submission_status", s.getStatus());
-                row.put("row_index", ++detailRowCount);
+                row.put("row_index", entry.getKey());
+                row.put("seq", ++detailRowCount);
                 for (ReportTemplateField df : detailFields) {
                     String val = entry.getValue().getOrDefault(df.getId(), "");
                     row.put(df.getFieldName(), val);
@@ -214,12 +226,22 @@ public class AggregationService {
                         detailSumMap.merge(df.getFieldName(), parseDouble(val), Double::sum);
                     }
                 }
+                // 交叉表单元格与明细字段共用同一行，同行输出便于前端按 row_index 定位
+                for (ReportTemplateField mf : matrixFields) {
+                    String val = entry.getValue().getOrDefault(mf.getId(), "");
+                    row.put(mf.getFieldName(), val);
+                    if ("number".equals(mf.getFieldType())) {
+                        detailSumMap.merge(mf.getFieldName(), parseDouble(val), Double::sum);
+                    }
+                }
                 detailRows.add(row);
             }
         }
-        // 明细汇总
+        // 明细汇总（含交叉表数值列）
         Map<String, Object> detailSummary = new LinkedHashMap<>();
-        for (ReportTemplateField df : detailFields) {
+        List<ReportTemplateField> detailSummaryFields = new ArrayList<>(detailFields);
+        detailSummaryFields.addAll(matrixFields);
+        for (ReportTemplateField df : detailSummaryFields) {
             if ("number".equals(df.getFieldType())) {
                 double total = detailSumMap.getOrDefault(df.getFieldName(), 0.0);
                 int count = Math.max(detailRowCount, 1);
@@ -235,6 +257,7 @@ public class AggregationService {
         result.put("template", templateToMap(t));
         result.put("summary_fields", summaryFields.stream().map(this::fieldToMap).collect(Collectors.toList()));
         result.put("detail_fields", detailFields.stream().map(this::fieldToMap).collect(Collectors.toList()));
+        result.put("matrix_fields", matrixFields.stream().map(this::fieldToMap).collect(Collectors.toList()));
         result.put("company_data", companyData);
         result.put("summary", summary);
         result.put("detail_rows", detailRows);

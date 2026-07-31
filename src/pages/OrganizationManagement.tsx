@@ -20,7 +20,7 @@ export const OrganizationManagement: React.FC = () => {
   };
 
   return (
-    <div className="reveal max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-6">
+    <div className="reveal max-w-[1280px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-6">
       {/* Page header */}
       <div>
         <h1 className="t-serif text-[32px] text-ink">机构与部门管理员</h1>

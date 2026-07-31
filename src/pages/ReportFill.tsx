@@ -11,6 +11,8 @@ import {
 } from '../types';
 import { getSubmissionWorkflowView } from '../utils/submissionWorkflow';
 import { getClientAccess } from '../utils/access';
+import { buildMatrixGroups } from '../utils/aggregationView';
+import { validateSubmission, ValidationIssue } from '../utils/dataValidation';
 import { SummaryForm } from '../components/report/SummaryForm';
 import { DetailTable } from '../components/report/DetailTable';
 import { CrossTable, MatrixGroup } from '../components/report/CrossTable';
@@ -33,6 +35,8 @@ export const ReportFill: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  // 提交前校验发现的错误（保存草稿不校验）
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
 
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
 
@@ -101,28 +105,11 @@ export const ReportFill: React.FC = () => {
   const matrixFields = fields.filter((f) => f.data_type === 'matrix');
 
   // Group matrix fields by their row_label (each group = one cross-tab table)
-  const matrixGroups = useMemo<MatrixGroup[]>(() => {
-    const groups: MatrixGroup[] = [];
-    const groupMap = new Map<string, number>();
-
-    matrixFields.forEach((field) => {
-      const config = typeof field.field_config === 'string'
-        ? JSON.parse(field.field_config || '{}')
-        : field.field_config || {};
-      const matrix = config.matrix;
-      // 容错：跳过配置残缺的矩阵字段（缺少行维度定义）
-      if (!matrix || !matrix.row_label) return;
-
-      const key = matrix.row_label;
-      if (!groupMap.has(key)) {
-        groupMap.set(key, groups.length);
-        groups.push({ rowLabel: key, rowOptions: matrix.row_options || [], columns: [] });
-      }
-      groups[groupMap.get(key)!].columns.push(field);
-    });
-
-    return groups;
-  }, [matrixFields]);
+  // 共享实现：与汇总视图一致，含 field_config 非法 JSON 容错
+  const matrixGroups = useMemo<MatrixGroup[]>(
+    () => buildMatrixGroups(matrixFields),
+    [matrixFields],
+  );
 
   // Ensure matrix rows exist in detailRows (matrix uses row_index 1..N for fixed rows)
   useEffect(() => {
@@ -156,6 +143,13 @@ export const ReportFill: React.FC = () => {
     if (!assignment) return;
 
     if (isSubmit) {
+      // 提交时强校验并阻断；保存草稿不校验
+      const issues = validateSubmission(fields, summaryForm, detailRows, matrixGroups);
+      setValidationIssues(issues);
+      if (issues.length > 0) {
+        toast(`存在 ${issues.length} 项校验错误，请修正后提交`, 'error');
+        return;
+      }
       if (!(await confirmDialog('确定提交该报表？提交后将发送至下发部门签收，签收前不能再次修改。'))) return;
       setSubmitting(true);
     } else {
@@ -184,7 +178,7 @@ export const ReportFill: React.FC = () => {
 
   if (loading || !assignment) {
     return (
-      <div className="max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)]">
+      <div className="max-w-[1280px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)]">
         <div className="text-center text-xs text-mute py-12">正在加载填报页面数据...</div>
       </div>
     );
@@ -214,7 +208,7 @@ export const ReportFill: React.FC = () => {
   };
 
   return (
-    <div className="reveal max-w-[1080px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-5 pb-12">
+    <div className="reveal max-w-[1280px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-5 pb-12">
       {/* Header */}
       <div
         className="bg-white rounded-[12px] p-6 sm:p-7 space-y-4"
@@ -279,6 +273,29 @@ export const ReportFill: React.FC = () => {
               请根据审核意见修改下方数据后重新提交（提交后系统将自动升级至版本 v
               {(submission?.version || 1) + 1}）。
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 提交校验错误面板 */}
+      {validationIssues.length > 0 && (
+        <div
+          className="bg-[#FDEBEC] rounded-[12px] px-5 py-4 flex items-start space-x-3 text-xs"
+          style={{ border: '1px solid #FDEBEC' }}
+        >
+          <XCircle className="w-[18px] h-[18px] text-[#9F2F2D] shrink-0 mt-0.5" />
+          <div className="space-y-1.5 min-w-0">
+            <div className="font-bold text-ink">
+              存在 {validationIssues.length} 项校验错误，请修正后重新提交
+            </div>
+            <ul className="text-[#9F2F2D] leading-relaxed space-y-0.5 list-disc list-inside">
+              {validationIssues.slice(0, 10).map((issue, idx) => (
+                <li key={`${issue.scope}-${issue.field_id}-${issue.row ?? 0}-${idx}`}>{issue.message}</li>
+              ))}
+            </ul>
+            {validationIssues.length > 10 && (
+              <div className="text-mute">仅显示前 10 条，共 {validationIssues.length} 条</div>
+            )}
           </div>
         </div>
       )}
