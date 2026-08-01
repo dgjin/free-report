@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720">
+  <style>
+    text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
+  </style>
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="720" fill="#ffffff"/>
+  <text x="600" y="34" text-anchor="middle" font-size="18" font-weight="600" fill="#111827">随手报 ReportNow · 核心业务流程图</text>
+  <text x="600" y="54" text-anchor="middle" font-size="12" fill="#6b7280">报表全生命周期：模板设计 → 模板审批 → 任务下发 → 数据填报 → 三级审批 → 签收 → 汇总分析</text>
+  <rect x="40" y="76" width="1120" height="140" fill="#f8fafc" stroke="none" data-graph-role="decoration"/>
+  <rect x="40" y="76" width="110" height="140" fill="#f1f5f9" stroke="none" data-graph-role="decoration"/>
+  <text x="95" y="151" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">部门报表管理员</text>
+  <rect x="40" y="216" width="1120" height="140" fill="#ffffff" stroke="none" data-graph-role="decoration"/>
+  <rect x="40" y="216" width="110" height="140" fill="#f1f5f9" stroke="none" data-graph-role="decoration"/>
+  <text x="95" y="280" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">数智化转型</text>
+  <text x="95" y="298" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">办公室</text>
+  <rect x="40" y="356" width="1120" height="140" fill="#f8fafc" stroke="none" data-graph-role="decoration"/>
+  <rect x="40" y="356" width="110" height="140" fill="#f1f5f9" stroke="none" data-graph-role="decoration"/>
+  <text x="95" y="431" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">分公司用户</text>
+  <rect x="40" y="496" width="1120" height="140" fill="#ffffff" stroke="none" data-graph-role="decoration"/>
+  <rect x="40" y="496" width="110" height="140" fill="#f1f5f9" stroke="none" data-graph-role="decoration"/>
+  <text x="95" y="571" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">填报审批人</text>
+  <rect x="40" y="76" width="1120" height="560" fill="none" stroke="#cbd5e1" stroke-width="1.2" data-graph-role="decoration"/>
+  <line x1="40" y1="216" x2="1160" y2="216" stroke="#e2e8f0" stroke-width="1"/>
+  <line x1="150" y1="216" x2="150" y2="216" stroke="#cbd5e1" stroke-width="1"/>
+  <line x1="40" y1="356" x2="1160" y2="356" stroke="#e2e8f0" stroke-width="1"/>
+  <line x1="150" y1="356" x2="150" y2="356" stroke="#cbd5e1" stroke-width="1"/>
+  <line x1="40" y1="496" x2="1160" y2="496" stroke="#e2e8f0" stroke-width="1"/>
+  <line x1="150" y1="496" x2="150" y2="496" stroke="#cbd5e1" stroke-width="1"/>
+  <line x1="150" y1="76" x2="150" y2="636" stroke="#cbd5e1" stroke-width="1"/>
+  <line x1="350" y1="146" x2="400" y2="146" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <line x1="470" y1="170" x2="470" y2="246" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <path d="M 385 286 H 300 V 170" stroke="#dc2626" stroke-width="1.5" fill="none" stroke-dasharray="5,3" marker-end="url(#arrow-red)"/>
+  <text x="292" y="228" text-anchor="end" font-size="12" fill="#dc2626">驳回·修改重报</text>
+  <path d="M 555 286 H 580 V 146 H 610" stroke="#2563eb" stroke-width="2" fill="none" marker-end="url(#arrow-blue)"/>
+  <text x="588" y="228" font-size="12" fill="#2563eb">通过·模板发布</text>
+  <line x1="670" y1="170" x2="670" y2="412" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="678" y="290" font-size="12" fill="#2563eb">下发任务·自动调度</text>
+  <line x1="730" y1="436" x2="760" y2="436" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <line x1="900" y1="436" x2="930" y2="436" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <line x1="990" y1="460" x2="990" y2="531" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <path d="M 895 576 H 830 V 460" stroke="#dc2626" stroke-width="1.5" fill="none" stroke-dasharray="5,3" marker-end="url(#arrow-red)"/>
+  <text x="822" y="520" text-anchor="end" font-size="12" fill="#dc2626">驳回·退回重填</text>
+  <path d="M 1085 576 H 1140 V 190 H 850 V 170" stroke="#2563eb" stroke-width="2" fill="none" marker-end="url(#arrow-blue)"/>
+  <text x="995" y="182" text-anchor="middle" font-size="12" fill="#2563eb">通过·待签收</text>
+  <line x1="910" y1="146" x2="950" y2="146" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <rect x="180" y="122" width="170" height="48" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="265.0" y="151" text-anchor="middle" font-size="13" font-weight="600" fill="#111827">创建模板·设计字段</text>
+  <rect x="400" y="122" width="140" height="48" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="470.0" y="151" text-anchor="middle" font-size="13" font-weight="600" fill="#111827">提交模板审批</text>
+  <rect x="610" y="122" width="120" height="48" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="670.0" y="151" text-anchor="middle" font-size="13" font-weight="600" fill="#111827">下发任务</text>
+  <rect x="790" y="122" width="120" height="48" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="850.0" y="151" text-anchor="middle" font-size="13" font-weight="600" fill="#111827">签收报表</text>
+  <rect x="950" y="122" width="170" height="48" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+  <text x="1035.0" y="151" text-anchor="middle" font-size="13" font-weight="600" fill="#166534">汇总分析·智能问数</text>
+  <polygon points="470,246 555,286 470,326 385,286" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+  <text x="470" y="282" text-anchor="middle" font-size="13" font-weight="600" fill="#92400e">模板审批</text>
+  <text x="470" y="300" text-anchor="middle" font-size="11" fill="#6b7280">通过 / 驳回</text>
+  <rect x="610" y="412" width="120" height="48" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="670.0" y="441" text-anchor="middle" font-size="13" font-weight="600" fill="#111827">接收任务</text>
+  <rect x="760" y="412" width="140" height="48" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="830.0" y="433" text-anchor="middle" font-size="13" font-weight="600" fill="#111827">填报数据</text>
+  <text x="830.0" y="450" text-anchor="middle" font-size="11" fill="#6b7280">汇总区·明细·交叉表</text>
+  <rect x="930" y="412" width="120" height="48" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="990.0" y="441" text-anchor="middle" font-size="13" font-weight="600" fill="#111827">提交填报</text>
+  <polygon points="990,531 1085,576 990,621 895,576" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+  <text x="990" y="572" text-anchor="middle" font-size="13" font-weight="600" fill="#92400e">三级审批</text>
+  <text x="990" y="590" text-anchor="middle" font-size="11" fill="#6b7280">分公司 → 部门</text>
+  <line x1="40" y1="668" x2="76" y2="668" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="84" y="672" font-size="12" fill="#6b7280">主流程（任务 / 数据流转）</text>
+  <line x1="320" y1="668" x2="356" y2="668" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-red)"/>
+  <text x="364" y="672" font-size="12" fill="#6b7280">驳回 / 退回路径</text>
+</svg>
