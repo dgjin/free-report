@@ -14,6 +14,7 @@ import {
 import { api, getStoredUser } from '../services/api';
 import { PendingApprovalTask, ReportSubmissionDetail, UserInfo } from '../types';
 import { SubmissionDetailTables } from '../components/SubmissionDetailTables';
+import { ApprovalTimeline } from '../components/report/ApprovalTimeline';
 import { TemplateApprovalPanel } from './TemplateApprovalList';
 
 export const ApprovalList: React.FC = () => {
@@ -240,10 +241,57 @@ export const ApprovalList: React.FC = () => {
               <div className="py-12 text-center text-sm text-mute">正在加载数据明细...</div>
             ) : (
               <div className="space-y-5">
-                {/* 1. Summary Items */}
+                {/* 一、审批流程 + 复核操作（置顶） */}
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-ink tracking-[-0.01em] pb-2 border-b border-line">
+                    一、审批流程
+                  </div>
+                  {submissionDetail.approvals && submissionDetail.approvals.length > 0 ? (
+                    <ApprovalTimeline approvals={submissionDetail.approvals} />
+                  ) : (
+                    <div className="text-xs text-mute">暂无审批记录</div>
+                  )}
+
+                  <div className="space-y-3 pt-1">
+                    <label className="block text-xs font-medium text-body">
+                      处理意见 (驳回时请必须填写具体原因)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      placeholder="如: 数据核实无误，同意提交上报 / 数据异常需重新核算..."
+                      className="w-full px-3.5 py-2.5 bg-white border border-line rounded-[12px] text-sm text-ink placeholder:text-faint focus:outline-none focus:border-ink focus:ring-1 focus:ring-[rgba(17,17,17,0.2)]"
+                    />
+
+                    <div className="flex items-center justify-end gap-3 pt-2 border-t border-line">
+                      <button
+                        type="button"
+                        disabled={processing}
+                        onClick={() => handleAction('rejected')}
+                        className="h-10 px-5 bg-[#FDEBEC] hover:bg-[#FDEBEC] text-[#9F2F2D] font-medium text-sm rounded-full transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        <span>驳回 (退回草稿)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={processing}
+                        onClick={() => handleAction('approved')}
+                        className="h-10 px-5 bg-ink hover:bg-inkhover text-white font-medium text-sm rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>审核通过 (进入下一步)</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 二、汇总指标 */}
                 <div className="p-4 bg-canvas rounded-[12px] space-y-3">
                   <div className="text-xs font-semibold text-ink tracking-[-0.01em] pb-2 border-b border-line">
-                    一、汇总指标核对
+                    二、汇总指标核对
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {submissionDetail.summary.map((s) => (
@@ -257,51 +305,15 @@ export const ApprovalList: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. Detail Items + Matrix Cross-Tabs */}
+                {/* 三、填报明细（分页） */}
                 {submissionDetail.details && submissionDetail.details.length > 0 && (
                   <div className="p-4 bg-canvas rounded-[12px] space-y-3">
                     <div className="text-xs font-semibold text-ink tracking-[-0.01em] pb-2 border-b border-line">
-                      二、填报明细清单 (共 {submissionDetail.details.length} 行)
+                      三、填报明细清单 (共 {submissionDetail.details.length} 行)
                     </div>
-                    <SubmissionDetailTables detail={submissionDetail} />
+                    <SubmissionDetailTables detail={submissionDetail} pageSize={10} />
                   </div>
                 )}
-
-                {/* Action Form */}
-                <div className="space-y-3 pt-1">
-                  <label className="block text-xs font-medium text-body">
-                    处理意见 (驳回时请必须填写具体原因)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="如: 数据核实无误，同意提交上报 / 数据异常需重新核算..."
-                    className="w-full px-3.5 py-2.5 bg-white border border-line rounded-[12px] text-sm text-ink placeholder:text-faint focus:outline-none focus:border-ink focus:ring-1 focus:ring-[rgba(17,17,17,0.2)]"
-                  />
-
-                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-line">
-                    <button
-                      type="button"
-                      disabled={processing}
-                      onClick={() => handleAction('rejected')}
-                      className="h-10 px-5 bg-[#FDEBEC] hover:bg-[#FDEBEC] text-[#9F2F2D] font-medium text-sm rounded-full transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <XCircle className="w-4 h-4" />
-                      <span>驳回 (退回草稿)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={processing}
-                      onClick={() => handleAction('approved')}
-                      className="h-10 px-5 bg-ink hover:bg-inkhover text-white font-medium text-sm rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>审核通过 (进入下一步)</span>
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
           </div>

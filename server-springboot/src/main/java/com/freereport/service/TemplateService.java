@@ -119,13 +119,21 @@ public class TemplateService {
     }
 
     /**
-     * 返回模板详情（含字段列表、创建者姓名与下发任务数）。
+     * 模板详情（含字段列表、创建者姓名与下发任务数；含属主校验）：
+     * 超级管理员与数智化转型办公室可看全部，部门报表管理员仅限本部门模板，
+     * 其余角色（含跨部门）一律 404 防止遍历探测。
      */
-    public Map<String, Object> getTemplateDetail(Long id) {
+    public Map<String, Object> getTemplateDetail(AuthUser user, Long id) {
         ReportTemplate t = templateMapper.findById(id);
-        if (t == null) {
+        if (t == null || !canReadTemplate(user, t.getOwnerDepartmentId())) {
             throw new DomainException("模板不存在", 404);
         }
+        return buildTemplateDetail(id);
+    }
+
+    /** 组装模板详情（无权限校验）：仅供已通过属主校验的内部流程调用 */
+    private Map<String, Object> buildTemplateDetail(Long id) {
+        ReportTemplate t = templateMapper.findById(id);
         Map<String, Object> m = toMap(t);
         List<ReportTemplateField> fields = templateMapper.findFieldsByTemplateId(id);
         m.put("fields", fields.stream().map(this::fieldToMap).collect(Collectors.toList()));
@@ -162,7 +170,7 @@ public class TemplateService {
             templateMapper.insertFieldsBatch(fieldList);
         }
         // 返回结构与前端契约匹配：{ template, fields }
-        Map<String, Object> detail = getTemplateDetail(templateId);
+        Map<String, Object> detail = buildTemplateDetail(templateId);
         Map<String, Object> template = new LinkedHashMap<>(detail);
         template.remove("fields");
         Map<String, Object> result = new LinkedHashMap<>();
@@ -190,7 +198,7 @@ public class TemplateService {
         String description = updates.containsKey("description") ? (String) updates.get("description") : t.getDescription();
         String periodType = updates.containsKey("period_type") ? (String) updates.get("period_type") : t.getPeriodType();
         templateMapper.updateTemplate(id, name, description, periodType);
-        return getTemplateDetail(id);
+        return buildTemplateDetail(id);
     }
 
     /**
@@ -215,7 +223,7 @@ public class TemplateService {
         // 返回结构与前端契约匹配：{ message, template }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", enabled ? "报表模板已启用" : "报表模板已停用");
-        result.put("template", getTemplateDetail(id));
+        result.put("template", buildTemplateDetail(id));
         return result;
     }
 
@@ -523,7 +531,7 @@ public class TemplateService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "模板已提交审批，等待数智化转型办公室审核");
-        result.put("template", getTemplateDetail(templateId));
+        result.put("template", buildTemplateDetail(templateId));
         return result;
     }
 
@@ -550,7 +558,7 @@ public class TemplateService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "模板审批通过，已发布");
-        result.put("template", getTemplateDetail(templateId));
+        result.put("template", buildTemplateDetail(templateId));
         return result;
     }
 
@@ -577,7 +585,7 @@ public class TemplateService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "模板已驳回");
-        result.put("template", getTemplateDetail(templateId));
+        result.put("template", buildTemplateDetail(templateId));
         return result;
     }
 
@@ -662,6 +670,15 @@ public class TemplateService {
         if (!"published".equals(status)) {
             throw new DomainException("模板尚未发布，不能下发。请先提交审批并通过", 409);
         }
+    }
+
+    private boolean canReadTemplate(AuthUser user, Long ownerDepartmentId) {
+        if ("super_admin".equals(user.getRole()) || "digital_admin".equals(user.getRole())) {
+            return true;
+        }
+        return "department_report_admin".equals(user.getRole())
+                && "department".equals(user.getCompanyLevel())
+                && user.getCompanyId().equals(ownerDepartmentId);
     }
 
     private boolean canManageTemplate(AuthUser user, Long ownerDepartmentId) {

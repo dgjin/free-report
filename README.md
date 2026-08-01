@@ -58,18 +58,31 @@ cors:
 npm install
 ```
 
-执行 SQL 迁移脚本创建表结构和初始数据：
+执行 SQL 迁移脚本创建表结构和初始数据。注意迁移顺序：`002_seed.sql` 依赖 `004` 的 `owner_department_id` 列与 `department` 级别、`008` 的 `digital_admin` 角色与 `pending_approval` 状态，因此必须放在结构与枚举迁移之后；`003`/`005` 是种子数据修正与 backfill，同样必须在 `002` 之后。
 
 ```bash
-# 按顺序执行
-mysql -u freereport -p freereport < sql/001_schema.sql
-mysql -u freereport -p freereport < sql/002_seed.sql
-mysql -u freereport -p freereport < sql/003_fix_vehicle_detail_fields.sql
-mysql -u freereport -p freereport < sql/004_department_reporting.sql
-mysql -u freereport -p freereport < sql/005_department_admin_backfill.sql
-mysql -u freereport -p freereport < sql/006_performance_indexes.sql
-mysql -u freereport -p freereport < sql/007_recall_and_onetime.sql
-mysql -u freereport -p freereport < sql/008_template_approval.sql
+# 推荐顺序（不可打乱）：
+# 结构演进 → 索引/枚举扩展 → 种子数据 → 数据修正与 backfill
+for f in \
+  sql/001_schema.sql \
+  sql/004_department_reporting.sql \
+  sql/006_performance_indexes.sql \
+  sql/007_recall_and_onetime.sql \
+  sql/008_template_approval.sql \
+  sql/009_template_schedule.sql \
+  sql/010_query_optimization.sql \
+  sql/002_seed.sql \
+  sql/003_fix_vehicle_detail_fields.sql \
+  sql/005_department_admin_backfill.sql; do
+  mysql -u freereport -p freereport < "$f"
+done
+```
+
+如需从零重置数据库（清除全部业务数据）：
+
+```bash
+mysql -u freereport -p -e "DROP DATABASE IF EXISTS freereport; CREATE DATABASE freereport CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+# 然后执行上面的迁移脚本
 ```
 
 所有演示账号初始密码为 `123456`。正式使用前必须修改或删除演示账号。
@@ -158,3 +171,36 @@ mvn compile
 - MySQL 密码使用强密码，定期更换
 - 数据库只允许应用服务器内网访问
 - 定期执行 `mvn dependency:check` 检查依赖漏洞
+
+## 8. 核心功能
+
+### 报表全生命周期
+- **模板管理**：支持汇总指标、明细行、二维交叉表三种数据区域，字段只增不减设计规范
+- **模板审批**：部门创建 → 数智化转型办公室审批 → 发布下发
+- **任务下发**：支持周期性自动下发与一次性下发，可配置周期计划
+- **填报提交**：分公司经办人在线填报，支持 Excel 批量导入明细
+- **三级审批**：经办人 → 复核人 → 审批人 → 部门签收
+- **汇总报表**：多机构对比、明细穿透、填报进度统计，支持导出 Excel
+
+### 智能问数
+- 自然语言提问，自动定位报表、周期与指标
+- 生成文字结论、图表与数据明细
+- 支持多轮对话追问
+- 结果可下载为 Excel（含图表数据）
+
+### AI 智能帮助
+- 帮助抽屉内置对话式 AI 问答
+- 基于系统帮助文档知识库（角色权限、审批流程、操作指南、模板设计、FAQ）
+- 输入自然语言问题，快速获得准确解答
+- 支持多轮对话追问
+
+### 权限与安全
+- **角色隔离**：超级管理员、数智化转型办公室、部门报表管理员、分公司经办人、复核人/审批人
+- **模板隔离**：各部门模板相互隔离，跨部门访问返回 404 防遍历探测
+- **智能问数权限分档**：超管与数智办仅限运营统计查询，具体报表数值仅部门管理员可问
+- **只读模式**：数智化转型办公室可查看模板但不可编辑其他部门模板
+
+### 审批体验优化
+- 签收/复核/审批弹窗：审批流程与操作按钮置顶，无需滚动即可处理
+- 明细数据分页：每页 10 行，支持翻页浏览
+- 审批时间线：可视化展示审批流转历史

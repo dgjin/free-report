@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../services/api';
+import { getStoredUser } from '../services/api';
+import { getClientAccess } from '../utils/access';
 import { ReportTemplate } from '../types';
 import ExcelFieldImportModal, {
   ImportPayload,
@@ -27,6 +29,11 @@ export const TemplateEditor: React.FC = () => {
   const [addFieldModalOpen, setAddFieldModalOpen] = useState<boolean>(false);
   const [excelImportModalOpen, setExcelImportModalOpen] = useState<boolean>(false);
   const [matrixModalOpen, setMatrixModalOpen] = useState(false);
+
+  // 数智化转型办公室等审批角色只读查看，不可编辑（即使模板状态允许）
+  const currentUser = getStoredUser();
+  const access = currentUser ? getClientAccess(currentUser) : null;
+  const isReadOnly = !access?.canManageTemplates || (template?.owner_department_id !== currentUser?.company_id);
 
   useEffect(() => {
     if (id) loadTemplateDetail();
@@ -121,9 +128,10 @@ export const TemplateEditor: React.FC = () => {
         onImportExcel={() => setExcelImportModalOpen(true)}
         onCreateMatrix={() => setMatrixModalOpen(true)}
         onAddField={() => setAddFieldModalOpen(true)}
+        readOnly={isReadOnly}
       />
 
-      <TemplateFieldList template={template} onChanged={loadTemplateDetail} />
+      <TemplateFieldList template={template} onChanged={loadTemplateDetail} readOnly={isReadOnly} />
 
       {/* Add Field Modal */}
       {addFieldModalOpen && (

@@ -374,6 +374,17 @@ export const api = {
       body: JSON.stringify({ question, history: history || [] }),
     });
   },
+
+  /** 帮助知识库 AI 问答：基于系统帮助文档回答用户咨询 */
+  async helpAiAsk(
+    question: string,
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+  ): Promise<{ answer: string }> {
+    return request<{ answer: string }>('/api/ai/help', {
+      method: 'POST',
+      body: JSON.stringify({ question, history: history || [] }),
+    });
+  },
 };
 
 // --- SWR hooks: client-side caching, avoids refetch on route changes ---

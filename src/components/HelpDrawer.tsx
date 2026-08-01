@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   X,
   BookOpen,
@@ -8,8 +8,10 @@ import {
   Grid3x3,
   Zap,
   ChevronDown,
+  Send,
 } from './icons';
 import { UserInfo } from '../types';
+import { api } from '../services/api';
 
 interface HelpDrawerProps {
   open: boolean;
@@ -108,6 +110,66 @@ const FIELD_TYPE_LEGEND: Array<{ label: string; desc: string }> = [
   { label: '二维交叉表', desc: '在行 × 列交叉单元格中填写' },
 ];
 
+/** AI 智能问答知识库 */
+const AI_QA_KNOWLEDGE_BASE: Array<{ q: string; a: string }> = [
+  {
+    q: '如何创建报表模板？',
+    a: '进入「模板管理」→ 点击「新建模板」→ 填写模板名称、周期类型、说明 → 在字段设计页通过「新增模版字段」「导入Excel」或「创建交叉表」添加字段 → 完成后点击「提交审批」，数智化转型办公室审批通过后即可下发。',
+  },
+  {
+    q: '如何下发报表任务？',
+    a: '进入「下发管理」→ 选择已发布的模板 → 指定目标分公司、周期与截止日期 → 点击「下发」。支持「一次性下发」用于补充调查场景。也可在「周期计划」中配置自动下发，系统每日按设定时间自动生成任务。',
+  },
+  {
+    q: '如何填报报表？',
+    a: '进入「报表填报」→ 查看收到的下发任务 → 点击进入填报页 → 填写汇总指标、明细行或交叉表数据 → 点击「提交」。支持「导入Excel」批量导入明细数据。提交后进入三级审批流程。',
+  },
+  {
+    q: '审批流程是怎样的？',
+    a: '三级审批：① 经办人填报提交 → ② 复核人审核（通过或退回）→ ③ 审批人终审（通过或退回）→ ④ 发起部门签收确认。退回后经办人可修改重提，流程从头开始。',
+  },
+  {
+    q: '模板审批流程是怎样的？',
+    a: '四步：① 部门报表管理员创建模板（草稿）→ ② 点击「提交审批」（待审批，锁定编辑）→ ③ 数智化转型办公室审批（通过或驳回）→ ④ 通过后自动发布，可下发；驳回退回草稿可修改重提。',
+  },
+  {
+    q: '如何使用智能问数？',
+    a: '进入「智能问数」→ 用日常说法提问（如「北京分公司上月的裸车价是多少」）→ 系统自动定位报表、周期与指标 → 生成文字结论、图表和数据明细。支持多轮对话，点击「下载」可导出 Excel。',
+  },
+  {
+    q: '智能问数可以查询哪些数据？',
+    a: '部门报表管理员可查询本部门模板的具体报表数据；超级管理员与数智化转型办公室仅限运营统计（如「各部门下发报表的情况」「各分公司填报情况分析」），不可查询具体报表数值。',
+  },
+  {
+    q: '如何导出报表数据？',
+    a: '两种导出：① 汇总报表页点击「导出 Excel」，生成机构对比、明细、进度三张表；② 智能问数结果点击「下载」，生成查询说明、数据表格、图表数据三张表。',
+  },
+  {
+    q: '如何处理被退回的报表？',
+    a: '工作台顶部会出现红色「退回提醒」，左侧导航菜单显示红色角标 → 进入原任务页面 → 查看退回原因 → 修改数据 → 重新提交即可消除提醒。',
+  },
+  {
+    q: '如何配置模板自动下发？',
+    a: '进入「模板管理」→ 找到目标模板 → 点击「周期计划」→ 配置下发时间、目标分公司 → 保存。模板审批发布后，系统每日按设定时间自动向目标分公司生成本期任务。也可在弹窗中「立即执行一次」手动触发补发。',
+  },
+  {
+    q: '如何查看汇总报表？',
+    a: '进入「汇总报表」→ 选择模板 → 查看多机构对比、明细数据与填报进度。数字型指标自动加总对比，明细可逐条穿透查看。仅统计已审批通过的填报数据。',
+  },
+  {
+    q: '模板字段可以删除吗？',
+    a: '模板未下发前（设计阶段）可自由修改、删除字段；一经下发遵循「只增不减」规范：字段不可物理删除，仅可停用。停用后历史数据完整保留，新填报不再要求填写。',
+  },
+  {
+    q: '如何批量导入历史数据？',
+    a: '进入「模板管理」→ 点击「数据导入」→ 选择「历史归档」或「期初预填」→ 上传 Excel。「历史归档」直接成为已签收数据并计入汇总；「期初预填」为已下发任务生成草稿，由分公司经办人核对后提交。',
+  },
+  {
+    q: '各角色的权限是什么？',
+    a: '超级管理员：全局只读，可管理机构与用户，不可填报；部门报表管理员：设计模板、下发任务、签收报表、查看汇总、智能问数（限本部门）；数智化转型办公室：审批模板，可查看所有模板；分公司经办人：填写并提交报表；复核人/审批人：审批操作（不可填报）。',
+  },
+];
+
 /** 可折叠的帮助区块 */
 const HelpSection: React.FC<{
   icon: React.ReactNode;
@@ -133,6 +195,32 @@ const HelpSection: React.FC<{
   </section>
 );
 
+/** AI 智能问答的可折叠问答对 */
+const AiQaItem: React.FC<{ question: string; answer: string }> = ({ question, answer }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      className="rounded-[10px] overflow-hidden"
+      style={{ border: '1px solid var(--hairline)' }}
+    >
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 text-left bg-canvas hover:bg-line transition-colors"
+      >
+        <span className="text-[12px] font-semibold text-ink leading-[1.5]">{question}</span>
+        <ChevronDown
+          className={`w-3 h-3 text-mute shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <div className="px-3.5 py-2.5 text-[12px] text-mute leading-[1.7] bg-white">
+          {answer}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) => {
   const isHQ = user?.role === 'department_report_admin' || user?.role === 'super_admin';
   const isDigitalAdmin = user?.role === 'digital_admin';
@@ -141,12 +229,45 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
   const defaultOpen = isHQ ? 'hq' : isDigitalAdmin ? 'digital' : 'branch';
   const [openSections, setOpenSections] = useState<Set<string>>(new Set([defaultOpen]));
 
+  // AI 对话状态
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   const toggleSection = (id: string) => {
     setOpenSections((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  // 滚动到底部
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  // 发送问题
+  const handleChatSend = async () => {
+    const question = chatInput.trim();
+    if (!question || chatLoading) return;
+
+    setChatInput('');
+    setChatMessages((prev) => [...prev, { role: 'user', content: question }]);
+    setChatLoading(true);
+
+    try {
+      const res = await api.helpAiAsk(question, chatMessages);
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: res.answer }]);
+    } catch (err: any) {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: '抱歉，智能帮助暂时不可用，请稍后再试。您也可以浏览下方的帮助文档找到答案。' },
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -200,6 +321,76 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          {/* AI 智能问答对话区 */}
+          <div
+            className="rounded-[12px] overflow-hidden"
+            style={{ border: '1px solid var(--hairline)' }}
+          >
+            <div className="px-4 py-3 bg-canvas flex items-center gap-2" style={{ borderBottom: '1px solid var(--hairline)' }}>
+              <Zap className="w-4 h-4 text-ink" />
+              <span className="text-[13px] font-semibold text-ink">AI 智能帮助</span>
+              <span className="text-[11px] text-mute ml-auto">输入问题，快速获得解答</span>
+            </div>
+
+            {/* 消息列表 */}
+            <div className="px-4 py-3 space-y-3 min-h-[120px] max-h-[280px] overflow-y-auto bg-white">
+              {chatMessages.length === 0 && (
+                <div className="text-[12px] text-mute text-center py-4">
+                  您好！我是智能帮助助手，可以回答关于系统使用的问题。<br />
+                  试试问我：「如何创建模板？」「审批流程是什么？」
+                </div>
+              )}
+              {chatMessages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[85%] px-3.5 py-2.5 rounded-[12px] text-[12px] leading-[1.7] ${
+                      msg.role === 'user'
+                        ? 'bg-ink text-white rounded-br-sm'
+                        : 'bg-canvas text-body rounded-bl-sm'
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-canvas px-3.5 py-2.5 rounded-[12px] rounded-bl-sm text-[12px] text-mute">
+                    正在思考中...
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* 输入区 */}
+            <div className="px-3 py-2.5 bg-canvas flex items-center gap-2" style={{ borderTop: '1px solid var(--hairline)' }}>
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleChatSend();
+                  }
+                }}
+                placeholder="输入您的问题..."
+                disabled={chatLoading}
+                className="flex-1 px-3 py-2 bg-white border border-line rounded-[10px] text-[12px] text-ink placeholder:text-faint focus:outline-none focus:border-ink focus:ring-1 focus:ring-[rgba(17,17,17,0.2)] disabled:opacity-50"
+              />
+              <button
+                onClick={handleChatSend}
+                disabled={chatLoading || !chatInput.trim()}
+                className="h-8 w-8 flex items-center justify-center rounded-[10px] bg-ink hover:bg-inkhover text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
           {/* 角色与权限 */}
           <HelpSection icon={<Shield className="w-4 h-4 text-ink" />} title="角色与权限"
             open={openSections.has('roles')} onToggle={() => toggleSection('roles')}>
@@ -422,6 +613,17 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
                   ))}
                 </ul>
               </div>
+            </div>
+          </HelpSection>
+
+          {/* AI 智能问答知识库 */}
+          <HelpSection icon={<Zap className="w-4 h-4 text-ink" />} title="AI 智能问答"
+            open={openSections.has('ai-qa')} onToggle={() => toggleSection('ai-qa')}>
+            <div className="space-y-2">
+              <p className="text-[11px] text-mute mb-2">点击问题查看答案，快速了解系统使用方法</p>
+              {AI_QA_KNOWLEDGE_BASE.map((item, idx) => (
+                <AiQaItem key={idx} question={item.q} answer={item.a} />
+              ))}
             </div>
           </HelpSection>
 

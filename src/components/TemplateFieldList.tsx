@@ -26,15 +26,18 @@ interface TemplateFieldListProps {
   template: ReportTemplate;
   /** 字段发生增删改停用后刷新模板详情 */
   onChanged: () => void;
+  /** 审批角色等只读查看，不可编辑字段 */
+  readOnly?: boolean;
 }
 
 /** 报表自定义字段列表面板：字段卡片展示 + 编辑/删除/停用操作（含编辑弹窗） */
-export const TemplateFieldList: React.FC<TemplateFieldListProps> = ({ template, onChanged }) => {
+export const TemplateFieldList: React.FC<TemplateFieldListProps> = ({ template, onChanged, readOnly = false }) => {
   const [editingField, setEditingField] = useState<ReportTemplateField | null>(null);
 
   const fieldsList = template.fields || [];
   const lifecycle = getTemplateLifecycleView(template.status);
-  const canWrite = lifecycle.canWrite;
+  // 审批角色只读查看，即使模板状态允许编辑
+  const canWrite = !readOnly && lifecycle.canWrite;
   // 设计阶段（从未下发）允许编辑/物理删除字段；下发后仅可停用
   const canMaintainFields = canWrite && canMaintainTemplateFields(template.status, template.assignment_count ?? 0);
 

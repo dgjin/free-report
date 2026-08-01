@@ -33,6 +33,24 @@ test('AiQueryController 仅放行超级管理员、数智化转型办公室与�
   assert.match(controller, /throw new DomainException\([^)]*403\)/s);
 });
 
+test('超级管理员与数智化办公室在智能问数中仅限运营统计，不可查询具体数据', () => {
+  const security = read('java/com/freereport/security/SecurityUtils.java');
+  // 规则集中在 SecurityUtils：超管与数智化办公室仅限运营统计
+  assert.match(security, /isAiQueryLimitedToOperationStats\(AuthUser user\)/);
+  assert.match(security, /isSuperAdmin\(user\) \|\| isDigitalAdmin\(user\)/);
+  // 拦截发生在运营统计直答之后、模板上下文构建与 LLM 计划之前
+  assert.match(service, /isAiQueryLimitedToOperationStats\(user\)/);
+  assert.match(service, /仅支持运营统计类查询/);
+  const statsPos = service.indexOf('operationAnalyzer.answerIfMatched');
+  const limitPos = service.indexOf('isAiQueryLimitedToOperationStats(user)');
+  const contextPos = service.indexOf('contextBuilder.buildContexts');
+  assert.ok(statsPos > -1 && limitPos > statsPos && contextPos > limitPos,
+    '拦截顺序应为：运营统计直答 → 受限角色拦截 → 构建模板上下文');
+  // 前端建议问题同步分流：受限角色只推荐两条运营统计引导
+  const aiQueryPage = fs.readFileSync(new URL('../src/pages/AiQuery.tsx', import.meta.url), 'utf8');
+  assert.match(aiQueryPage, /access\.isSuperAdmin \|\| access\.isDigitalAdmin/);
+});
+
 test('AiQueryService 通过聚合引擎取数，不绕过权限校验', () => {
   // 多周期取数走批量接口（一次调用替代逐周期 N+1），权限校验仍在聚合引擎内部
   assert.match(service, /aggregationService\.getAggregationsByTemplateAndPeriods\(/);

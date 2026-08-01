@@ -23,6 +23,7 @@ import { api, getStoredUser, swrKeys, swrFetcher, useRejectedReminders } from '.
 import { UserInfo, ReportTemplate, ReportAssignment, PendingApprovalTask, Company, PendingReceipt, ReportSubmissionDetail, RejectedReminder } from '../types';
 import { getClientAccess } from '../utils/access';
 import { SubmissionDetailTables } from '../components/SubmissionDetailTables';
+import { ApprovalTimeline } from '../components/report/ApprovalTimeline';
 
 export const Dashboard: React.FC = () => {
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
@@ -627,9 +628,53 @@ export const Dashboard: React.FC = () => {
               <div className="py-16 text-center text-[13px] text-mute">正在加载数据明细...</div>
             ) : (
               <div className="space-y-5 pt-5">
+                {/* 一、审批流程 + 签收操作（置顶） */}
+                <div className="space-y-3">
+                  <div className="text-[13px] font-semibold text-ink">一、审批流程</div>
+                  {submissionDetail.approvals && submissionDetail.approvals.length > 0 ? (
+                    <ApprovalTimeline approvals={submissionDetail.approvals} />
+                  ) : (
+                    <div className="text-[12px] text-mute">暂无审批记录</div>
+                  )}
+
+                  <div className="space-y-3 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
+                    <label className="block text-[13px] font-semibold text-ink">
+                      签收备注 <span className="text-mute font-normal">(退回时必须填写原因)</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={receiptComment}
+                      onChange={(e) => setReceiptComment(e.target.value)}
+                      placeholder="如：数据核实无误，同意签收 / 数据有误需退回修正..."
+                      className="w-full px-3.5 py-2.5 bg-canvas rounded-[12px] text-[13px] text-ink placeholder:text-faint focus:outline-none focus:ring-1 focus:ring-ink focus:bg-white transition-colors"
+                    />
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        type="button"
+                        disabled={processingId !== null}
+                        onClick={() => handleReceiptAction('returned')}
+                        className="inline-flex items-center gap-1.5 h-11 px-5 rounded-md bg-canvas hover:bg-line text-ink font-semibold text-[13px] transition-colors disabled:opacity-50"
+                      >
+                        <XCircle className="w-4 h-4 text-[#9F2F2D]" />
+                        <span>退回修正</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={processingId !== null}
+                        onClick={() => handleReceiptAction('received')}
+                        className="inline-flex items-center gap-1.5 h-11 px-6 rounded-md bg-ink hover:bg-inkhover text-white font-semibold text-[13px] transition-colors disabled:opacity-50"
+                      >
+                        <CheckSquare className="w-4 h-4" />
+                        <span>确认签收</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 二、汇总指标 */}
                 {submissionDetail.summary.length > 0 && (
                   <div className="space-y-3">
-                    <div className="text-[13px] font-semibold text-ink">一、汇总指标</div>
+                    <div className="text-[13px] font-semibold text-ink">二、汇总指标</div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-[10px]">
                       {submissionDetail.summary.map((s) => (
                         <div key={s.field_id} className="bg-canvas p-3 rounded-[12px]">
@@ -641,65 +686,15 @@ export const Dashboard: React.FC = () => {
                   </div>
                 )}
 
+                {/* 三、填报明细（分页） */}
                 {submissionDetail.details && submissionDetail.details.length > 0 ? (
                   <div className="space-y-3">
                     <div className="text-[13px] font-semibold text-ink">
-                      二、填报明细 (共 <span className="tabular-nums">{submissionDetail.details.length}</span> 行)
+                      三、填报明细 (共 <span className="tabular-nums">{submissionDetail.details.length}</span> 行)
                     </div>
-                    <SubmissionDetailTables detail={submissionDetail} />
+                    <SubmissionDetailTables detail={submissionDetail} pageSize={10} />
                   </div>
                 ) : null}
-
-                {submissionDetail.approvals && submissionDetail.approvals.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-[13px] font-semibold text-ink">三、审批记录</div>
-                    {submissionDetail.approvals.map((ar) => (
-                      <div key={ar.id} className="flex items-center justify-between text-[12px] py-1">
-                        <span className="font-medium text-body">
-                          {ar.approval_level === 'reviewer' ? '复核' : ar.approval_level === 'approver' ? '审批' : '经办'}: {ar.approver_name || '-'}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full font-semibold ${
-                          ar.status === 'approved' ? 'text-[#346538] bg-[#EDF3EC]'
-                          : ar.status === 'rejected' ? 'text-[#9F2F2D] bg-[#FDEBEC]'
-                          : 'text-[#1F6C9F] bg-[#E1F3FE]'
-                        }`}>
-                          {ar.status === 'approved' ? '通过' : ar.status === 'rejected' ? '驳回' : '待处理'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="space-y-3 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
-                  <label className="block text-[13px] font-semibold text-ink">签收备注 <span className="text-mute font-normal">(退回时必须填写原因)</span></label>
-                  <textarea
-                    rows={2}
-                    value={receiptComment}
-                    onChange={(e) => setReceiptComment(e.target.value)}
-                    placeholder="如：数据核实无误，同意签收 / 数据有误需退回修正..."
-                    className="w-full px-3.5 py-2.5 bg-canvas rounded-[12px] text-[13px] text-ink placeholder:text-faint focus:outline-none focus:ring-1 focus:ring-ink focus:bg-white transition-colors"
-                  />
-                  <div className="flex items-center justify-end gap-3">
-                    <button
-                      type="button"
-                      disabled={processingId !== null}
-                      onClick={() => handleReceiptAction('returned')}
-                      className="inline-flex items-center gap-1.5 h-11 px-5 rounded-md bg-canvas hover:bg-line text-ink font-semibold text-[13px] transition-colors disabled:opacity-50"
-                    >
-                      <XCircle className="w-4 h-4 text-[#9F2F2D]" />
-                      <span>退回修正</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={processingId !== null}
-                      onClick={() => handleReceiptAction('received')}
-                      className="inline-flex items-center gap-1.5 h-11 px-6 rounded-md bg-ink hover:bg-inkhover text-white font-semibold text-[13px] transition-colors disabled:opacity-50"
-                    >
-                      <CheckSquare className="w-4 h-4" />
-                      <span>确认签收</span>
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
           </div>

@@ -310,16 +310,18 @@ export const TemplateList: React.FC = () => {
                       </button>
                     )}
 
-                    <button
-                      onClick={() => openAssignModal(t)}
-                      disabled={!lifecycle.canAssign}
-                      className="h-9 px-4 bg-ink hover:bg-inkhover text-white font-medium text-xs rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>按周期下发</span>
-                    </button>
+                    {canManageTemplate(t) && (
+                      <button
+                        onClick={() => openAssignModal(t)}
+                        disabled={!lifecycle.canAssign}
+                        className="h-9 px-4 bg-ink hover:bg-inkhover text-white font-medium text-xs rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>按周期下发</span>
+                      </button>
+                    )}
 
-                    {lifecycle.canTransition && (
+                    {canManageTemplate(t) && lifecycle.canTransition && (
                       <button
                         onClick={() => handleTemplateLifecycle(t)}
                         disabled={lifecycleActionId !== null}

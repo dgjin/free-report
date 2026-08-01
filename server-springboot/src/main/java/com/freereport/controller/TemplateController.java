@@ -47,7 +47,8 @@ public class TemplateController {
 
     @GetMapping("/{id}")
     public Map<String, Object> getTemplateDetail(@PathVariable Long id) {
-        return templateService.getTemplateDetail(id);
+        AuthUser user = securityUtils.getCurrentUser();
+        return templateService.getTemplateDetail(user, id);
     }
 
     @PostMapping

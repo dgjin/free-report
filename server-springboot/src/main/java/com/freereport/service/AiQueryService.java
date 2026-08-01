@@ -1,6 +1,7 @@
 package com.freereport.service;
 
 import com.freereport.security.AuthUser;
+import com.freereport.security.SecurityUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -30,11 +31,12 @@ public class AiQueryService {
     private final AiResultBuilder resultBuilder;
     private final AiQueryAuditor auditor;
     private final AiOperationAnalyzer operationAnalyzer;
+    private final SecurityUtils securityUtils;
 
     public AiQueryService(AiClient aiClient, AggregationService aggregationService,
                           AiQueryContextBuilder contextBuilder, AiPlanResolver planResolver,
                           AiResultBuilder resultBuilder, AiQueryAuditor auditor,
-                          AiOperationAnalyzer operationAnalyzer) {
+                          AiOperationAnalyzer operationAnalyzer, SecurityUtils securityUtils) {
         this.aiClient = aiClient;
         this.aggregationService = aggregationService;
         this.contextBuilder = contextBuilder;
@@ -42,6 +44,7 @@ public class AiQueryService {
         this.resultBuilder = resultBuilder;
         this.auditor = auditor;
         this.operationAnalyzer = operationAnalyzer;
+        this.securityUtils = securityUtils;
     }
 
     /** 智能问数可用性（前端据此提示配置缺失） */
@@ -66,6 +69,13 @@ public class AiQueryService {
         Map<String, Object> operationAnswer = operationAnalyzer.answerIfMatched(question, user);
         if (operationAnswer != null) {
             return operationAnswer;
+        }
+
+        // 超级管理员与数智化转型办公室仅限运营统计：具体报表数值归各部门负责，
+        // 数值问数仅部门报表管理员可在本部门范围内执行，此处直接拦截（不消耗 LLM 调用）
+        if (securityUtils.isAiQueryLimitedToOperationStats(user)) {
+            return textOnly("当前角色仅支持运营统计类查询，可问我「各部门下发报表的情况」或「各分公司填报情况分析」。"
+                    + "具体报表数据请由对应部门的报表管理员查询。", List.of());
         }
 
         List<AiTemplateContext> contexts = contextBuilder.buildContexts(user);

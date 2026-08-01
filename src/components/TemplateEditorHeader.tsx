@@ -13,6 +13,8 @@ interface TemplateEditorHeaderProps {
   onImportExcel: () => void;
   onCreateMatrix: () => void;
   onAddField: () => void;
+  /** 审批角色等只读查看，不可编辑（即使模板状态允许） */
+  readOnly?: boolean;
 }
 
 /** 模板设计页头部：标题与操作区、只读提示、只增不减设计规范说明 */
@@ -22,12 +24,14 @@ export const TemplateEditorHeader: React.FC<TemplateEditorHeaderProps> = ({
   onImportExcel,
   onCreateMatrix,
   onAddField,
+  readOnly = false,
 }) => {
   const navigate = useNavigate();
   const [submittingApproval, setSubmittingApproval] = useState(false);
 
   const lifecycle = getTemplateLifecycleView(template.status);
-  const canWrite = lifecycle.canWrite;
+  // 审批角色只读查看，即使模板状态允许编辑
+  const canWrite = !readOnly && lifecycle.canWrite;
 
   const handleSubmitApproval = async () => {
     if (submittingApproval) return;

@@ -15,7 +15,8 @@ import {
   YAxis,
 } from 'recharts';
 import { Sparkles, Send, AlertCircle, BarChart3, Grid3x3, ChevronDown, Download } from '../components/icons';
-import { api } from '../services/api';
+import { api, getStoredUser } from '../services/api';
+import { getClientAccess } from '../utils/access';
 import { toast } from '../utils/toast';
 import {
   AI_QUESTION_MAX_LENGTH,
@@ -219,6 +220,13 @@ export const AiQuery: React.FC = () => {
         setAiEnabled(config.enabled);
       } catch {
         setAiEnabled(false);
+      }
+      // 超管与数智化办公室仅限运营统计（各部门下发/各分公司填报情况）：建议问题只给固定引导
+      const storedUser = getStoredUser();
+      const access = storedUser ? getClientAccess(storedUser) : null;
+      if (access && (access.isSuperAdmin || access.isDigitalAdmin)) {
+        setSuggestions(['各部门下发报表的情况', '各分公司填报情况分析']);
+        return;
       }
       try {
         const [templates, assignments] = await Promise.all([api.getTemplates(), api.getAssignments()]);

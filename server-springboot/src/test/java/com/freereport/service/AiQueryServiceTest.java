@@ -7,6 +7,7 @@ import com.freereport.exception.DomainException;
 import com.freereport.mapper.AssignmentMapper;
 import com.freereport.mapper.TemplateMapper;
 import com.freereport.security.AuthUser;
+import com.freereport.security.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +48,9 @@ class AiQueryServiceTest {
 
     private final AuthUser admin = new AuthUser(1L, "admin", "管理员", 1L,
             "总部", "HQ", "headquarter", "super_admin");
+    /** 数值问数仅部门报表管理员可用（限本部门模板） */
+    private final AuthUser deptAdmin = new AuthUser(2L, "caiwu", "财务部管理员", 10L,
+            "财务部", "CW", "department", "department_report_admin");
 
     @BeforeEach
     void setUp() {
@@ -59,7 +63,8 @@ class AiQueryServiceTest {
                 new AiPlanResolver(new ObjectMapper()),
                 new AiResultBuilder(aiClient),
                 new AiQueryAuditor(),
-                new AiOperationAnalyzer(assignmentMapper));
+                new AiOperationAnalyzer(assignmentMapper),
+                new SecurityUtils());
         stubVehicleTemplate();
     }
 
@@ -175,7 +180,7 @@ class AiQueryServiceTest {
         stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[]," +
                 "\"dimension\":\"company\",\"chart_type\":\"bar\",\"title\":\"公务车\",\"unanswerable_reason\":null}");
 
-        Map<String, Object> result = service.query("统计公务车情况", List.of(), admin);
+        Map<String, Object> result = service.query("统计公务车情况", List.of(), deptAdmin);
 
         List<Map<String, String>> metrics = (List<Map<String, String>>) plan(result).get("metrics");
         List<String> fieldNames = metrics.stream().map(m -> m.get("field_name")).toList();
@@ -189,7 +194,7 @@ class AiQueryServiceTest {
         stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"bare_price\"]," +
                 "\"dimension\":\"company\",\"chart_type\":\"bar\",\"company_names\":[\"北京\"],\"unanswerable_reason\":null}");
 
-        Map<String, Object> result = service.query("北京的裸车价", List.of(), admin);
+        Map<String, Object> result = service.query("北京的裸车价", List.of(), deptAdmin);
 
         List<List<String>> rows = rows(result);
         assertEquals(1, rows.size(), "只应保留北京分公司一行");
@@ -203,7 +208,7 @@ class AiQueryServiceTest {
         stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"bare_price\"]," +
                 "\"dimension\":\"company\",\"chart_type\":\"bar\",\"company_names\":[\"不存在的机构\"],\"unanswerable_reason\":null}");
 
-        Map<String, Object> result = service.query("裸车价", List.of(), admin);
+        Map<String, Object> result = service.query("裸车价", List.of(), deptAdmin);
 
         assertEquals(3, rows(result).size(), "筛选无匹配时应回退为全部机构");
         assertEquals(List.of(), plan(result).get("company_names"));
@@ -214,7 +219,7 @@ class AiQueryServiceTest {
         stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"bare_price\"]," +
                 "\"dimension\":\"period\",\"aggregation\":\"avg\",\"chart_type\":\"table\",\"unanswerable_reason\":null}");
 
-        Map<String, Object> result = service.query("裸车价平均值", List.of(), admin);
+        Map<String, Object> result = service.query("裸车价平均值", List.of(), deptAdmin);
 
         assertEquals("avg", plan(result).get("aggregation"));
         assertTrue(columns(result).contains("裸车价（平均）"), "列名应标注平均");
@@ -227,7 +232,7 @@ class AiQueryServiceTest {
         stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"_record_count\"]," +
                 "\"dimension\":\"company\",\"chart_type\":\"bar\",\"unanswerable_reason\":null}");
 
-        Map<String, Object> result = service.query("各机构有多少台车", List.of(), admin);
+        Map<String, Object> result = service.query("各机构有多少台车", List.of(), deptAdmin);
 
         List<List<String>> rows = rows(result);
         assertEquals("2", rows.get(0).get(1), "北京应为 2 台");
@@ -240,7 +245,7 @@ class AiQueryServiceTest {
         stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"bare_price\",\"_record_count\"]," +
                 "\"dimension\":\"field\",\"group_by_field\":\"brand\",\"chart_type\":\"bar\",\"unanswerable_reason\":null}");
 
-        Map<String, Object> result = service.query("按品牌统计裸车价", List.of(), admin);
+        Map<String, Object> result = service.query("按品牌统计裸车价", List.of(), deptAdmin);
 
         assertEquals("field", plan(result).get("dimension"));
         assertEquals("brand", plan(result).get("group_by_field"));
@@ -262,7 +267,7 @@ class AiQueryServiceTest {
         stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"bare_price\"]," +
                 "\"dimension\":\"field\",\"group_by_field\":\"engine_no\",\"chart_type\":\"bar\",\"unanswerable_reason\":null}");
 
-        Map<String, Object> result = service.query("按发动机号统计", List.of(), admin);
+        Map<String, Object> result = service.query("按发动机号统计", List.of(), deptAdmin);
 
         assertEquals("company", plan(result).get("dimension"), "engine_no 是数值字段不在可分组字段清单，应降级");
         assertNull(plan(result).get("group_by_field"));
@@ -273,7 +278,7 @@ class AiQueryServiceTest {
         stubPlan("{\"template_id\":10,\"period_labels\":[\"2030年Q1\"],\"metric_field_names\":[\"bare_price\"]," +
                 "\"dimension\":\"company\",\"chart_type\":\"bar\",\"unanswerable_reason\":null}");
 
-        Map<String, Object> result = service.query("裸车价", List.of(), admin);
+        Map<String, Object> result = service.query("裸车价", List.of(), deptAdmin);
 
         assertEquals(List.of("2026年Q3"), plan(result).get("period_labels"), "编造的周期应回退为最近一期");
     }
@@ -282,7 +287,7 @@ class AiQueryServiceTest {
     void 无法回答时返回纯文本() {
         stubPlan("{\"unanswerable_reason\":\"该问题与报表数据无关\"}");
 
-        Map<String, Object> result = service.query("今天天气如何", List.of(), admin);
+        Map<String, Object> result = service.query("今天天气如何", List.of(), deptAdmin);
 
         assertNull(result.get("plan"));
         assertNull(result.get("chart"));
@@ -371,9 +376,40 @@ class AiQueryServiceTest {
         stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"_record_count\"]," +
                 "\"dimension\":\"company\",\"chart_type\":\"bar\",\"unanswerable_reason\":null}");
 
-        Map<String, Object> result = service.query("各分公司填报了多少台车", List.of(), admin);
+        Map<String, Object> result = service.query("各分公司填报了多少台车", List.of(), deptAdmin);
 
         assertNotNull(result.get("plan"), "含「填报」但问的是台数，应走 LLM 指标查询");
+    }
+
+    @Test
+    void 超管与数智化办公室仅限运营统计不可查询具体数据() {
+        AuthUser digital = new AuthUser(3L, "digital", "数智化管理员", 1L,
+                "总部", "HQ", "headquarter", "digital_admin");
+        for (AuthUser u : List.of(admin, digital)) {
+            Map<String, Object> result = service.query("北京的裸车价", List.of(), u);
+            assertTrue(String.valueOf(result.get("answer")).contains("仅支持运营统计"),
+                    u.getRole() + " 数值问数应被拦截");
+            assertNull(result.get("table"));
+            assertNull(result.get("chart"));
+            assertNull(result.get("plan"));
+        }
+        // 拦截发生在 LLM 计划与取数之前，不消耗模型调用
+        verify(aiClient, never()).chat(any(), anyBoolean());
+        verify(aggregationService, never()).getAggregationsByTemplateAndPeriods(any(), any(), any());
+    }
+
+    @Test
+    void 超管与数智化办公室运营统计仍可用() {
+        AuthUser digital = new AuthUser(3L, "digital", "数智化管理员", 1L,
+                "总部", "HQ", "headquarter", "digital_admin");
+        when(assignmentMapper.statsByIssuerDepartment(any(), any())).thenReturn(List.of(
+                statsRow("财务部", 5, 2, 3, 2, 1, 1, 1, 0, 0)
+        ));
+        for (AuthUser u : List.of(admin, digital)) {
+            Map<String, Object> result = service.query("各部门下发报表的情况", List.of(), u);
+            assertEquals("部门", columns(result).get(0));
+            assertNotNull(result.get("table"));
+        }
     }
 
     /** 运营统计行：COUNT 为 Long、SUM 为 BigDecimal，模拟 MyBatis Map 返回 */
@@ -404,19 +440,20 @@ class AiQueryServiceTest {
             return "{\"unanswerable_reason\":\"测试\"}";
         });
 
-        Thread first = new Thread(() -> service.query("第一问", List.of(), admin));
+        // 数值问数仅部门报表管理员可进入 LLM 流程，并发闸门按用户限流
+        Thread first = new Thread(() -> service.query("第一问", List.of(), deptAdmin));
         first.start();
         assertTrue(entered.await(5, TimeUnit.SECONDS), "首个请求应已进入 LLM 调用");
         try {
             DomainException e = assertThrows(DomainException.class,
-                    () -> service.query("第二问", List.of(), admin));
+                    () -> service.query("第二问", List.of(), deptAdmin));
             assertEquals(429, e.getStatusCode());
         } finally {
             release.countDown();
             first.join(5000);
         }
         // 首个请求结束后应可再次提问
-        Map<String, Object> again = service.query("第三问", List.of(), admin);
+        Map<String, Object> again = service.query("第三问", List.of(), deptAdmin);
         assertNull(again.get("plan"));
     }
 }

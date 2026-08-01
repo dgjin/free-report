@@ -73,6 +73,15 @@ public class SecurityUtils {
 
     // ---- 资源级权限 ----
 
+    /**
+     * 智能问数是否仅限运营统计（各部门下发情况 / 各分公司填报情况）。
+     * 超级管理员与数智化转型办公室可看全量任务状态统计，但不可查询具体报表数值——
+     * 报表数据归各部门负责，数值问数仅对部门报表管理员开放（限本部门模板）。
+     */
+    public boolean isAiQueryLimitedToOperationStats(AuthUser user) {
+        return isSuperAdmin(user) || isDigitalAdmin(user);
+    }
+
     public boolean canReadTemplate(Long ownerDepartmentId) {
         AuthUser user = getCurrentUser();
         if (isSuperAdmin(user) || isDigitalAdmin(user)) return true;
