@@ -170,7 +170,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
             </h3>
             <div className="space-y-2 text-[12px] leading-[1.7]">
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">超级管理员</span><span className="text-mute">全局只读视图，可管理机构与用户，不可填报或签收</span></div>
-              <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">部门报表管理员</span><span className="text-mute">设计模板、下发任务、签收报表、查看汇总（仅限本部门）</span></div>
+              <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">部门报表管理员</span><span className="text-mute">设计模板、下发任务、签收报表、查看汇总、智能问数（仅限本部门）</span></div>
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">数智化转型办公室</span><span className="text-mute">审批各部门提交的报表模板；可查看所有部门模板</span></div>
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">分公司经办人</span><span className="text-mute">填写并提交报表数据</span></div>
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">复核人 / 审批人</span><span className="text-mute">查看填报信息，进行审批操作（不可填报）</span></div>
@@ -211,7 +211,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
             <div className="bg-canvas rounded-[12px] p-4 space-y-2 text-[12px]">
               {[
                 { step: '1', label: '创建模板', desc: '部门报表管理员设计模板，保存后为「草稿」状态' },
-                { step: '2', label: '提交审批', desc: '在模板列表点击「提交审批」，模板进入「待审批」并锁定编辑' },
+                { step: '2', label: '提交审批', desc: '在模板列表或字段设计页面点击「提交审批」，模板进入「待审批」并锁定编辑' },
                 { step: '3', label: '数转办审批', desc: '数智化转型办公室在「审批中心」通过或驳回，可附审批意见' },
                 { step: '4', label: '发布下发', desc: '审批通过后模板自动发布方可下发；驳回退回草稿可修改重提' },
               ].map((s) => (
@@ -253,6 +253,10 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
                 <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
                   <div className="font-semibold text-ink mb-1">汇总报表</div>
                   <div className="text-mute">在「汇总报表」查看多机构对比、明细数据与填报进度，支持导出 Excel（含机构对比、明细、进度三张表）。</div>
+                </div>
+                <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
+                  <div className="font-semibold text-ink mb-1">智能问数</div>
+                  <div className="text-mute">在「智能问数」用日常说法提问即可查询报表数据，系统自动定位报表、周期与指标，生成文字结论、图表和数据明细。支持多轮对话，点击「下载」可导出 Excel（含查询说明、数据表格、图表数据）。</div>
                 </div>
               </div>
             </section>
@@ -411,6 +415,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
               <span>使用提示</span>
             </h3>
             <ul className="space-y-1.5 text-[12px] text-mute leading-[1.7] list-disc pl-5">
+              <li>模板字段设计完成后，可在字段设计页面直接点击「提交审批」，无需返回模板列表</li>
               <li>月报/季报/年报模板可在「模板管理 → 周期计划」配置自动下发：模板审批发布后，系统每日按设定时间自动向目标分公司生成本期任务，也可在弹窗中「立即执行一次」手动触发补发</li>
               <li>「模板管理 → 数据导入」支持按模板批量导入 Excel：「历史归档」直接成为已签收数据并计入汇总；「期初预填」为已下发任务生成草稿，由分公司经办人核对后提交</li>
               <li>填报被驳回/签收退回或模板被驳回时，工作台顶部会出现红色「退回提醒」，左侧导航对应菜单也会显示红色角标；修改后重新提交即可消除</li>
@@ -420,6 +425,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
               <li>逾期任务会在列表中标记「已逾期」</li>
               <li>一次性下发的任务会标注「⚡ 一次性」徽章</li>
               <li>汇总报表仅统计已审批通过的填报数据</li>
+              <li>智能问数仅统计已提交并通过接收的数据，结果支持下载为 Excel（含图表数据）</li>
             </ul>
           </section>
         </div>

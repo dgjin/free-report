@@ -41,6 +41,14 @@
       }
     },
     {
+      "name": "按字段分组统计",
+      "question": "按品牌统计分析一下公务车裸车价",
+      "expect": {
+        "template_name_contains": "公务车",
+        "dimension": "field"
+      }
+    },
+    {
       "name": "无关问题拒答",
       "question": "今天天气怎么样？",
       "expect": { "unanswerable": true }

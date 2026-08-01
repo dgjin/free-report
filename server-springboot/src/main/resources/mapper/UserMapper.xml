@@ -8,9 +8,9 @@
         SELECT * FROM users WHERE id = #{id}
     </select>
 
-    <!-- 根据用户名查询用户（大小写不敏感） -->
+    <!-- 根据用户名查询用户（大小写不敏感，数据库 collation utf8mb4_0900_ai_ci 已保证） -->
     <select id="findByUsername" resultType="com.freereport.entity.User">
-        SELECT * FROM users WHERE LOWER(username) = LOWER(#{username})
+        SELECT * FROM users WHERE username = #{username}
     </select>
 
     <!-- 查询所有用户 -->

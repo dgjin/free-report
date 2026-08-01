@@ -237,10 +237,7 @@ public class SubmissionService {
         }
 
         // 查询字段元数据（field_name, field_label, field_type）
-        ReportAssignment assignment = assignmentMapper.findById(s.getAssignmentId());
-        List<ReportTemplateField> templateFields = assignment != null
-                ? templateMapper.findFieldsByTemplateId(assignment.getTemplateId())
-                : Collections.emptyList();
+        List<ReportTemplateField> templateFields = templateMapper.findFieldsByTemplateId(a.getTemplateId());
         Map<Long, ReportTemplateField> fieldMetaMap = templateFields.stream()
                 .collect(Collectors.toMap(ReportTemplateField::getId, f -> f, (x, y) -> x));
 
@@ -303,11 +300,9 @@ public class SubmissionService {
         result.put("approvals", approvalMaps);
         result.put("matrix_groups", buildMatrixGroups(templateFields));
         // 附加任务与模板信息
-        if (assignment != null) {
-            result.put("assignment_title", assignment.getTitle());
-            ReportTemplate template = templateMapper.findById(assignment.getTemplateId());
-            result.put("template_name", template != null ? template.getName() : null);
-        }
+        result.put("assignment_title", a.getTitle());
+        ReportTemplate template = templateMapper.findById(a.getTemplateId());
+        result.put("template_name", template != null ? template.getName() : null);
         return result;
     }
 

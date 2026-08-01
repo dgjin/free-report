@@ -73,6 +73,21 @@
         SELECT * FROM report_aggregations WHERE assignment_id = #{assignmentId}
     </select>
 
+    <!-- 根据任务 ID 列表批量查询汇总记录（避免 N+1） -->
+    <select id="findByAssignmentIds" resultType="com.freereport.entity.ReportAggregation">
+        <choose>
+            <when test="assignmentIds != null and assignmentIds.size() > 0">
+                SELECT * FROM report_aggregations WHERE assignment_id IN
+                <foreach collection="assignmentIds" item="assignmentId" open="(" separator="," close=")">
+                    #{assignmentId}
+                </foreach>
+            </when>
+            <otherwise>
+                SELECT * FROM report_aggregations WHERE 1 = 0
+            </otherwise>
+        </choose>
+    </select>
+
     <!-- 插入任务收回审计记录 -->
     <insert id="insertRecall" parameterType="com.freereport.entity.AssignmentRecall"
             useGeneratedKeys="true" keyProperty="id">

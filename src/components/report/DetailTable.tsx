@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { CheckSquare, Plus, Trash2, Upload, Download, X } from '../icons';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckSquare, Plus, Trash2, Upload, Download, X, ChevronLeft, ChevronRight } from '../icons';
 import { toast } from '../../utils/toast';
 import { ReportTemplateField } from '../../types';
 import { parseDetailRows, type DetailImportField, type DetailImportCellError } from '../../utils/detailImport';
@@ -36,6 +36,25 @@ export const DetailTable: React.FC<DetailTableProps> = ({
   const [importing, setImporting] = useState(false);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
+  // ── 分页（全屏 / 数据多时避免表格过长）──
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const PAGE_SIZE_OPTIONS = [20, 50, 100, 200];
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(rows.length / pageSize)), [rows.length, pageSize]);
+  const pageStart = (currentPage - 1) * pageSize;
+  const pageEnd = Math.min(rows.length, pageStart + pageSize);
+  const visibleRows = useMemo(() => rows.slice(pageStart, pageEnd), [rows, pageStart, pageEnd]);
+
+  // 行数变化（删除 / 导入 / 撤销）时，把当前页拉回有效范围
+  useEffect(() => {
+    if (rows.length === 0) {
+      if (currentPage !== 1) setCurrentPage(1);
+      return;
+    }
+    const maxPage = Math.ceil(rows.length / pageSize);
+    if (currentPage > maxPage) setCurrentPage(maxPage);
+  }, [rows.length, pageSize, currentPage]);
+
   if (fields.length === 0) return null;
 
   const handleDetailChange = (rowIndex: number, fieldId: number, value: string) => {
@@ -45,7 +64,10 @@ export const DetailTable: React.FC<DetailTableProps> = ({
   };
 
   const addDetailRow = () => {
-    onRowsChange([...rows, {}]);
+    const next = [...rows, {}];
+    onRowsChange(next);
+    // 新增行后跳到最后一页，让用户立刻看到新行
+    setCurrentPage(Math.ceil(next.length / pageSize));
   };
 
   const removeDetailRow = (index: number) => {
@@ -243,6 +265,85 @@ export const DetailTable: React.FC<DetailTableProps> = ({
           </div>
         </div>
 
+        {/* 分页控制栏：行数多时避免表格过长，全屏下尤其必要 */}
+        {rows.length > pageSize && (
+          <div
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-1 py-2 text-xs"
+            style={{ borderBottom: '1px solid var(--hairline)' }}
+          >
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-mute tabular-nums">
+              <span>
+                共 <span className="font-semibold text-ink">{rows.length}</span> 行
+              </span>
+              <span className="text-line">|</span>
+              <span>
+                第 <span className="font-semibold text-ink">{pageStart + 1}</span>
+                {' '}-{' '}
+                <span className="font-semibold text-ink">{pageEnd}</span> 行
+              </span>
+              <span className="text-line">|</span>
+              <span>
+                第 <span className="font-semibold text-ink">{currentPage}</span>/{totalPages} 页
+              </span>
+            </div>
+            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+              <span className="text-mute">每页</span>
+              <div className="inline-flex rounded-md overflow-hidden" style={{ border: '1px solid var(--hairline)' }}>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 text-[11px] font-medium tabular-nums transition-colors ${
+                      pageSize === size
+                        ? 'bg-ink text-white'
+                        : 'bg-white text-mute hover:bg-hoverbg hover:text-ink'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+              <div className="inline-flex items-center rounded-md overflow-hidden" style={{ border: '1px solid var(--hairline)' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  className="p-1 text-mute hover:text-ink hover:bg-hoverbg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="上一页"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={currentPage}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (!Number.isNaN(v)) {
+                      setCurrentPage(Math.min(Math.max(1, v), totalPages));
+                    }
+                  }}
+                  className="w-12 h-7 px-1 text-center text-xs tabular-nums bg-white text-ink outline-none border-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="p-1 text-mute hover:text-ink hover:bg-hoverbg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="下一页"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div
           className="overflow-x-auto rounded-[12px]"
           style={{ border: '1px solid var(--hairline)' }}
@@ -260,14 +361,16 @@ export const DetailTable: React.FC<DetailTableProps> = ({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={rowIndex} className="hover:bg-hoverbg">
-                  <td
-                    className="p-3 text-center text-mute font-mono font-semibold tabular-nums"
-                    style={{ borderTop: rowIndex === 0 ? 'none' : '1px solid var(--hairline)' }}
-                  >
-                    {rowIndex + 1}
-                  </td>
+              {visibleRows.map((row, idx) => {
+                const rowIndex = pageStart + idx;
+                return (
+                  <tr key={rowIndex} className="hover:bg-hoverbg">
+                    <td
+                      className="p-3 text-center text-mute font-mono font-semibold tabular-nums"
+                      style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--hairline)' }}
+                    >
+                      {rowIndex + 1}
+                    </td>
 
                   {fields.map((df, dfIdx) => {
                     const val = row[df.id] || '';
@@ -280,7 +383,7 @@ export const DetailTable: React.FC<DetailTableProps> = ({
                       <td
                         key={df.id}
                         className="p-2"
-                        style={{ borderTop: rowIndex === 0 && dfIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
+                        style={{ borderTop: idx === 0 && dfIdx === 0 ? 'none' : '1px solid var(--hairline)' }}
                       >
                         {df.field_type === 'select' ? (
                           <select
@@ -315,7 +418,7 @@ export const DetailTable: React.FC<DetailTableProps> = ({
                   {!isReadOnly && (
                     <td
                       className="p-2 text-center"
-                      style={{ borderTop: rowIndex === 0 ? 'none' : '1px solid var(--hairline)' }}
+                      style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--hairline)' }}
                     >
                       <button
                         type="button"
@@ -328,7 +431,18 @@ export const DetailTable: React.FC<DetailTableProps> = ({
                     </td>
                   )}
                 </tr>
-              ))}
+              );})}
+              {rows.length > 0 && visibleRows.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={fields.length + (isReadOnly ? 1 : 2)}
+                    className="p-6 text-center text-[12px] text-faint"
+                    style={{ borderTop: '1px solid var(--hairline)' }}
+                  >
+                    当前页无数据
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

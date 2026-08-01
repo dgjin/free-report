@@ -162,7 +162,22 @@ public class AiQueryService {
             return textOnly("报表「" + ctx.template.getName() + "」没有可统计的数值指标，暂时无法问数。", contexts);
         }
 
-        String dimension = "period".equals(text(plan, "dimension")) ? "period" : "company";
+        String dimension = parseDimension(text(plan, "dimension"));
+        // 按字段分组：模型给出 group_by_field，可能输出字段名或字段标签，统一解析为字段名
+        String rawGroupByField = "field".equals(dimension) ? text(plan, "group_by_field") : null;
+        final String groupByField = rawGroupByField == null || rawGroupByField.isBlank() ? null
+                : ctx.groupableFields.stream()
+                        .filter(f -> rawGroupByField.equals(f.getFieldName()) || rawGroupByField.equals(f.getFieldLabel()))
+                        .map(ReportTemplateField::getFieldName)
+                        .findFirst().orElse(null);
+        if ("field".equals(dimension) && groupByField == null) {
+            dimension = "company";
+        }
+        String groupByFieldLabel = groupByField != null
+                ? ctx.groupableFields.stream()
+                        .filter(f -> groupByField.equals(f.getFieldName()))
+                        .map(ReportTemplateField::getFieldLabel).findFirst().orElse(groupByField)
+                : null;
         String chartType = normalizeChartType(text(plan, "chart_type"));
         Agg agg = Agg.parse(text(plan, "aggregation"));
         // 机构筛选：模型给出的机构名在取数后与真实机构名模糊匹配，全都对不上时忽略筛选而不是返回空结果
@@ -185,12 +200,18 @@ public class AiQueryService {
         List<String> companyFilter = (!requestedCompanies.isEmpty() && filterMatched)
                 ? requestedCompanies : List.of();
 
-        Map<String, Object> table = "period".equals(dimension)
-                ? buildPeriodTable(periodDataList, metrics, agg, companyFilter)
-                : buildCompanyTable(periodDataList, metrics, agg, companyFilter);
-        Map<String, Object> chart = "period".equals(dimension)
-                ? buildPeriodChart(periodDataList, metrics, chartType, title, agg, companyFilter)
-                : buildCompanyChart(periodDataList, metrics, chartType, title, agg, companyFilter);
+        Map<String, Object> table;
+        Map<String, Object> chart;
+        if ("field".equals(dimension) && groupByField != null) {
+            table = buildFieldGroupTable(periodDataList, groupByField, groupByFieldLabel, metrics, agg);
+            chart = buildFieldGroupChart(periodDataList, groupByField, groupByFieldLabel, metrics, chartType, title, agg);
+        } else if ("period".equals(dimension)) {
+            table = buildPeriodTable(periodDataList, metrics, agg, companyFilter);
+            chart = buildPeriodChart(periodDataList, metrics, chartType, title, agg, companyFilter);
+        } else {
+            table = buildCompanyTable(periodDataList, metrics, agg, companyFilter);
+            chart = buildCompanyChart(periodDataList, metrics, chartType, title, agg, companyFilter);
+        }
 
         Map<String, Object> resolvedPlan = new LinkedHashMap<>();
         resolvedPlan.put("template_id", ctx.template.getId());
@@ -204,8 +225,12 @@ public class AiQueryService {
         resolvedPlan.put("chart_type", chartType);
         resolvedPlan.put("aggregation", agg.name().toLowerCase());
         resolvedPlan.put("company_names", companyFilter);
+        if (groupByField != null) {
+            resolvedPlan.put("group_by_field", groupByField);
+            resolvedPlan.put("group_by_field_label", groupByFieldLabel);
+        }
 
-        String answer = summarize(question, ctx, periods, metrics, table, agg, companyFilter);
+        String answer = summarize(question, ctx, periods, metrics, table, agg, companyFilter, groupByFieldLabel);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("answer", answer);
@@ -215,6 +240,9 @@ public class AiQueryService {
         StringBuilder scopeNote = new StringBuilder("报表：" + ctx.template.getName()
                 + " ｜ 周期：" + String.join("、", periods)
                 + " ｜ 指标：" + metrics.stream().map(Metric::label).collect(Collectors.joining("、")));
+        if (groupByFieldLabel != null) {
+            scopeNote.append(" ｜ 分组：").append(groupByFieldLabel);
+        }
         if (!companyFilter.isEmpty()) {
             scopeNote.append(" ｜ 机构：").append(String.join("、", companyFilter));
         }
@@ -273,6 +301,12 @@ public class AiQueryService {
             detailNumbers.forEach(f -> metrics.add(new Metric(f.getFieldName(), f.getFieldLabel(),
                     MetricSource.DETAIL, looksLikeIdentifier(f))));
 
+            // 明细/交叉表区的文本字段可作为分组维度（如机构名称、品牌、类型等）
+            List<ReportTemplateField> groupableFields = fields.stream()
+                    .filter(f -> ("detail".equals(f.getDataType()) || "matrix".equals(f.getDataType()))
+                            && !"number".equals(f.getFieldType())
+                            && "active".equals(f.getStatus()))
+                    .collect(Collectors.toList());
             Set<String> metricFieldNames = metrics.stream()
                     .map(Metric::fieldName).collect(Collectors.toSet());
             List<ReportTemplateField> others = fields.stream()
@@ -284,7 +318,7 @@ public class AiQueryService {
                     .sorted(Comparator.reverseOrder())
                     .limit(MAX_PERIODS_IN_PROMPT)
                     .collect(Collectors.toList());
-            contexts.add(new TemplateContext(t, metrics, others, periods));
+            contexts.add(new TemplateContext(t, metrics, groupableFields, others, periods));
         }
         return contexts;
     }
@@ -302,6 +336,11 @@ public class AiQueryService {
             catalog.append("  可用指标: ").append(c.metrics.isEmpty() ? "（无数值指标）"
                     : c.metrics.stream().map(Metric::promptHint)
                     .collect(Collectors.joining("、"))).append('\n');
+            if (!c.groupableFields.isEmpty()) {
+                catalog.append("  可分组字段: ").append(c.groupableFields.stream()
+                        .map(f -> f.getFieldName() + "(" + f.getFieldLabel() + ")")
+                        .collect(Collectors.joining("、"))).append('\n');
+            }
             if (!c.others.isEmpty()) {
                 catalog.append("  其他字段: ").append(c.others.stream().limit(15)
                         .map(ReportTemplateField::getFieldLabel).collect(Collectors.joining("、"))).append('\n');
@@ -320,10 +359,13 @@ public class AiQueryService {
                 - template_id: 整数，必须来自上面清单
                 - period_labels: 字符串数组，必须原样来自该模板的「已有周期」；用户未指定时取最近 1 个周期；问趋势/多期对比时可取多个（最多 12 个）
                 - metric_field_names: 字符串数组，必须来自该模板的「可用指标」字段名；用户未指定时留空数组表示全部
-                - dimension: "company" 表示按机构横向对比，"period" 表示按周期看趋势
-                - aggregation: "sum" | "avg" | "max" | "min"；默认 sum；用户问「平均/均值」用 avg，「最高/最大」用 max，「最低/最小」用 min
+                - dimension: "company" 表示按上报机构横向对比，"period" 表示按周期看趋势，"field" 表示按某个明细字段分组统计
+                - group_by_field: 当 dimension="field" 时必填，填写要分组的字段名（必须来自「可分组字段」列出的字段名）；否则为 null
+                  使用规则：用户说「按XX统计/按XX分析/按XX分组」时，若XX与「可分组字段」中某个字段的标签匹配，必须用 dimension="field" 且 group_by_field 填对应字段名
+                  注意：「机构名称」这类字段是明细数据中的列，与上报机构(company)不同；按它分组时应选 dimension="field"
+                - aggregation: "sum" | "avg" | "max" | "min"; 默认 sum; 用户问「平均/均值」用 avg，「最高/最大」用 max，「最低/最小」用 min
                 - company_names: 字符串数组；用户点名了具体机构（如「北京分公司」「上海」）时填写机构名，否则留空数组表示全部机构
-                - chart_type: "bar" | "line" | "pie" | "table"；趋势用 line，机构对比用 bar，占比用 pie，无需图表用 table
+                - chart_type: "bar" | "line" | "pie" | "table"; 趋势用 line，机构对比用 bar，占比用 pie，分组对比用 bar，无需图表用 table
                 - title: 简短中文图表标题
                 - unanswerable_reason: 若问题与报表数据无关、或所需报表/指标不在清单中，填写一句中文说明；否则为 null
 
@@ -475,6 +517,98 @@ public class AiQueryService {
         return chart(chartType, title, categories, series);
     }
 
+    /** 按明细字段分组的表格：分组值 × 指标聚合值 */
+    private Map<String, Object> buildFieldGroupTable(List<PeriodData> periodDataList,
+                                                      String groupByField, String groupByFieldLabel,
+                                                      List<Metric> metrics, Agg agg) {
+        boolean multiPeriod = periodDataList.size() > 1;
+        List<String> columns = new ArrayList<>();
+        if (multiPeriod) columns.add("周期");
+        columns.add(groupByFieldLabel);
+        metrics.forEach(m -> columns.add(m.periodColumn(agg)));
+
+        List<List<String>> rows = new ArrayList<>();
+        for (PeriodData pd : periodDataList) {
+            Map<String, List<Map<String, Object>>> groups = pd.detailRowsGroupedBy(groupByField);
+            // 按第一个指标的聚合值降序排列，使关键分组排在前面
+            List<Map.Entry<String, List<Map<String, Object>>>> sorted = new ArrayList<>(groups.entrySet());
+            if (!metrics.isEmpty()) {
+                Metric first = metrics.get(0);
+                sorted.sort((a, b) -> {
+                    double va = first.source() == MetricSource.ROW_COUNT
+                            ? a.getValue().size()
+                            : agg.apply(a.getValue().stream()
+                                    .map(r -> parseDouble(r.get(first.fieldName())))
+                                    .collect(Collectors.toList()));
+                    double vb = first.source() == MetricSource.ROW_COUNT
+                            ? b.getValue().size()
+                            : agg.apply(b.getValue().stream()
+                                    .map(r -> parseDouble(r.get(first.fieldName())))
+                                    .collect(Collectors.toList()));
+                    return Double.compare(vb, va);
+                });
+            }
+            for (Map.Entry<String, List<Map<String, Object>>> entry : sorted) {
+                List<String> row = new ArrayList<>();
+                if (multiPeriod) row.add(pd.period);
+                row.add(entry.getKey());
+                for (Metric m : metrics) {
+                    if (m.source() == MetricSource.ROW_COUNT) {
+                        row.add(String.valueOf(entry.getValue().size()));
+                    } else {
+                        List<Double> values = entry.getValue().stream()
+                                .map(r -> parseDouble(r.get(m.fieldName())))
+                                .collect(Collectors.toList());
+                        row.add(formatNumber(agg.apply(values)));
+                    }
+                }
+                rows.add(row);
+            }
+        }
+        Map<String, Object> table = new LinkedHashMap<>();
+        table.put("columns", columns);
+        table.put("rows", rows);
+        return table;
+    }
+
+    /** 按明细字段分组的图表 */
+    private Map<String, Object> buildFieldGroupChart(List<PeriodData> periodDataList,
+                                                      String groupByField, String groupByFieldLabel,
+                                                      List<Metric> metrics, String chartType,
+                                                      String title, Agg agg) {
+        // 收集所有分组值（按首次出现的顺序，保持稳定）
+        List<String> categories = new ArrayList<>(new LinkedHashSet<>(periodDataList.stream()
+                .flatMap(pd -> pd.detailRowsGroupedBy(groupByField).keySet().stream())
+                .collect(Collectors.toList())));
+
+        List<Map<String, Object>> series = new ArrayList<>();
+        boolean multiPeriod = periodDataList.size() > 1;
+        for (PeriodData pd : periodDataList) {
+            Map<String, List<Map<String, Object>>> groups = pd.detailRowsGroupedBy(groupByField);
+            for (Metric m : metrics) {
+                List<Double> data = new ArrayList<>();
+                for (String cat : categories) {
+                    List<Map<String, Object>> groupRows = groups.get(cat);
+                    if (groupRows == null) {
+                        data.add(0.0);
+                    } else if (m.source() == MetricSource.ROW_COUNT) {
+                        data.add((double) groupRows.size());
+                    } else {
+                        List<Double> values = groupRows.stream()
+                                .map(r -> parseDouble(r.get(m.fieldName())))
+                                .collect(Collectors.toList());
+                        data.add(agg.apply(values));
+                    }
+                }
+                Map<String, Object> s = new LinkedHashMap<>();
+                s.put("name", multiPeriod ? pd.period + " " + m.label() : m.label());
+                s.put("data", data);
+                series.add(s);
+            }
+        }
+        return chart(chartType, title, categories, series);
+    }
+
     private Map<String, Object> buildPeriodChart(List<PeriodData> periodDataList, List<Metric> metrics,
                                                  String chartType, String title, Agg agg, List<String> companyFilter) {
         // 周期趋势按时间正序展示，便于阅读
@@ -507,13 +641,16 @@ public class AiQueryService {
     /** 让模型基于查出的数据生成结论；调用失败时降级为规则文案，不影响数据返回 */
     private String summarize(String question, TemplateContext ctx, List<String> periods,
                              List<Metric> metrics, Map<String, Object> table,
-                             Agg agg, List<String> companyFilter) {
+                             Agg agg, List<String> companyFilter, String groupByFieldLabel) {
         String dataText = tableToText(table);
         StringBuilder userPrompt = new StringBuilder();
         userPrompt.append("用户问题：").append(question).append("\n\n")
                 .append("报表：").append(ctx.template.getName()).append('\n')
                 .append("周期：").append(String.join("、", periods)).append('\n')
                 .append("指标：").append(metrics.stream().map(Metric::label).collect(Collectors.joining("、"))).append('\n');
+        if (groupByFieldLabel != null) {
+            userPrompt.append("分组字段：").append(groupByFieldLabel).append('\n');
+        }
         if (agg != Agg.SUM) {
             userPrompt.append("聚合方式：").append(agg.cn()).append('\n');
         }
@@ -604,6 +741,13 @@ public class AiQueryService {
         };
     }
 
+    /** 解析维度：company / period / field */
+    private String parseDimension(String raw) {
+        if ("period".equals(raw)) return "period";
+        if ("field".equals(raw)) return "field";
+        return "company";
+    }
+
     private String text(JsonNode node, String field) {
         JsonNode v = node.path(field);
         return v.isTextual() ? v.asText() : null;
@@ -668,6 +812,7 @@ public class AiQueryService {
     /** 单个模板的问数上下文 */
     private record TemplateContext(ReportTemplate template,
                                    List<Metric> metrics,
+                                   List<ReportTemplateField> groupableFields,
                                    List<ReportTemplateField> others,
                                    List<String> periods) {
     }
@@ -828,6 +973,18 @@ public class AiQueryService {
                         LinkedHashMap::new, Collectors.toList()));
             }
             return detailIndex.getOrDefault(companyName == null ? "" : companyName, List.of());
+        }
+
+        /** 按指定字段值分组明细行（用于按字段分组统计，如按品牌/类型分组） */
+        Map<String, List<Map<String, Object>>> detailRowsGroupedBy(String fieldName) {
+            return detailRows().stream()
+                    .collect(Collectors.groupingBy(
+                            r -> {
+                                Object v = r.get(fieldName);
+                                return v == null || String.valueOf(v).trim().isEmpty()
+                                        ? "(未填写)" : String.valueOf(v).trim();
+                            },
+                            LinkedHashMap::new, Collectors.toList()));
         }
 
         @SuppressWarnings("unchecked")

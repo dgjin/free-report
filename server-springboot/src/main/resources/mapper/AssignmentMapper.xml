@@ -86,6 +86,15 @@
           AND period_label = #{periodLabel}
     </select>
 
+    <!-- 根据模板 + 周期 + 机构精确查询（利用唯一键 uq_assignment_period） -->
+    <select id="findByTemplatePeriodAndCompany" resultType="com.freereport.entity.ReportAssignment">
+        SELECT * FROM report_assignments
+        WHERE template_id = #{templateId}
+          AND period_label = #{periodLabel}
+          AND assigned_to_company_id = #{companyId}
+        LIMIT 1
+    </select>
+
     <!-- 根据模板 ID 查询下发任务 -->
     <select id="findByTemplateId" resultType="com.freereport.entity.ReportAssignment">
         SELECT * FROM report_assignments WHERE template_id = #{templateId}

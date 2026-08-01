@@ -211,9 +211,7 @@ public class DataImportService {
     }
 
     private ReportAssignment findAssignment(Long templateId, Long companyId, String periodLabel) {
-        return assignmentMapper.findByTemplateAndPeriod(templateId, periodLabel).stream()
-                .filter(a -> a.getAssignedToCompanyId().equals(companyId))
-                .findFirst().orElse(null);
+        return assignmentMapper.findByTemplatePeriodAndCompany(templateId, periodLabel, companyId);
     }
 
     // ---- archive：生成已签收历史数据 ----

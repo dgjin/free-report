@@ -55,6 +55,11 @@ public interface AggregationMapper {
     ReportAggregation findByAssignmentId(@Param("assignmentId") Long assignmentId);
 
     /**
+     * 根据任务 ID 列表批量查询汇总记录（避免 N+1）。
+     */
+    List<ReportAggregation> findByAssignmentIds(@Param("assignmentIds") List<Long> assignmentIds);
+
+    /**
      * 插入任务收回审计记录。
      */
     int insertRecall(AssignmentRecall recall);

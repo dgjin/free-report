@@ -71,6 +71,7 @@ export const TemplateEditor: React.FC = () => {
   const [editSumOf, setEditSumOf] = useState<number[]>([]);
   const [editDetailSumOf, setEditDetailSumOf] = useState<number | ''>('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [submittingApproval, setSubmittingApproval] = useState(false);
 
   useEffect(() => {
     if (id) loadTemplateDetail();
@@ -369,6 +370,21 @@ export const TemplateEditor: React.FC = () => {
     textarea: '多行文本 (textarea)',
   };
 
+  const handleSubmitApproval = async () => {
+    if (!template || submittingApproval) return;
+    if (!(await confirmDialog('提交后模板将进入审批流程，审批通过前不能编辑或下发。确认提交？'))) return;
+    setSubmittingApproval(true);
+    try {
+      const res = await api.submitTemplateForApproval(template.id);
+      toast(res.message, 'success');
+      loadTemplateDetail();
+    } catch (err: any) {
+      toast(err.message || '提交审批失败', 'error');
+    } finally {
+      setSubmittingApproval(false);
+    }
+  };
+
   if (loading || !template) {
     return (
       <div className="max-w-[1280px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)]">
@@ -435,6 +451,16 @@ export const TemplateEditor: React.FC = () => {
                   <span>新增模版字段</span>
                 </button>
               </>
+            )}
+            {lifecycle.canSubmitApproval && (
+              <button
+                onClick={handleSubmitApproval}
+                disabled={submittingApproval}
+                className="h-11 px-5 bg-[#1F6C9F] hover:bg-[#1a5a85] text-white font-semibold text-xs rounded-md transition-colors flex items-center space-x-1.5 disabled:opacity-50"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>{submittingApproval ? '提交中...' : '提交审批'}</span>
+              </button>
             )}
           </div>
         </div>

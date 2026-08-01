@@ -63,6 +63,13 @@ public interface AssignmentMapper {
                                                    @Param("periodLabel") String periodLabel);
 
     /**
+     * 根据模板 + 周期 + 机构精确查询下发任务（利用唯一键 uq_assignment_period，O(1) 查找）。
+     */
+    ReportAssignment findByTemplatePeriodAndCompany(@Param("templateId") Long templateId,
+                                                    @Param("periodLabel") String periodLabel,
+                                                    @Param("companyId") Long companyId);
+
+    /**
      * 根据模板 ID 查询下发任务。
      */
     List<ReportAssignment> findByTemplateId(@Param("templateId") Long templateId);

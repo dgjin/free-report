@@ -125,6 +125,7 @@ class AiQueryServiceTest {
         row.put("engine_no", 12345678);
         row.put("bare_price", barePrice);
         row.put("mileage", mileage);
+        row.put("brand", companyName.contains("北京") ? "丰田" : "奥迪");
         return row;
     }
 
@@ -217,6 +218,39 @@ class AiQueryServiceTest {
         assertEquals("2", rows.get(0).get(1), "北京应为 2 台");
         assertEquals("1", rows.get(1).get(1), "上海应为 1 台");
         assertEquals("-", rows.get(2).get(1), "未提交机构显示 -");
+    }
+
+    @Test
+    void 按字段分组统计各组聚合值与记录数() {
+        stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"bare_price\",\"_record_count\"]," +
+                "\"dimension\":\"field\",\"group_by_field\":\"brand\",\"chart_type\":\"bar\",\"unanswerable_reason\":null}");
+
+        Map<String, Object> result = service.query("按品牌统计裸车价", List.of(), admin);
+
+        assertEquals("field", plan(result).get("dimension"));
+        assertEquals("brand", plan(result).get("group_by_field"));
+        assertEquals("品牌", plan(result).get("group_by_field_label"));
+        // 明细行：北京 2 行（丰田）、上海 1 行（奥迪）
+        List<List<String>> rows = rows(result);
+        assertEquals(2, rows.size(), "应按品牌分两组");
+        // 第一组应聚合值更高（丰田 2 行合计 1,570,500 > 奥迪 1 行 800,000）
+        assertEquals("丰田", rows.get(0).get(0), "降序排列后丰田在前");
+        assertEquals("1,570,500", rows.get(0).get(1), "丰田裸车价合计应带千分位");
+        assertEquals("2", rows.get(0).get(2), "丰田记录数应为 2");
+        assertEquals("奥迪", rows.get(1).get(0));
+        assertEquals("800,000", rows.get(1).get(1));
+        assertEquals("1", rows.get(1).get(2));
+    }
+
+    @Test
+    void groupByField不在可分组字段清单时降级为机构维度() {
+        stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"bare_price\"]," +
+                "\"dimension\":\"field\",\"group_by_field\":\"engine_no\",\"chart_type\":\"bar\",\"unanswerable_reason\":null}");
+
+        Map<String, Object> result = service.query("按发动机号统计", List.of(), admin);
+
+        assertEquals("company", plan(result).get("dimension"), "engine_no 是数值字段不在可分组字段清单，应降级");
+        assertNull(plan(result).get("group_by_field"));
     }
 
     @Test

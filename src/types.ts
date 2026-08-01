@@ -153,6 +153,7 @@ export interface SubmissionSummaryItem {
   field_name: string;
   field_label: string;
   field_type: FieldType;
+  data_type?: DataType;
   value: string;
   row_index: number;
 }

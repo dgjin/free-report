@@ -322,9 +322,15 @@ public class AggregationService {
                 : companyMapper.findByIds(companyIds).stream()
                 .collect(Collectors.toMap(Company::getId, c -> c));
 
+        // 批量查询汇总记录（避免 N+1）
+        List<Long> assignmentIds = assignments.stream().map(ReportAssignment::getId).collect(Collectors.toList());
+        Map<Long, ReportAggregation> aggMap = assignmentIds.isEmpty() ? Collections.emptyMap()
+                : aggregationMapper.findByAssignmentIds(assignmentIds).stream()
+                .collect(Collectors.toMap(ReportAggregation::getAssignmentId, a -> a));
+
         List<Map<String, Object>> result = new ArrayList<>();
         for (ReportAssignment a : assignments) {
-            ReportAggregation agg = aggregationMapper.findByAssignmentId(a.getId());
+            ReportAggregation agg = aggMap.get(a.getId());
             if (agg == null) {
                 continue;
             }

@@ -33,6 +33,7 @@ export const ReportFill: React.FC = () => {
   const [comment, setComment] = useState<string>('');
 
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   // 提交前校验发现的错误（保存草稿不校验）
@@ -48,9 +49,19 @@ export const ReportFill: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const aId = parseInt(assignmentId!, 10);
+      if (isNaN(aId)) {
+        setLoadError('任务 ID 无效');
+        return;
+      }
       const aRes = await api.getAssignmentDetail(aId);
+      if (!aRes || aRes.status === 'recalled') {
+        toast('该任务已撤回或不存在');
+        navigate('/fill', { replace: true });
+        return;
+      }
       setAssignment(aRes);
 
       const activeFields = (aRes.fields || []).filter((f) => f.status === 'active');
@@ -70,31 +81,58 @@ export const ReportFill: React.FC = () => {
 
         // Populate Summary Form
         const summaryDataMap: Record<string, string> = {};
-        subRes.summary.forEach((item) => {
-          summaryDataMap[item.field_id] = item.value;
+        (subRes.summary || []).forEach((item) => {
+          if (item.value) {
+            summaryDataMap[item.field_id] = item.value;
+          }
         });
         setSummaryForm(summaryDataMap);
 
         // Populate Detail Rows
-        const parsedDetailRows = subRes.details.map((rowItems) => {
-          const rowObj: Record<string, string> = {};
-          rowItems.forEach((item) => {
-            rowObj[item.field_id] = item.value;
+        const parsedDetailRows: Array<Record<string, string>> = [];
+        if (subRes.details && subRes.details.length > 0) {
+          subRes.details.forEach((rowItems) => {
+            const rowObj: Record<string, string> = {};
+            rowItems.forEach((item) => {
+              rowObj[item.field_id] = item.value;
+            });
+            parsedDetailRows.push(rowObj);
           });
-          return rowObj;
-        });
+        }
+
+        // Fallback: 当 detail 字段数据被错误存储为 row_index=0 时
+        // 会出现在 subRes.summary 中，用 data_type 识别并回补到 detailRows
+        const detailTypeFields = activeFields.filter((f) => f.data_type === 'detail');
+        if (parsedDetailRows.length === 0 && detailTypeFields.length > 0) {
+          const orphanDetailRow: Record<string, string> = {};
+          let hasDetailData = false;
+          (subRes.summary || []).forEach((item) => {
+            if (item.data_type === 'detail' && item.value) {
+              orphanDetailRow[item.field_id] = item.value;
+              hasDetailData = true;
+            }
+          });
+          if (hasDetailData) {
+            parsedDetailRows.push(orphanDetailRow);
+          }
+        }
 
         if (parsedDetailRows.length > 0) {
           setDetailRows(parsedDetailRows);
         } else {
           setDetailRows([{}]); // default 1 empty detail row
         }
-      } catch {
-        // No submission yet -> default empty
+      } catch (err: unknown) {
+        // Log error and show empty form
+        console.error('获取填报数据失败:', err);
+        const message = err instanceof Error ? err.message : '获取填报数据失败，请稍后重试';
+        setLoadError(message);
         setDetailRows([{}]);
       }
-    } catch {
-      // ignore
+    } catch (err: unknown) {
+      console.error('加载填报页面失败:', err);
+      const message = err instanceof Error ? err.message : '加载填报页面数据失败，请稍后重试';
+      setLoadError(message);
     } finally {
       setLoading(false);
     }
@@ -179,7 +217,19 @@ export const ReportFill: React.FC = () => {
   if (loading || !assignment) {
     return (
       <div className="max-w-[1280px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)]">
-        <div className="text-center text-xs text-mute py-12">正在加载填报页面数据...</div>
+        {loadError ? (
+          <div className="text-center py-12">
+            <div className="text-red-500 text-sm mb-4">{loadError}</div>
+            <button
+              className="bg-primary text-white px-5 py-2 rounded-md text-sm hover:bg-primary/90 transition-colors"
+              onClick={() => { setLoadError(null); loadData(); }}
+            >
+              重新加载
+            </button>
+          </div>
+        ) : (
+          <div className="text-center text-xs text-mute py-12">正在加载填报页面数据...</div>
+        )}
       </div>
     );
   }
@@ -209,6 +259,19 @@ export const ReportFill: React.FC = () => {
 
   return (
     <div className="reveal max-w-[1280px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)] space-y-5 pb-12">
+      {/* 数据加载异常提示 */}
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center justify-between">
+          <span className="text-red-600 text-sm">{loadError}</span>
+          <button
+            className="text-red-600 hover:text-red-700 text-xs font-medium underline ml-4 shrink-0"
+            onClick={() => { setLoadError(null); loadData(); }}
+          >
+            重试
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div
         className="bg-white rounded-[12px] p-6 sm:p-7 space-y-4"

@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Sparkles, Send, AlertCircle, BarChart3, Grid3x3, ChevronDown } from '../components/icons';
+import { Sparkles, Send, AlertCircle, BarChart3, Grid3x3, ChevronDown, Download } from '../components/icons';
 import { api } from '../services/api';
 import { toast } from '../utils/toast';
 import {
@@ -144,6 +144,65 @@ const TableBlock: React.FC<{ table: AiTable }> = ({ table }) => {
   );
 };
 
+/** 导出问数结果为 Excel：Sheet1 查询说明，Sheet2 数据表格，Sheet3 图表数据 */
+async function downloadQueryResult(question: string, msg: AiMessage) {
+  const res = msg.response;
+  if (!res) return;
+  const { utils, writeFile } = await import('xlsx');
+  const wb = utils.book_new();
+
+  // Sheet 1: 查询说明
+  const metaRows: string[][] = [
+    ['提问', question],
+    ['结论', res.answer],
+  ];
+  if (res.scope_note) metaRows.push(['统计口径', res.scope_note]);
+  if (res.plan) {
+    metaRows.push(['报表', res.plan.template_name]);
+    metaRows.push(['周期', res.plan.period_labels.join('、')]);
+    metaRows.push(['指标', res.plan.metrics.map((m) => m.field_label).join('、')]);
+    if (res.plan.group_by_field_label) {
+      metaRows.push(['分组', res.plan.group_by_field_label]);
+    }
+    if (res.plan.company_names && res.plan.company_names.length > 0) {
+      metaRows.push(['机构', res.plan.company_names.join('、')]);
+    }
+  }
+  metaRows.push(['导出时间', new Date().toLocaleString('zh-CN')]);
+  const wsMeta = utils.aoa_to_sheet(metaRows);
+  wsMeta['!cols'] = [{ wch: 12 }, { wch: 80 }];
+  utils.book_append_sheet(wb, wsMeta, '查询说明');
+
+  // Sheet 2: 数据表格
+  if (res.table && res.table.columns.length > 0 && res.table.rows.length > 0) {
+    const wsData = utils.aoa_to_sheet([res.table.columns, ...res.table.rows]);
+    wsData['!cols'] = res.table.columns.map((_, i) => ({
+      wch: Math.max(10, ...[res.table!.columns[i], ...res.table!.rows.map((r) => r[i] || '')].map((s) => s.length)) + 4,
+    }));
+    utils.book_append_sheet(wb, wsData, '查询数据');
+  }
+
+  // Sheet 3: 图表数据（categories × series 转为表格）
+  if (res.chart && res.chart.categories.length > 0 && res.chart.series.length > 0) {
+    const chartHeader = ['分类', ...res.chart.series.map((s) => s.name)];
+    const chartRows = res.chart.categories.map((cat, i) => [
+      cat,
+      ...res.chart!.series.map((s) => s.data[i] ?? ''),
+    ]);
+    const wsChart = utils.aoa_to_sheet([chartHeader, ...chartRows]);
+    wsChart['!cols'] = chartHeader.map((_, i) => ({
+      wch: i === 0
+        ? Math.max(10, ...chartRows.map((r) => String(r[0]).length)) + 4
+        : 14,
+    }));
+    const chartSheetName = res.chart.title.length > 20 ? '图表数据' : res.chart.title;
+    utils.book_append_sheet(wb, wsChart, chartSheetName);
+  }
+
+  const safeName = (res.plan?.template_name || '问数结果').replace(/[\\/?*[\]:]/g, '-');
+  writeFile(wb, `${safeName}_问数结果.xlsx`);
+}
+
 export const AiQuery: React.FC = () => {
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [input, setInput] = useState('');
@@ -247,7 +306,7 @@ export const AiQuery: React.FC = () => {
           </div>
         )}
 
-        {messages.map((m) => {
+        {messages.map((m, mIdx) => {
           if (m.role === 'user') {
             return (
               <div key={m.id} className="flex justify-end">
@@ -283,9 +342,23 @@ export const AiQuery: React.FC = () => {
                 </div>
               )}
               {res?.table && <TableBlock table={res.table} />}
-              {res?.scope_note && (
-                <div className="text-[11px] text-faint leading-relaxed">{res.scope_note}</div>
-              )}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[11px] text-faint leading-relaxed flex-1">{res?.scope_note || ''}</div>
+                {((res?.table && res.table.rows.length > 0) || (res?.chart && res.chart.categories.length > 0)) && (
+                  <button
+                    onClick={() => {
+                      const userQ = mIdx > 0 && messages[mIdx - 1]?.role === 'user'
+                        ? messages[mIdx - 1].content : '';
+                      downloadQueryResult(userQ, m);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-white text-[11px] font-semibold text-ink hover:bg-line transition-colors shrink-0"
+                    style={{ boxShadow: 'var(--sh-card)' }}
+                    title="下载查询结果">
+                    <Download className="w-3.5 h-3.5" />
+                    下载
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
