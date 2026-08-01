@@ -182,4 +182,64 @@
         </choose>
     </select>
 
+    <!-- 智能问数运营统计：按下发部门分组统计任务数与状态分布（权限口径与 findForUser 一致）
+         状态分桶覆盖全部枚举：填报中=pending+filling（含尚未开填），审核中=submitted，
+         待签收=pending_receipt+approved，已签收=received+aggregated，已退回=rejected+returned，已撤回=recalled -->
+    <select id="statsByIssuerDepartment" resultType="java.util.Map">
+        SELECT a.issuer_department_id AS groupId,
+               COALESCE(c.name, '未指定部门') AS groupName,
+               COUNT(*) AS total,
+               COUNT(DISTINCT a.template_id) AS templates,
+               COUNT(DISTINCT a.assigned_to_company_id) AS companies,
+               SUM(a.status IN ('pending', 'filling')) AS filling,
+               SUM(a.status = 'submitted') AS reviewing,
+               SUM(a.status IN ('pending_receipt', 'approved')) AS pendingReceipt,
+               SUM(a.status IN ('received', 'aggregated')) AS received,
+               SUM(a.status IN ('rejected', 'returned')) AS rejected,
+               SUM(a.status = 'recalled') AS recalled
+        FROM report_assignments a
+        LEFT JOIN companies c ON c.id = a.issuer_department_id
+        <choose>
+            <when test="role == 'super_admin' or role == 'digital_admin'">
+            </when>
+            <when test="role == 'department_report_admin'">
+                WHERE a.issuer_department_id = #{companyId}
+            </when>
+            <otherwise>
+                WHERE a.assigned_to_company_id = #{companyId}
+            </otherwise>
+        </choose>
+        GROUP BY a.issuer_department_id, c.name
+        ORDER BY total DESC
+    </select>
+
+    <!-- 智能问数运营统计：按填报机构分组统计任务数与状态分布（不含已撤回；权限口径与 findForUser 一致）
+         状态分桶与 statsByIssuerDepartment 同口径，保证各桶之和等于任务总数 -->
+    <select id="statsByAssignedCompany" resultType="java.util.Map">
+        SELECT a.assigned_to_company_id AS groupId,
+               COALESCE(c.name, '未知机构') AS groupName,
+               COUNT(*) AS total,
+               COUNT(DISTINCT a.template_id) AS templates,
+               SUM(a.status IN ('pending', 'filling')) AS filling,
+               SUM(a.status = 'submitted') AS reviewing,
+               SUM(a.status IN ('pending_receipt', 'approved')) AS pendingReceipt,
+               SUM(a.status IN ('received', 'aggregated')) AS received,
+               SUM(a.status IN ('rejected', 'returned')) AS rejected
+        FROM report_assignments a
+        LEFT JOIN companies c ON c.id = a.assigned_to_company_id
+        <choose>
+            <when test="role == 'super_admin' or role == 'digital_admin'">
+                WHERE a.status != 'recalled'
+            </when>
+            <when test="role == 'department_report_admin'">
+                WHERE a.issuer_department_id = #{companyId} AND a.status != 'recalled'
+            </when>
+            <otherwise>
+                WHERE a.assigned_to_company_id = #{companyId} AND a.status != 'recalled'
+            </otherwise>
+        </choose>
+        GROUP BY a.assigned_to_company_id, c.name
+        ORDER BY total DESC
+    </select>
+
 </mapper>

@@ -10,6 +10,7 @@ import com.freereport.security.AuthUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,13 +20,17 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -53,7 +58,8 @@ class AiQueryServiceTest {
                 new AiQueryContextBuilder(templateMapper, assignmentMapper),
                 new AiPlanResolver(new ObjectMapper()),
                 new AiResultBuilder(aiClient),
-                new AiQueryAuditor());
+                new AiQueryAuditor(),
+                new AiOperationAnalyzer(assignmentMapper));
         stubVehicleTemplate();
     }
 
@@ -281,6 +287,111 @@ class AiQueryServiceTest {
         assertNull(result.get("plan"));
         assertNull(result.get("chart"));
         assertTrue(String.valueOf(result.get("answer")).contains("该问题与报表数据无关"));
+    }
+
+    @Test
+    void 各部门下发情况命中规则统计且不调用LLM() {
+        when(assignmentMapper.statsByIssuerDepartment(any(), any())).thenReturn(List.of(
+                statsRow("财务部", 5, 2, 3, 1, 1, 1, 1, 0, 1),
+                statsRow("综合部", 2, 1, 2, 0, 0, 0, 2, 0, 0)
+        ));
+
+        Map<String, Object> result = service.query("各部门下发报表的情况", List.of(), admin);
+
+        assertNull(result.get("plan"), "运营统计无模板查询计划");
+        assertEquals(List.of("部门", "下发任务数", "涉及模板", "覆盖机构",
+                "填报中", "审核中", "待签收", "已签收", "已退回", "已撤回"), columns(result));
+        List<List<String>> rows = rows(result);
+        assertEquals(2, rows.size());
+        assertEquals("财务部", rows.get(0).get(0));
+        assertEquals("5", rows.get(0).get(1));
+        assertEquals("1", rows.get(0).get(9), "已撤回列取自 recalled");
+        String answer = String.valueOf(result.get("answer"));
+        assertTrue(answer.contains("累计下发任务 7 项"), "合计两行任务数");
+        assertTrue(answer.contains("财务部"), "点名下发最多的部门");
+        assertNotNull(result.get("chart"), "统计结果应附带图表");
+        verify(aiClient, never()).chat(anyList(), anyBoolean());
+    }
+
+    @Test
+    void 各分公司填报情况按机构统计并计算完成率() {
+        when(assignmentMapper.statsByAssignedCompany(any(), any())).thenReturn(List.of(
+                statsRow("北京分公司", 4, 2, 0, 1, 0, 0, 3, 0, 0),
+                statsRow("上海分公司", 2, 1, 0, 1, 1, 0, 0, 0, 0)
+        ));
+
+        Map<String, Object> result = service.query("各分公司填报情况分析", List.of(), admin);
+
+        assertEquals(List.of("机构", "任务数", "填报中", "审核中", "待签收", "已签收", "已退回", "完成率"),
+                columns(result));
+        List<List<String>> rows = rows(result);
+        assertEquals("75%", rows.get(0).get(7), "北京 3/4 完成率");
+        assertEquals("0%", rows.get(1).get(7), "上海 0/2 完成率");
+        String answer = String.valueOf(result.get("answer"));
+        assertTrue(answer.contains("整体完成率 50%"), "整体 3/6 = 50%");
+        assertTrue(answer.contains("北京分公司"), "点名完成率最高的机构");
+        assertTrue(answer.contains("相对滞后"), "点名相对滞后的机构");
+        verify(aiClient, never()).chat(anyList(), anyBoolean());
+    }
+
+    @Test
+    void 下发完成情况不误判为填报统计() {
+        when(assignmentMapper.statsByIssuerDepartment(any(), any())).thenReturn(List.of(
+                statsRow("财务部", 5, 2, 3, 2, 1, 1, 1, 0, 0)
+        ));
+
+        Map<String, Object> result = service.query("总部部门下发完成情况", List.of(), admin);
+
+        assertEquals("部门", columns(result).get(0), "问下发完成情况应给出按部门分组的下发统计");
+        verify(aiClient, never()).chat(anyList(), anyBoolean());
+    }
+
+    @Test
+    void 复合问句按先出现的意图作答并引导追问() {
+        when(assignmentMapper.statsByIssuerDepartment(any(), any())).thenReturn(List.of(
+                statsRow("财务部", 5, 2, 3, 2, 1, 1, 1, 0, 0)
+        ));
+        when(assignmentMapper.statsByAssignedCompany(any(), any())).thenReturn(List.of(
+                statsRow("北京分公司", 4, 2, 0, 1, 0, 0, 3, 0, 0)
+        ));
+
+        // 下发在前：给下发统计，引导追问填报
+        Map<String, Object> issueFirst = service.query("总部部门下发及分公司填报情况", List.of(), admin);
+        assertEquals("部门", columns(issueFirst).get(0), "下发在前应按部门统计");
+        assertTrue(String.valueOf(issueFirst.get("answer")).contains("各分公司填报情况分析"), "应引导追问填报维度");
+
+        // 填报在前：给填报统计，引导追问下发
+        Map<String, Object> fillFirst = service.query("各分公司填报情况及各部门下发对比", List.of(), admin);
+        assertEquals("机构", columns(fillFirst).get(0), "填报在前应按机构统计");
+        assertTrue(String.valueOf(fillFirst.get("answer")).contains("各部门下发报表的情况"), "应引导追问下发维度");
+    }
+
+    @Test
+    void 数值指标问题不命中运营统计规则() {
+        stubPlan("{\"template_id\":10,\"period_labels\":[\"2026年Q3\"],\"metric_field_names\":[\"_record_count\"]," +
+                "\"dimension\":\"company\",\"chart_type\":\"bar\",\"unanswerable_reason\":null}");
+
+        Map<String, Object> result = service.query("各分公司填报了多少台车", List.of(), admin);
+
+        assertNotNull(result.get("plan"), "含「填报」但问的是台数，应走 LLM 指标查询");
+    }
+
+    /** 运营统计行：COUNT 为 Long、SUM 为 BigDecimal，模拟 MyBatis Map 返回 */
+    private Map<String, Object> statsRow(String name, long total, long templates, long companies,
+                                         long filling, long reviewing, long pending, long received,
+                                         long rejected, long recalled) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("groupName", name);
+        row.put("total", total);
+        row.put("templates", templates);
+        row.put("companies", companies);
+        row.put("filling", BigDecimal.valueOf(filling));
+        row.put("reviewing", BigDecimal.valueOf(reviewing));
+        row.put("pendingReceipt", BigDecimal.valueOf(pending));
+        row.put("received", BigDecimal.valueOf(received));
+        row.put("rejected", BigDecimal.valueOf(rejected));
+        row.put("recalled", BigDecimal.valueOf(recalled));
+        return row;
     }
 
     @Test

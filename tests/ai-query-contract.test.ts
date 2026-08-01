@@ -26,8 +26,9 @@ test('AiQueryController 暴露 /api/ai/query 与 /api/ai/config 两个端点', (
   assert.match(controller, /@Valid\s+@RequestBody\s+AiQueryRequest/);
 });
 
-test('AiQueryController 仅放行超级管理员与部门报表管理员，其余 403', () => {
+test('AiQueryController 仅放行超级管理员、数智化转型办公室与部门报表管理员，其余 403', () => {
   assert.match(controller, /isSuperAdmin\(\)/);
+  assert.match(controller, /isDigitalAdmin\(\)/);
   assert.match(controller, /isDepartmentReportAdmin\(\)/);
   assert.match(controller, /throw new DomainException\([^)]*403\)/s);
 });
@@ -135,7 +136,7 @@ test('前端路由与菜单接入智能问数入口', () => {
   assert.match(app, /path="ai-query"/);
   assert.match(app, /import\('\.\/pages\/AiQuery'\)/);
   const navItems = layout.match(/to="\/ai-query"/g) || [];
-  assert.equal(navItems.length, 2, '部门报表管理员与超级管理员菜单各应有一项智能问数');
+  assert.equal(navItems.length, 3, '部门报表管理员、数智化转型办公室与超级管理员菜单各应有一项智能问数');
   assert.match(api, /\/api\/ai\/query/);
   assert.match(api, /\/api\/ai\/config/);
 });

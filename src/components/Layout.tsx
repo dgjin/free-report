@@ -374,6 +374,7 @@ export const Layout: React.FC = () => {
                 <>
                   <NavItem to="/approvals" active={location.pathname.startsWith('/approvals') || location.pathname.startsWith('/template-approvals')} icon={CheckSquare} label="审批中心" badge={pendingCount} />
                   <NavItem to="/templates" active={location.pathname.startsWith('/templates')} icon={FileSpreadsheet} label="模板管理" />
+                  <NavItem to="/ai-query" active={location.pathname.startsWith('/ai-query')} icon={Sparkles} label="智能问数" />
                 </>
               )}
 

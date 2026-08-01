@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
  *
  * 本类只保留编排逻辑，各阶段职责由协作组件承担：
  * - {@link AiQueryAuditor}        单用户并发闸门 + 审计日志
+ * - {@link AiOperationAnalyzer}   运营统计（各部门下发情况 / 各机构填报情况）规则识别与直接作答
  * - {@link AiQueryContextBuilder} 用户可见的模板/指标/周期上下文组装
  * - {@link AiPlanResolver}        LLM 计划 prompt 构建、计划解析与白名单校验
  * - {@link AiResultBuilder}       表格/图表数据构建与结论生成
@@ -28,16 +29,19 @@ public class AiQueryService {
     private final AiPlanResolver planResolver;
     private final AiResultBuilder resultBuilder;
     private final AiQueryAuditor auditor;
+    private final AiOperationAnalyzer operationAnalyzer;
 
     public AiQueryService(AiClient aiClient, AggregationService aggregationService,
                           AiQueryContextBuilder contextBuilder, AiPlanResolver planResolver,
-                          AiResultBuilder resultBuilder, AiQueryAuditor auditor) {
+                          AiResultBuilder resultBuilder, AiQueryAuditor auditor,
+                          AiOperationAnalyzer operationAnalyzer) {
         this.aiClient = aiClient;
         this.aggregationService = aggregationService;
         this.contextBuilder = contextBuilder;
         this.planResolver = planResolver;
         this.resultBuilder = resultBuilder;
         this.auditor = auditor;
+        this.operationAnalyzer = operationAnalyzer;
     }
 
     /** 智能问数可用性（前端据此提示配置缺失） */
@@ -57,6 +61,13 @@ public class AiQueryService {
     }
 
     private Map<String, Object> doQuery(String question, List<Map<String, String>> history, AuthUser user) {
+        // 运营统计类问题（各部门下发情况 / 各机构填报情况）：固定口径规则识别直接作答，
+        // 不消耗 LLM 调用，AI 服务不可用时也可用；数据范围仍按用户权限过滤
+        Map<String, Object> operationAnswer = operationAnalyzer.answerIfMatched(question, user);
+        if (operationAnswer != null) {
+            return operationAnswer;
+        }
+
         List<AiTemplateContext> contexts = contextBuilder.buildContexts(user);
         if (contexts.isEmpty()) {
             return textOnly("当前没有可供问数的报表。请先创建并发布模板、下发任务并完成填报后再来提问。", contexts);

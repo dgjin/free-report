@@ -117,11 +117,14 @@ test('buildSuggestedQuestions: 只用已发布模板，带周期时拼入周期'
   assert.ok(questions.some((q) => q.includes('趋势变化')));
 });
 
-test('buildSuggestedQuestions: 最多 4 条，无模板返回空', () => {
+test('buildSuggestedQuestions: 最多 6 条且附运营统计引导，无模板仅剩固定引导', () => {
   const many = buildSuggestedQuestions([1, 2, 3, 4, 5].map((i) => template(i, `报表${i}`)));
-  assert.equal(many.length, 4);
-  assert.deepEqual(buildSuggestedQuestions([]), []);
-  assert.deepEqual(buildSuggestedQuestions(undefined), []);
+  assert.equal(many.length, 6);
+  assert.ok(many.includes('各部门下发报表的情况'));
+  assert.ok(many.includes('各分公司填报情况分析'));
+  // 运营统计引导不依赖模板，无模板时仍可引导提问
+  assert.deepEqual(buildSuggestedQuestions([]), ['各部门下发报表的情况', '各分公司填报情况分析']);
+  assert.deepEqual(buildSuggestedQuestions(undefined), ['各部门下发报表的情况', '各分公司填报情况分析']);
 });
 
 // --- validateQuestion ---

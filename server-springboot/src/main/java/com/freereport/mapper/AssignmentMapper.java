@@ -105,4 +105,18 @@ public interface AssignmentMapper {
      * 根据模板 ID 列表批量查询各模板的去重周期标签（智能问数上下文用，避免逐模板 N+1）。
      */
     List<Map<String, Object>> findPeriodLabelsByTemplateIds(@Param("templateIds") List<Long> templateIds);
+
+    /**
+     * 智能问数运营统计：按下发部门分组统计任务数与状态分布。
+     * 数据范围与 findForUser 的权限口径一致（超管全量 / 部门管理员本部门 / 其余本机构）。
+     */
+    List<Map<String, Object>> statsByIssuerDepartment(@Param("companyId") Long companyId,
+                                                      @Param("role") String role);
+
+    /**
+     * 智能问数运营统计：按填报机构分组统计任务数与状态分布（不含已撤回任务）。
+     * 数据范围与 findForUser 的权限口径一致（超管全量 / 部门管理员本部门下发 / 其余本机构）。
+     */
+    List<Map<String, Object>> statsByAssignedCompany(@Param("companyId") Long companyId,
+                                                     @Param("role") String role);
 }

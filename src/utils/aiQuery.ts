@@ -88,7 +88,8 @@ export function shouldRenderChart(chart: AiChart | null | undefined): boolean {
 
 /**
  * 建议问题：基于可见模板生成，引导用户用系统认得的说法提问。
- * 仅取已发布且有下发周期的模板，最多 4 条。
+ * 另附两条运营统计固定引导（各部门下发情况 / 各机构填报情况），
+ * 这两类问题由后端规则识别直接作答，不依赖具体模板。
  */
 export function buildSuggestedQuestions(
   templates: ReportTemplate[] | undefined,
@@ -105,7 +106,10 @@ export function buildSuggestedQuestions(
   if (published.length > 0) {
     questions.push(`「${published[0].name}」近几期的趋势变化`);
   }
-  return questions.slice(0, 4);
+  // 运营统计类固定引导：不依赖模板指标，规则识别口径稳定
+  questions.push('各部门下发报表的情况');
+  questions.push('各分公司填报情况分析');
+  return questions.slice(0, 6);
 }
 
 /** 提问校验：空、纯空白、超长均拦在前端，减少无效请求 */

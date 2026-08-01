@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, XCircle } from '../components/icons';
+import { ArrowLeft, Download, XCircle } from '../components/icons';
 import { api, getStoredUser } from '../services/api';
 import { toast, confirmDialog } from '../utils/toast';
 import {
@@ -13,6 +13,7 @@ import { getSubmissionWorkflowView } from '../utils/submissionWorkflow';
 import { getClientAccess } from '../utils/access';
 import { buildMatrixGroups } from '../utils/aggregationView';
 import { validateSubmission, ValidationIssue } from '../utils/dataValidation';
+import { exportSubmissionToExcel } from '../utils/reportExport';
 import { SummaryForm } from '../components/report/SummaryForm';
 import { DetailTable } from '../components/report/DetailTable';
 import { CrossTable, MatrixGroup } from '../components/report/CrossTable';
@@ -36,6 +37,7 @@ export const ReportFill: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [exporting, setExporting] = useState<boolean>(false);
   // 提交前校验发现的错误（保存草稿不校验）
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
 
@@ -214,6 +216,28 @@ export const ReportFill: React.FC = () => {
     }
   };
 
+  // 导出当前已填报数据到本地 Excel（填报信息 + 汇总指标 + 明细数据 + 交叉表）
+  const handleExport = async () => {
+    if (!assignment || exporting) return;
+    setExporting(true);
+    try {
+      await exportSubmissionToExcel({
+        assignment,
+        summaryFields,
+        detailFields,
+        matrixGroups,
+        summaryForm,
+        detailRows,
+        submission,
+      });
+      toast('导出成功，已保存到本地下载目录', 'success');
+    } catch (err: any) {
+      toast(err.message || '导出失败，请稍后重试', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading || !assignment) {
     return (
       <div className="max-w-[1280px] mx-auto px-[22px] py-[clamp(20px,4vw,32px)]">
@@ -312,14 +336,27 @@ export const ReportFill: React.FC = () => {
             </div>
           </div>
 
-          {!isReadOnly && (
-            <ReportActions
-              saving={saving}
-              submitting={submitting}
-              onSave={() => handleSave(false)}
-              onSubmit={() => handleSave(true)}
-            />
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {submission && (
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-1.5 px-3.5 h-9 rounded-md bg-canvas text-[12px] font-semibold text-ink hover:bg-line transition-colors disabled:opacity-50"
+                title="将已填报数据导出为 Excel 保存到本地"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {exporting ? '导出中...' : '导出数据'}
+              </button>
+            )}
+            {!isReadOnly && (
+              <ReportActions
+                saving={saving}
+                submitting={submitting}
+                onSave={() => handleSave(false)}
+                onSubmit={() => handleSave(true)}
+              />
+            )}
+          </div>
         </div>
       </div>
 
