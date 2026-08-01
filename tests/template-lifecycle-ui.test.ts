@@ -114,14 +114,16 @@ test('template cards expose lifecycle status and guarded lifecycle actions', () 
 });
 
 test('template editor makes every non-published template read only with matching copy', () => {
-  const source = readFileSync(new URL('../src/pages/TemplateEditor.tsx', import.meta.url), 'utf8');
+  // 拆分后：头部（只读提示与操作按钮）在 TemplateEditorHeader，字段行操作在 TemplateFieldList
+  const header = readFileSync(new URL('../src/components/TemplateEditorHeader.tsx', import.meta.url), 'utf8');
+  const list = readFileSync(new URL('../src/components/TemplateFieldList.tsx', import.meta.url), 'utf8');
 
-  assert.match(source, /getTemplateLifecycleView\(template\.status\)/);
-  assert.match(source, /const canWrite = lifecycle\.canWrite/);
-  assert.match(source, /\{lifecycle\.readOnlyMessage\}/);
-  assert.match(source, /\{canWrite && \(/);
-  assert.match(source, /\{isActive && canWrite \?/);
-  assert.match(source, /focus-visible:ring-2/);
+  assert.match(header, /getTemplateLifecycleView\(template\.status\)/);
+  assert.match(header, /const canWrite = lifecycle\.canWrite/);
+  assert.match(header, /\{lifecycle\.readOnlyMessage\}/);
+  assert.match(header, /\{canWrite && \(/);
+  assert.match(list, /\{isActive && canWrite \?/);
+  assert.match(header, /focus-visible:ring-2/);
 });
 
 test('template metadata client payload type excludes lifecycle status', () => {

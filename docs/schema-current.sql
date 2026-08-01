@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Free Report 当前数据库完整结构参考（schema-current.sql）
 --
--- 本文件合并 sql/001 ~ sql/008 全部迁移后的最终结构，与线上库 mysqldump
+-- 本文件合并 sql/001 ~ sql/010 全部迁移后的最终结构，与线上库 mysqldump
 -- 导出结果一致。每处变更以注释标注来源迁移文件：
 --   [001] 001_schema.sql                  基础表结构
 --   [003] 003_fix_vehicle_detail_fields.sql 数据修正（无 DDL）
@@ -10,12 +10,14 @@
 --   [006] 006_performance_indexes.sql     性能索引
 --   [007] 007_recall_and_onetime.sql      强制收回 + 一次性下发
 --   [008] 008_template_approval.sql       模板审批流 + numeric_value 冗余列
+--   [009] 009_template_schedule.sql       模板周期下发计划
+--   [010] 010_query_optimization.sql      查询性能优化索引
 --
 -- 注意：
 --   1. report_template_fields.data_type 的 'matrix' 枚举在迁移文件之外
 --      直接应用于库中（支撑交叉表/矩阵填报），本文件按实际结构记录。
 --   2. 本文件仅作结构参考，不作为迁移脚本执行；环境初始化请按序执行
---      sql/001 ~ sql/008。
+--      sql/001 ~ sql/010。
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -113,6 +115,8 @@ CREATE TABLE report_assignments (
   UNIQUE KEY uq_assignment_period (template_id, assigned_to_company_id, period_label),
   INDEX idx_assignments_company_status (assigned_to_company_id, status),
   INDEX idx_assignments_issuer_status (issuer_department_id, status),       -- [004]
+  INDEX idx_assignments_template_period (template_id, period_label),        -- [010] 按模板+周期聚合查询
+  INDEX idx_assignments_company_id (assigned_to_company_id, id),            -- [010] 分页排序免 filesort
   CONSTRAINT fk_assignments_template FOREIGN KEY (template_id) REFERENCES report_templates(id),
   CONSTRAINT fk_assignments_company FOREIGN KEY (assigned_to_company_id) REFERENCES companies(id),
   CONSTRAINT fk_assignments_assigner FOREIGN KEY (assigned_by) REFERENCES users(id),
@@ -153,6 +157,7 @@ CREATE TABLE report_submissions (
   INDEX idx_submissions_assignment_status (assignment_id, status, version),
   INDEX idx_submissions_company_status (submitted_by_company_id, status),   -- [006]
   INDEX idx_submissions_submitted_by (submitted_by),                        -- [006]
+  INDEX idx_submissions_status (status, submitted_by_company_id),           -- [010] 纯状态过滤（待签收清单）
   CONSTRAINT fk_submissions_assignment FOREIGN KEY (assignment_id) REFERENCES report_assignments(id),
   CONSTRAINT fk_submissions_company FOREIGN KEY (submitted_by_company_id) REFERENCES companies(id),
   CONSTRAINT fk_submissions_user FOREIGN KEY (submitted_by) REFERENCES users(id)
@@ -172,6 +177,8 @@ CREATE TABLE report_submission_data (
   UNIQUE KEY uq_submission_field_row (submission_id, field_id, row_index),
   INDEX idx_submission_data_submission (submission_id, row_index),
   INDEX idx_sd_numeric (field_id, numeric_value),                           -- [008]
+  INDEX idx_sd_submission_covering (submission_id, field_id, row_index, numeric_value), -- [010] 聚合覆盖索引免回表
+  INDEX idx_sd_submission_ordered (submission_id, row_index, field_id),     -- [010] 明细查询免排序
   CONSTRAINT fk_submission_data_submission FOREIGN KEY (submission_id) REFERENCES report_submissions(id) ON DELETE CASCADE,
   CONSTRAINT fk_submission_data_field FOREIGN KEY (field_id) REFERENCES report_template_fields(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -249,6 +256,26 @@ CREATE TABLE template_approvals (
   CONSTRAINT fk_ta_submitter FOREIGN KEY (submitted_by) REFERENCES users(id),
   CONSTRAINT fk_ta_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------------------------
+-- 模板周期下发计划表 [009]
+-- 月报=每月N日；季报=每季首月N日；年报=issue_month月N日；
+-- 模板发布后由 AutoAssignScheduler 按规则自动生成后续周期下发任务
+-- ----------------------------------------------------------------------------
+CREATE TABLE report_template_schedules (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  template_id BIGINT UNSIGNED NOT NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 0,
+  issue_month TINYINT NULL,              -- 仅年报：每年第几月下发（1-12）
+  issue_day TINYINT NOT NULL DEFAULT 5,  -- 月报=每月N日；季报=每季首月N日；年报=issue_month月N日（1-28）
+  deadline_offset_days INT NOT NULL DEFAULT 10,  -- 下发后 N 天为填报截止日
+  target_company_ids JSON NOT NULL,      -- 自动下发目标机构 ID 数组
+  last_period_label VARCHAR(80) NULL,    -- 最近已生成分期标签（防重复生成）
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uq_schedule_template (template_id),
+  CONSTRAINT fk_schedule_template FOREIGN KEY (template_id) REFERENCES report_templates(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ----------------------------------------------------------------------------
 -- 迁移记录表

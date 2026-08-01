@@ -71,6 +71,11 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   }
 
   const res = await fetch(url, { ...options, headers });
+  // 滑动过期：后端在 token 临近过期时通过响应头下发新 token，无感替换避免使用中掉线
+  const refreshedToken = res.headers.get('X-Refreshed-Token');
+  if (refreshedToken) {
+    setToken(refreshedToken);
+  }
   // 兼容空响应体（void/204/null 返回），避免 res.json() 抛出 Unexpected end of JSON input
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;

@@ -24,12 +24,27 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
  * 汇总服务：按模板/周期查看汇总、按任务执行汇总、汇总历史。
+ *
+ * 【汇总数据一致性契约】
+ * 1. 单一事实来源：report_submission_data（numeric_value 冗余列）。所有汇总数字
+ *    均可由该表实时推导，任何读路径的数字都以实时计算为准。
+ * 2. 实时计算路径（汇总页 / 智能问数）：getAggregationByTemplate /
+ *    getAggregationsByTemplateAndPeriods 走 SQL 下沉聚合
+ *    （sumNumericFieldsByTemplateAndPeriods），口径 = 各任务最新版本 + 已审批
+ *    （pending_receipt / received）+ 汇总区（row_index=0）数值字段。
+ * 3. 快照路径（report_aggregations 表）：仅在部门管理员手动执行 aggregateAssignment
+ *    时写入（ON DUPLICATE KEY UPDATE 可重复刷新），是「某次手动汇总动作」的历史留痕，
+ *    仅 getAggregationHistory 展示使用。快照不随后续退回/重报自动刷新，展示时应
+ *    结合 updated_at 理解其时效性；需要最新数字请走实时路径。
+ * 4. 两条路径的数值口径已对齐（最新版本过滤 + 已审批状态过滤），同一时刻对同一
+ *    任务重复执行手动汇总，快照数字与实时汇总数字一致。
  */
 @Service
 public class AggregationService {
@@ -63,8 +78,21 @@ public class AggregationService {
      * - 批量查询各分支最新已审批提交，计算合计/均值
      * - 仅 pending_receipt/received 状态参与计算
      * - 返回结构与前端 AggregationResponse 匹配
+     *
+     * 单周期是批量多周期版本的特例，统一走批量实现以保证口径只有一份。
      */
     public Map<String, Object> getAggregationByTemplate(Long templateId, String periodLabel, AuthUser user) {
+        return getAggregationsByTemplateAndPeriods(templateId, List.of(periodLabel), user).get(periodLabel);
+    }
+    
+    /**
+     * 按模板 + 多个周期批量返回汇总数据（智能问数多周期取数用，避免逐周期 N+1）：
+     * 模板/权限/字段仅加载一次，任务/提交/数据/机构/聚合全部批量查询后按周期分组组装，
+     * 口径与单周期调用完全一致。返回 LinkedHashMap，键顺序与入参周期顺序一致；
+     * 无任务的周期也会返回空结构（与逐周期调用行为一致）。
+     */
+    public Map<String, Map<String, Object>> getAggregationsByTemplateAndPeriods(
+            Long templateId, List<String> periodLabels, AuthUser user) {
         ReportTemplate t = templateMapper.findById(templateId);
         if (t == null) {
             throw new DomainException("模板不存在", 404);
@@ -73,8 +101,18 @@ public class AggregationService {
             throw new DomainException("无权查看该模板", 403);
         }
     
-        List<ReportAssignment> assignments = assignmentMapper.findByTemplateAndPeriod(templateId, periodLabel);
-        List<Long> assignmentIds = assignments.stream().map(ReportAssignment::getId).collect(Collectors.toList());
+        // 周期去重且保序，避免重复周期重复取数
+        List<String> periods = new ArrayList<>(new LinkedHashSet<>(periodLabels));
+        Map<String, Map<String, Object>> resultByPeriod = new LinkedHashMap<>();
+        if (periods.isEmpty()) {
+            return resultByPeriod;
+        }
+    
+        List<ReportAssignment> allAssignments = assignmentMapper.findByTemplateAndPeriods(templateId, periods);
+        Map<String, List<ReportAssignment>> assignmentsByPeriod = allAssignments.stream()
+                .collect(Collectors.groupingBy(ReportAssignment::getPeriodLabel, LinkedHashMap::new, Collectors.toList()));
+        List<Long> allAssignmentIds = allAssignments.stream()
+                .map(ReportAssignment::getId).collect(Collectors.toList());
     
         List<ReportTemplateField> allFields = templateMapper.findFieldsByTemplateId(templateId);
         List<ReportTemplateField> summaryFields = allFields.stream()
@@ -93,10 +131,10 @@ public class AggregationService {
                         && "active".equals(f.getStatus()))
                 .collect(Collectors.toList());
     
-        // 每个任务的最新已审批提交
+        // 每个任务的最新已审批提交（跨周期一次批量查询；assignmentId 全局唯一，按任务归组天然区分周期）
         Map<Long, ReportSubmission> subMap = new HashMap<>();
-        if (!assignmentIds.isEmpty()) {
-            List<ReportSubmission> latestApproved = submissionMapper.findLatestApprovedByAssignmentIds(assignmentIds);
+        if (!allAssignmentIds.isEmpty()) {
+            List<ReportSubmission> latestApproved = submissionMapper.findLatestApprovedByAssignmentIds(allAssignmentIds);
             for (ReportSubmission s : latestApproved) {
                 subMap.put(s.getAssignmentId(), s);
             }
@@ -125,13 +163,48 @@ public class AggregationService {
             }
         }
     
-        // 批量查询机构
-        List<Long> companyIds = assignments.stream()
+        // 批量查询机构（跨周期去重）
+        List<Long> companyIds = allAssignments.stream()
                 .map(ReportAssignment::getAssignedToCompanyId).distinct().collect(Collectors.toList());
         Map<Long, Company> companyMap = companyIds.isEmpty() ? Collections.emptyMap()
                 : companyMapper.findByIds(companyIds).stream()
                 .collect(Collectors.toMap(Company::getId, c -> c));
     
+        // summary 数值总额：SQL 下沉批量聚合，按 (周期, 字段) 分组；count/average 在组装阶段按周期计算
+        Map<String, Map<String, Double>> sqlTotalsByPeriod = new HashMap<>();
+        if (!numericFields.isEmpty()) {
+            List<Map<String, Object>> aggRows =
+                    aggregationMapper.sumNumericFieldsByTemplateAndPeriods(templateId, periods);
+            for (Map<String, Object> aggRow : aggRows) {
+                sqlTotalsByPeriod
+                        .computeIfAbsent((String) aggRow.get("periodLabel"), k -> new HashMap<>())
+                        .put((String) aggRow.get("fieldName"), parseDouble(aggRow.get("total")));
+            }
+        }
+    
+        for (String period : periods) {
+            resultByPeriod.put(period, assemblePeriodAggregation(t,
+                    assignmentsByPeriod.getOrDefault(period, Collections.emptyList()),
+                    summaryFields, detailFields, matrixFields, numericFields,
+                    subMap, summaryBySubmission, detailBySubmission, companyMap,
+                    sqlTotalsByPeriod.getOrDefault(period, Collections.emptyMap())));
+        }
+        return resultByPeriod;
+    }
+    
+    /**
+     * 组装单个周期的汇总结构（company_data / summary / detail_rows / detail_summary）。
+     * 输入的 subMap / 数据索引 / 机构表为跨周期批量查询结果，按本周期任务过滤使用。
+     */
+    private Map<String, Object> assemblePeriodAggregation(
+            ReportTemplate t, List<ReportAssignment> assignments,
+            List<ReportTemplateField> summaryFields, List<ReportTemplateField> detailFields,
+            List<ReportTemplateField> matrixFields, List<ReportTemplateField> numericFields,
+            Map<Long, ReportSubmission> subMap,
+            Map<Long, Map<Long, String>> summaryBySubmission,
+            Map<Long, Map<Integer, Map<Long, String>>> detailBySubmission,
+            Map<Long, Company> companyMap,
+            Map<String, Double> sqlTotals) {
         // 构建 company_data 行
         List<Map<String, Object>> companyData = new ArrayList<>();
         int submittedCount = 0;
@@ -169,16 +242,8 @@ public class AggregationService {
         }
     
         // summary: { field_name: { total, count, average } }
-        // total 由 SQL 下沉聚合（仅统计各任务最新已审批提交的 row_index=0 数据），替代 Java 循环累加；
+        // total 来自 SQL 下沉批量聚合结果（仅统计各任务最新已审批提交的 row_index=0 数据），替代 Java 循环累加；
         // count/average 语义保持不变：缺失值按 0 计入平均。
-        Map<String, Double> sqlTotals = new HashMap<>();
-        if (!numericFields.isEmpty()) {
-            List<Map<String, Object>> aggRows =
-                    aggregationMapper.sumNumericFieldsByTemplateAndPeriod(templateId, periodLabel);
-            for (Map<String, Object> aggRow : aggRows) {
-                sqlTotals.put((String) aggRow.get("fieldName"), parseDouble(aggRow.get("total")));
-            }
-        }
         Map<String, Object> summary = new LinkedHashMap<>();
         for (ReportTemplateField nf : numericFields) {
             double total = sqlTotals.getOrDefault(nf.getFieldName(), 0.0);

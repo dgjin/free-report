@@ -12,13 +12,16 @@ import java.util.Date;
 public class JwtTokenProvider {
     private final SecretKey key;
     private final long expiration;
+    private final long renewalThreshold;
     private final JwtParser jwtParser;
 
     public JwtTokenProvider(@Value("${jwt.secret}") String secret,
-                           @Value("${jwt.expiration}") long expiration) {
+                           @Value("${jwt.expiration}") long expiration,
+                           @Value("${jwt.renewal-threshold:1800000}") long renewalThreshold) {
         byte[] decoded = Base64.getDecoder().decode(secret);
         this.key = Keys.hmacShaKeyFor(decoded);
         this.expiration = expiration;
+        this.renewalThreshold = renewalThreshold;
         this.jwtParser = Jwts.parser().verifyWith(key).build();
     }
 
@@ -62,5 +65,15 @@ public class JwtTokenProvider {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * 滑动过期判断：token 剩余有效期低于续签阈值时需要续签。
+     * 调用前须已通过 validateToken（此处直接解析，不再容错）。
+     */
+    public boolean needsRenewal(String token) {
+        Claims claims = jwtParser.parseSignedClaims(token).getPayload();
+        long remaining = claims.getExpiration().getTime() - System.currentTimeMillis();
+        return remaining < renewalThreshold;
     }
 }

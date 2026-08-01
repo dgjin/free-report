@@ -20,12 +20,13 @@ public interface AggregationMapper {
     List<Map<String, Object>> sumNumericFieldsByAssignment(@Param("assignmentId") Long assignmentId);
 
     /**
-     * 按模板 + 周期聚合 summary 区数值字段（SQL 下沉汇总）：
+     * 按模板 + 多个周期批量聚合 summary 区数值字段（SQL 下沉汇总，智能问数多周期取数用）：
      * 仅统计每个任务最新已审批提交（MAX(version)）中 row_index = 0 的数据。
-     * 返回 fieldName / total / cnt。
+     * 单周期场景传入单元素列表即可，语义与原单周期查询一致。
+     * 返回 periodLabel / fieldName / total。
      */
-    List<Map<String, Object>> sumNumericFieldsByTemplateAndPeriod(@Param("templateId") Long templateId,
-                                                                  @Param("periodLabel") String periodLabel);
+    List<Map<String, Object>> sumNumericFieldsByTemplateAndPeriods(@Param("templateId") Long templateId,
+                                                                   @Param("periodLabels") List<String> periodLabels);
 
     /**
      * 统计指定任务下已审批通过的提交数。

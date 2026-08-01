@@ -1,5 +1,7 @@
--- 009: 查询性能优化索引
+-- ============================================================================
+-- 010: 查询性能优化索引
 -- 基于慢查询分析与 EXPLAIN 结果，补齐缺失的覆盖索引与过滤索引
+-- ============================================================================
 
 -- 1. report_submission_data 覆盖索引：聚合查询 (submission_id, field_id, row_index, numeric_value)
 --    影响查询：sumNumericFieldsByTemplateAndPeriod、sumNumericFieldsByAssignment

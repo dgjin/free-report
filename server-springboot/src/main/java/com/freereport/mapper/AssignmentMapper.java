@@ -57,10 +57,11 @@ public interface AssignmentMapper {
                       @Param("companyLevel") String companyLevel);
 
     /**
-     * 根据模板和周期查询下发任务。
+     * 根据模板和多个周期批量查询下发任务（智能问数多周期取数用，避免逐周期 N+1）。
+     * 单周期场景传入单元素列表即可，语义与原单周期查询一致。
      */
-    List<ReportAssignment> findByTemplateAndPeriod(@Param("templateId") Long templateId,
-                                                   @Param("periodLabel") String periodLabel);
+    List<ReportAssignment> findByTemplateAndPeriods(@Param("templateId") Long templateId,
+                                                    @Param("periodLabels") List<String> periodLabels);
 
     /**
      * 根据模板 + 周期 + 机构精确查询下发任务（利用唯一键 uq_assignment_period，O(1) 查找）。

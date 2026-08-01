@@ -79,11 +79,21 @@
         </choose>
     </select>
 
-    <!-- 根据模板和周期查询下发任务 -->
-    <select id="findByTemplateAndPeriod" resultType="com.freereport.entity.ReportAssignment">
-        SELECT * FROM report_assignments
-        WHERE template_id = #{templateId}
-          AND period_label = #{periodLabel}
+    <!-- 根据模板和多个周期批量查询下发任务（智能问数多周期取数，避免逐周期 N+1） -->
+    <select id="findByTemplateAndPeriods" resultType="com.freereport.entity.ReportAssignment">
+        <choose>
+            <when test="periodLabels != null and periodLabels.size() > 0">
+                SELECT * FROM report_assignments
+                WHERE template_id = #{templateId}
+                  AND period_label IN
+                <foreach collection="periodLabels" item="periodLabel" open="(" separator="," close=")">
+                    #{periodLabel}
+                </foreach>
+            </when>
+            <otherwise>
+                SELECT * FROM report_assignments WHERE 1 = 0
+            </otherwise>
+        </choose>
     </select>
 
     <!-- 根据模板 + 周期 + 机构精确查询（利用唯一键 uq_assignment_period） -->

@@ -22,6 +22,8 @@ public class JwtAuthFilter implements Filter {
     // Auth cache: 30s TTL to avoid DB queries on every request
     private static final long CACHE_TTL_MS = 30_000;
     private static final int MAX_CACHE_SIZE = 10_000;
+    /** 滑动过期：token 临近过期时通过该响应头下发新 token，前端无感替换 */
+    private static final String REFRESHED_TOKEN_HEADER = "X-Refreshed-Token";
     private final Map<Long, CacheEntry> cache = new ConcurrentHashMap<>();
 
     record CacheEntry(AuthUser authUser, long expiresAt) {}
@@ -58,6 +60,12 @@ public class JwtAuthFilter implements Filter {
         }
 
         AuthUser authUser = jwtTokenProvider.getAuthUserFromToken(token);
+
+        // 滑动过期：剩余有效期低于阈值时签发新 token，前端无感替换，避免活跃使用中突然掉线。
+        // 须在 chain.doFilter 之前写入响应头，防止响应提交后头部无法修改。
+        if (jwtTokenProvider.needsRenewal(token)) {
+            response.setHeader(REFRESHED_TOKEN_HEADER, jwtTokenProvider.generateToken(authUser));
+        }
 
         // Check cache
         CacheEntry cached = cache.get(authUser.getId());

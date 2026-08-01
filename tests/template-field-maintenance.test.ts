@@ -59,22 +59,25 @@ test('field maintenance API methods use the PUT and DELETE field endpoints', asy
 });
 
 test('template editor wires guarded field edit and delete actions', () => {
-  const source = readFileSync(new URL('../src/pages/TemplateEditor.tsx', import.meta.url), 'utf8');
+  // 拆分后：字段列表与守卫在 TemplateFieldList，编辑提交在 EditFieldModal，安全提示在 TemplateEditorHeader
+  const listSource = readFileSync(new URL('../src/components/TemplateFieldList.tsx', import.meta.url), 'utf8');
+  const editSource = readFileSync(new URL('../src/components/EditFieldModal.tsx', import.meta.url), 'utf8');
+  const headerSource = readFileSync(new URL('../src/components/TemplateEditorHeader.tsx', import.meta.url), 'utf8');
 
   // 未下发守卫判定
-  assert.match(source, /canMaintainTemplateFields/);
-  assert.match(source, /template\.assignment_count \?\? 0/);
+  assert.match(listSource, /canMaintainTemplateFields/);
+  assert.match(listSource, /template\.assignment_count \?\? 0/);
   // 编辑/删除 handler 调用 API
-  assert.match(source, /api\.updateField\(template\.id, editingField\.id/);
-  assert.match(source, /api\.deleteField\(template\.id, field\.id\)/);
+  assert.match(editSource, /api\.updateField\(templateId, field\.id/);
+  assert.match(listSource, /api\.deleteField\(template\.id, field\.id\)/);
   // 删除前确认对话框（物理删除不可恢复提示）
-  assert.match(source, /物理删除字段/);
-  assert.match(source, /confirmDialog\(/);
+  assert.match(listSource, /物理删除字段/);
+  assert.match(listSource, /confirmDialog\(/);
   // 字段行按钮：编辑 / 删除 / 停用
-  assert.match(source, /canMaintainFields && \(/);
+  assert.match(listSource, /canMaintainFields && \(/);
   // 安全提示文案：未下发可编辑删除、下发后仅可停用
-  assert.match(source, /可自由编辑、删除字段/);
+  assert.match(headerSource, /可自由编辑、删除字段/);
   // 编辑弹窗
-  assert.match(source, /编辑字段\{editingField\.data_type === 'matrix'/);
-  assert.match(source, /保存修改/);
+  assert.match(editSource, /编辑字段\{field\.data_type === 'matrix'/);
+  assert.match(editSource, /保存修改/);
 });

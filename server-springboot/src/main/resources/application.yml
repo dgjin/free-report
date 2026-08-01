@@ -38,6 +38,8 @@ mybatis:
 jwt:
   secret: ${JWT_SECRET:YjM2N2Y0ZWE4NzQ3YmJlYTdjNTkwYjRiOGU0MGM0OTg=}
   expiration: 86400000
+  # 滑动过期：token 剩余有效期低于该阈值时，服务端随响应头 X-Refreshed-Token 下发新 token
+  renewal-threshold: ${JWT_RENEWAL_THRESHOLD:1800000}
 
 cors:
   allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}

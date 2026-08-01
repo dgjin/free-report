@@ -8,8 +8,22 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+/**
+ * 权限判断工具：所有规则基于「角色 + 机构级别 + 机构归属」三元组。
+ * 角色/级别字面量集中为常量，避免散落各处导致改名漏改。
+ */
 @Component
 public class SecurityUtils {
+
+    // 角色
+    private static final String ROLE_SUPER_ADMIN = "super_admin";
+    private static final String ROLE_DEPARTMENT_REPORT_ADMIN = "department_report_admin";
+    private static final String ROLE_DIGITAL_ADMIN = "digital_admin";
+    private static final String ROLE_HANDLER = "handler";
+    private static final String ROLE_BRANCH_ADMIN = "branch_admin";
+    // 机构级别
+    private static final String LEVEL_HEADQUARTER = "headquarter";
+    private static final String LEVEL_DEPARTMENT = "department";
 
     /**
      * 通过 RequestContextHolder 获取当前线程绑定的请求，避免构造器注入 HttpServletRequest 代理。
@@ -30,54 +44,69 @@ public class SecurityUtils {
         return user;
     }
 
+    // ---- 角色判断：公开方法每次调用取一次当前用户，委托给私有实现避免重复读取 ----
+
     public boolean isSuperAdmin() {
-        return "super_admin".equals(getCurrentUser().getRole());
+        return isSuperAdmin(getCurrentUser());
     }
 
     public boolean isDepartmentReportAdmin() {
-        AuthUser user = getCurrentUser();
-        return "department_report_admin".equals(user.getRole()) && "department".equals(user.getCompanyLevel());
+        return isDepartmentReportAdmin(getCurrentUser());
     }
 
     public boolean isDigitalAdmin() {
-        return "digital_admin".equals(getCurrentUser().getRole());
+        return isDigitalAdmin(getCurrentUser());
     }
+
+    private boolean isSuperAdmin(AuthUser user) {
+        return ROLE_SUPER_ADMIN.equals(user.getRole());
+    }
+
+    private boolean isDepartmentReportAdmin(AuthUser user) {
+        return ROLE_DEPARTMENT_REPORT_ADMIN.equals(user.getRole())
+                && LEVEL_DEPARTMENT.equals(user.getCompanyLevel());
+    }
+
+    private boolean isDigitalAdmin(AuthUser user) {
+        return ROLE_DIGITAL_ADMIN.equals(user.getRole());
+    }
+
+    // ---- 资源级权限 ----
 
     public boolean canReadTemplate(Long ownerDepartmentId) {
         AuthUser user = getCurrentUser();
-        if ("super_admin".equals(user.getRole())) return true;
-        if (isDigitalAdmin()) return true;
-        return "department_report_admin".equals(user.getRole()) && "department".equals(user.getCompanyLevel())
-                && user.getCompanyId().equals(ownerDepartmentId);
+        if (isSuperAdmin(user) || isDigitalAdmin(user)) return true;
+        return isDepartmentReportAdmin(user) && user.getCompanyId().equals(ownerDepartmentId);
     }
 
     public boolean canManageTemplate(Long ownerDepartmentId) {
         AuthUser user = getCurrentUser();
-        return !"super_admin".equals(user.getRole()) &&
-               "department_report_admin".equals(user.getRole()) && "department".equals(user.getCompanyLevel())
-               && user.getCompanyId().equals(ownerDepartmentId);
+        return !isSuperAdmin(user) && isDepartmentReportAdmin(user)
+                && user.getCompanyId().equals(ownerDepartmentId);
     }
 
     public boolean canReadAssignment(ReportAssignment assignment) {
         AuthUser user = getCurrentUser();
-        if ("super_admin".equals(user.getRole())) return true;
+        if (isSuperAdmin(user)) return true;
         if (user.getCompanyId().equals(assignment.getAssignedToCompanyId())) return true;
-        return isDepartmentReportAdmin() && user.getCompanyId().equals(assignment.getIssuerDepartmentId());
+        return isDepartmentReportAdmin(user) && user.getCompanyId().equals(assignment.getIssuerDepartmentId());
     }
 
     public boolean canWriteAssignment(ReportAssignment assignment) {
         AuthUser user = getCurrentUser();
-        if ("super_admin".equals(user.getRole())) return false;
+        if (isSuperAdmin(user)) return false;
         if (!user.getCompanyId().equals(assignment.getAssignedToCompanyId())) return false;
-        return "handler".equals(user.getRole()) || "branch_admin".equals(user.getRole());
+        return ROLE_HANDLER.equals(user.getRole()) || ROLE_BRANCH_ADMIN.equals(user.getRole());
     }
 
     public boolean canReadSubmission(ReportSubmission submission) {
         AuthUser user = getCurrentUser();
-        if ("super_admin".equals(user.getRole())) return true;
-        if ("headquarter".equals(user.getCompanyLevel())) return true;
+        if (isSuperAdmin(user)) return true;
+        if (LEVEL_HEADQUARTER.equals(user.getCompanyLevel())) return true;
         return submission.getSubmittedByCompanyId().equals(user.getCompanyId());
     }
+
+    // ---- 门槛式断言 ----
 
     public void requireDepartmentReportAdmin() {
         if (!isDepartmentReportAdmin()) {

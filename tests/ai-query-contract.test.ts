@@ -6,7 +6,14 @@ const serverRoot = new URL('../server-springboot/src/main/', import.meta.url);
 const read = (relative: string) => fs.readFileSync(new URL(relative, serverRoot), 'utf8');
 
 const controller = read('java/com/freereport/controller/AiQueryController.java');
+// 智能问数已按职责拆分：AiQueryService 只留编排，上下文/计划/结果/审计由协作组件承担
 const service = read('java/com/freereport/service/AiQueryService.java');
+const contextBuilder = read('java/com/freereport/service/AiQueryContextBuilder.java');
+const planResolver = read('java/com/freereport/service/AiPlanResolver.java');
+const resultBuilder = read('java/com/freereport/service/AiResultBuilder.java');
+const auditor = read('java/com/freereport/service/AiQueryAuditor.java');
+const periodData = read('java/com/freereport/service/AiPeriodData.java');
+const aggEnum = read('java/com/freereport/service/AiAgg.java');
 const client = read('java/com/freereport/service/AiClient.java');
 const properties = read('java/com/freereport/config/AiProperties.java');
 const request = read('java/com/freereport/dto/AiQueryRequest.java');
@@ -26,69 +33,73 @@ test('AiQueryController 仅放行超级管理员与部门报表管理员，其�
 });
 
 test('AiQueryService 通过聚合引擎取数，不绕过权限校验', () => {
-  assert.match(service, /aggregationService\.getAggregationByTemplate\(/);
-  assert.doesNotMatch(service, /\bselect\s+.*\bfrom\b/i, 'AI 服务不应直接拼装 SQL');
+  // 多周期取数走批量接口（一次调用替代逐周期 N+1），权限校验仍在聚合引擎内部
+  assert.match(service, /aggregationService\.getAggregationsByTemplateAndPeriods\(/);
+  const components: Record<string, string> = { service, contextBuilder, planResolver, resultBuilder, auditor };
+  for (const [name, src] of Object.entries(components)) {
+    assert.doesNotMatch(src, /\bselect\s+.*\bfrom\b/i, `${name} 不应直接拼装 SQL`);
+  }
   // 模板可见范围来自现有的按用户过滤查询
-  assert.match(service, /templateMapper\.findForUser\(/);
+  assert.match(contextBuilder, /templateMapper\.findForUser\(/);
 });
 
 test('AiQueryService 对查询计划做合法性校验并限制规模', () => {
   // 周期数量上限，防止一次问数打爆聚合与 token
-  assert.match(service, /MAX_PERIODS\s*=\s*\d+/);
-  assert.match(service, /MAX_METRICS\s*=\s*\d+/);
+  assert.match(planResolver, /MAX_PERIODS\s*=\s*\d+/);
+  assert.match(planResolver, /MAX_METRICS\s*=\s*\d+/);
   // LLM 返回非纯 JSON 时的兜底解析
-  assert.match(service, /parseJsonLoose/);
-  assert.match(service, /unanswerable_reason/);
+  assert.match(planResolver, /parseJsonLoose/);
+  assert.match(planResolver, /unanswerable_reason/);
 });
 
 test('AiQueryService 返回 answer/plan/chart/table/scope_note 契约字段', () => {
   for (const key of ['answer', 'plan', 'chart', 'table', 'scope_note']) {
     assert.match(service, new RegExp(`"${key}"`), `缺少返回字段 ${key}`);
   }
-  assert.match(service, /"categories"/);
-  assert.match(service, /"series"/);
-  assert.match(service, /"columns"/);
-  assert.match(service, /"rows"/);
+  assert.match(resultBuilder, /"categories"/);
+  assert.match(resultBuilder, /"series"/);
+  assert.match(resultBuilder, /"columns"/);
+  assert.match(resultBuilder, /"rows"/);
 });
 
 test('AiQueryService 支持明细型台账问数（明细数值合计与记录数指标）', () => {
   // 纯明细台账（如公务车）无汇总字段，需提供明细逐行合计与记录数两类指标
-  assert.match(service, /RECORD_COUNT_FIELD/);
-  assert.match(service, /MetricSource\.DETAIL/);
-  assert.match(service, /MetricSource\.ROW_COUNT/);
-  assert.match(service, /"detail_rows"/);
-  assert.match(service, /"detail_summary"/);
+  assert.match(contextBuilder, /RECORD_COUNT_FIELD/);
+  assert.match(contextBuilder, /AiMetric\.Source\.DETAIL/);
+  assert.match(contextBuilder, /AiMetric\.Source\.ROW_COUNT/);
+  assert.match(periodData, /"detail_rows"/);
+  assert.match(periodData, /"detail_summary"/);
   // 车牌号、发动机号等标识类数值字段默认不作为求和指标
-  assert.match(service, /looksLikeIdentifier/);
+  assert.match(contextBuilder, /looksLikeIdentifier/);
 });
 
 test('AiQueryService 上下文组装批量取周期，不做逐模板 N+1 查询', () => {
-  assert.match(service, /findPeriodLabelsByTemplateIds/);
-  assert.doesNotMatch(service, /assignmentMapper\.findByTemplateId\(/, '不应在循环里逐模板查周期');
+  assert.match(contextBuilder, /findPeriodLabelsByTemplateIds/);
+  assert.doesNotMatch(contextBuilder, /assignmentMapper\.findByTemplateId\(/, '不应在循环里逐模板查周期');
   const mapper = fs.readFileSync(
     new URL('../server-springboot/src/main/resources/mapper/AssignmentMapper.xml', import.meta.url), 'utf8');
   assert.match(mapper, /findPeriodLabelsByTemplateIds/);
 });
 
 test('AiQueryService 具备审计日志与单用户并发限制', () => {
-  assert.match(service, /AI_QUERY_AUDIT/);
-  assert.match(service, /inFlightUsers/);
-  assert.match(service, /throw new DomainException\([^)]*429\)/s, '并发冲突应返回 429');
+  assert.match(auditor, /AI_QUERY_AUDIT/);
+  assert.match(auditor, /inFlightUsers/);
+  assert.match(auditor, /throw new DomainException\([^)]*429\)/s, '并发冲突应返回 429');
 });
 
 test('AiQueryService 支持聚合方式与机构筛选', () => {
-  assert.match(service, /enum Agg/);
+  assert.match(aggEnum, /enum AiAgg/);
   for (const agg of ['SUM', 'AVG', 'MAX', 'MIN']) {
-    assert.match(service, new RegExp(`\\b${agg}\\b`), `缺少聚合方式 ${agg}`);
+    assert.match(aggEnum, new RegExp(`\\b${agg}\\b`), `缺少聚合方式 ${agg}`);
   }
-  assert.match(service, /"aggregation"/);
-  assert.match(service, /"company_names"/);
-  assert.match(service, /matchesCompany/);
+  assert.match(planResolver, /"aggregation"/);
+  assert.match(planResolver, /"company_names"/);
+  assert.match(resultBuilder, /matchesCompany/);
 });
 
 test('数字带千分位且喂给模型的表格不再用逗号分隔', () => {
-  assert.match(service, /%,d|%,\.2f/, 'formatNumber 应输出千分位');
-  assert.match(service, /String\.join\(" \| "/, 'tableToText 应改用竖线分隔');
+  assert.match(resultBuilder, /%,d|%,\.2f/, 'formatNumber 应输出千分位');
+  assert.match(resultBuilder, /String\.join\(" \| "/, 'tableToText 应改用竖线分隔');
 });
 
 test('AiClient 走 OpenAI 兼容协议且不引入额外 HTTP 依赖', () => {

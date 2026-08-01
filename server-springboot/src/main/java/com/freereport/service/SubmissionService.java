@@ -47,11 +47,12 @@ public class SubmissionService {
     private final SecurityUtils securityUtils;
     private final ObjectMapper objectMapper;
     private final ValidationService validationService;
+    private final SubmissionWorkflow submissionWorkflow;
 
     public SubmissionService(SubmissionMapper submissionMapper, AssignmentMapper assignmentMapper,
                              TemplateMapper templateMapper, ApprovalMapper approvalMapper, UserMapper userMapper,
                              CompanyMapper companyMapper, SecurityUtils securityUtils, ObjectMapper objectMapper,
-                             ValidationService validationService) {
+                             ValidationService validationService, SubmissionWorkflow submissionWorkflow) {
         this.submissionMapper = submissionMapper;
         this.assignmentMapper = assignmentMapper;
         this.templateMapper = templateMapper;
@@ -61,14 +62,14 @@ public class SubmissionService {
         this.securityUtils = securityUtils;
         this.objectMapper = objectMapper;
         this.validationService = validationService;
+        this.submissionWorkflow = submissionWorkflow;
     }
 
     /**
      * 创建或更新填报，完整实现三级审批流程：
      * - 验证权限（handler/branch_admin/department_report_admin 且公司匹配）
-     * - 检查状态可写（draft/returned/rejected）
+     * - 状态流转（可写判断/目标状态/版本演化）由 {@link SubmissionWorkflow} 集中决策
      * - submit 时查找 reviewer：有 -> pending_review，无 -> pending_receipt
-     * - draft 状态更新现有记录，否则创建新版本
      * - 清理旧数据并插入新数据
      * - 更新 assignment 状态，必要时创建审批记录
      */
@@ -90,7 +91,7 @@ public class SubmissionService {
         }
 
         ReportSubmission existing = submissionMapper.findLatestByAssignmentIdForUpdate(assignmentId);
-        if (!canWriteSubmissionStatus(existing)) {
+        if (!submissionWorkflow.canWrite(existing)) {
             throw new DomainException("该报表已提交，不能重复保存或提交，请刷新页面查看最新状态", 409);
         }
 
@@ -105,40 +106,28 @@ public class SubmissionService {
             }
         }
 
-        // 三级审批：submit 时查找公司内的复核人
-        User reviewer = null;
-        String initialStatus = "draft";
-        String assignmentStatus = "filling";
-        if (isSubmit) {
-            reviewer = approvalMapper.findReviewer(user.getCompanyId());
-            if (reviewer != null) {
-                initialStatus = "pending_review";
-                assignmentStatus = "submitted";
-            } else {
-                initialStatus = "pending_receipt";
-                assignmentStatus = "pending_receipt";
-            }
-        }
+        // 三级审批：submit 时查找公司内的复核人，目标状态由状态机决策
+        User reviewer = isSubmit ? approvalMapper.findReviewer(user.getCompanyId()) : null;
+        SubmissionWorkflow.SaveTransition transition = submissionWorkflow.onSave(isSubmit, reviewer != null);
 
         Long submissionId;
-        if (existing != null && "draft".equals(existing.getStatus())) {
+        if (submissionWorkflow.shouldUpdateInPlace(existing)) {
             // 草稿状态：更新现有记录
             submissionId = existing.getId();
             submissionMapper.updateSubmissionStatus(submissionId, user.getId(), user.getCompanyId(),
-                    initialStatus, comment, isSubmit ? LocalDateTime.now() : null);
+                    transition.submissionStatus(), comment, isSubmit ? LocalDateTime.now() : null);
             submissionMapper.deleteSubmissionData(submissionId);
         } else {
             // 防御性清理：上一版本若是 rejected/returned，关闭其遗留 pending 审批
-            if (existing != null && ("rejected".equals(existing.getStatus()) || "returned".equals(existing.getStatus()))) {
+            if (submissionWorkflow.shouldClosePendingApprovals(existing)) {
                 approvalMapper.rejectPendingApprovals(existing.getId(), "版本过期（重新提交）");
             }
-            int version = existing != null ? (existing.getVersion() == null ? 1 : existing.getVersion() + 1) : 1;
             ReportSubmission sub = new ReportSubmission();
             sub.setAssignmentId(assignmentId);
-            sub.setVersion(version);
+            sub.setVersion(submissionWorkflow.nextVersion(existing));
             sub.setSubmittedByCompanyId(user.getCompanyId());
             sub.setSubmittedBy(user.getId());
-            sub.setStatus(initialStatus);
+            sub.setStatus(transition.submissionStatus());
             sub.setComment(comment);
             sub.setSubmittedAt(isSubmit ? LocalDateTime.now() : null);
             submissionMapper.insertSubmission(sub);
@@ -177,7 +166,7 @@ public class SubmissionService {
             submissionMapper.insertSubmissionDataBatch(dataList);
         }
 
-        assignmentMapper.updateStatus(assignmentId, assignmentStatus);
+        assignmentMapper.updateStatus(assignmentId, transition.assignmentStatus());
 
         // submit 且存在复核人时，创建复核审批记录
         List<Map<String, Object>> approvals = new ArrayList<>();
@@ -402,14 +391,6 @@ public class SubmissionService {
         } catch (Exception e) {
             return Collections.emptyMap();
         }
-    }
-
-    private boolean canWriteSubmissionStatus(ReportSubmission s) {
-        if (s == null) {
-            return true;
-        }
-        String status = s.getStatus();
-        return "draft".equals(status) || "returned".equals(status) || "rejected".equals(status);
     }
 
     private Long parseFieldId(Object key) {

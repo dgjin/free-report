@@ -49,8 +49,11 @@ class AiQueryServiceTest {
         aggregationService = mock(AggregationService.class);
         templateMapper = mock(TemplateMapper.class);
         assignmentMapper = mock(AssignmentMapper.class);
-        service = new AiQueryService(aiClient, aggregationService, templateMapper,
-                assignmentMapper, new ObjectMapper());
+        service = new AiQueryService(aiClient, aggregationService,
+                new AiQueryContextBuilder(templateMapper, assignmentMapper),
+                new AiPlanResolver(new ObjectMapper()),
+                new AiResultBuilder(aiClient),
+                new AiQueryAuditor());
         stubVehicleTemplate();
     }
 
@@ -73,10 +76,16 @@ class AiQueryServiceTest {
                 Map.of("template_id", 10L, "period_label", "2026年Q3"),
                 Map.of("template_id", 10L, "period_label", "2026年Q2")
         ));
-        when(aggregationService.getAggregationByTemplate(eq(10L), eq("2026年Q3"), any()))
-                .thenReturn(aggregation("2026年Q3"));
-        when(aggregationService.getAggregationByTemplate(eq(10L), eq("2026年Q2"), any()))
-                .thenReturn(aggregation("2026年Q2"));
+        // 多周期取数已改为一次批量调用，mock 按请求周期逐个返回相同结构的汇总数据
+        when(aggregationService.getAggregationsByTemplateAndPeriods(eq(10L), anyList(), any()))
+                .thenAnswer(invocation -> {
+                    List<String> periods = invocation.getArgument(1);
+                    Map<String, Map<String, Object>> byPeriod = new LinkedHashMap<>();
+                    for (String period : periods) {
+                        byPeriod.put(period, aggregation(period));
+                    }
+                    return byPeriod;
+                });
     }
 
     private ReportTemplateField field(Long templateId, String name, String label, String fieldType, String dataType) {
