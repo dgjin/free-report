@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   BookOpen,
@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   Grid3x3,
   Zap,
+  ChevronDown,
 } from './icons';
 import { UserInfo } from '../types';
 
@@ -107,9 +108,46 @@ const FIELD_TYPE_LEGEND: Array<{ label: string; desc: string }> = [
   { label: '二维交叉表', desc: '在行 × 列交叉单元格中填写' },
 ];
 
+/** 可折叠的帮助区块 */
+const HelpSection: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}> = ({ icon, title, open, onToggle, children }) => (
+  <section>
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center justify-between gap-2 text-[14px] font-semibold text-ink mb-2.5 group"
+    >
+      <span className="flex items-center gap-2">
+        {icon}
+        <span>{title}</span>
+      </span>
+      <ChevronDown
+        className={`w-3.5 h-3.5 text-mute transition-transform duration-200 group-hover:text-ink ${open ? 'rotate-180' : ''}`}
+      />
+    </button>
+    {open && children}
+  </section>
+);
+
 export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) => {
   const isHQ = user?.role === 'department_report_admin' || user?.role === 'super_admin';
   const isDigitalAdmin = user?.role === 'digital_admin';
+
+  // 默认展开与当前角色相关的操作指南，其余折叠
+  const defaultOpen = isHQ ? 'hq' : isDigitalAdmin ? 'digital' : 'branch';
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set([defaultOpen]));
+
+  const toggleSection = (id: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -163,11 +201,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {/* 角色与权限 */}
-          <section>
-            <h3 className="flex items-center gap-2 text-[14px] font-semibold text-ink mb-2.5">
-              <Shield className="w-4 h-4 text-ink" />
-              <span>角色与权限</span>
-            </h3>
+          <HelpSection icon={<Shield className="w-4 h-4 text-ink" />} title="角色与权限"
+            open={openSections.has('roles')} onToggle={() => toggleSection('roles')}>
             <div className="space-y-2 text-[12px] leading-[1.7]">
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">超级管理员</span><span className="text-mute">全局只读视图，可管理机构与用户，不可填报或签收</span></div>
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">部门报表管理员</span><span className="text-mute">设计模板、下发任务、签收报表、查看汇总、智能问数（仅限本部门）</span></div>
@@ -175,14 +210,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">分公司经办人</span><span className="text-mute">填写并提交报表数据</span></div>
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">复核人 / 审批人</span><span className="text-mute">查看填报信息，进行审批操作（不可填报）</span></div>
             </div>
-          </section>
+          </HelpSection>
 
           {/* 三级审批流程 */}
-          <section>
-            <h3 className="flex items-center gap-2 text-[14px] font-semibold text-ink mb-2.5">
-              <Workflow className="w-4 h-4 text-ink" />
-              <span>三级审批流程</span>
-            </h3>
+          <HelpSection icon={<Workflow className="w-4 h-4 text-ink" />} title="三级审批流程"
+            open={openSections.has('approval')} onToggle={() => toggleSection('approval')}>
             <div className="bg-canvas rounded-[12px] p-4 space-y-2 text-[12px]">
               {[
                 { step: '1', label: '经办人填报', desc: '分公司经办人填写报表数据并提交' },
@@ -200,14 +232,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
               ))}
             </div>
             <p className="text-[11px] text-mute mt-2">退回的报表可修改后重新提交，流程从头开始</p>
-          </section>
+          </HelpSection>
 
           {/* 模板审批流程 */}
-          <section>
-            <h3 className="flex items-center gap-2 text-[14px] font-semibold text-ink mb-2.5">
-              <Shield className="w-4 h-4 text-ink" />
-              <span>模板审批流程</span>
-            </h3>
+          <HelpSection icon={<Shield className="w-4 h-4 text-ink" />} title="模板审批流程"
+            open={openSections.has('template-approval')} onToggle={() => toggleSection('template-approval')}>
             <div className="bg-canvas rounded-[12px] p-4 space-y-2 text-[12px]">
               {[
                 { step: '1', label: '创建模板', desc: '部门报表管理员设计模板，保存后为「草稿」状态' },
@@ -224,15 +253,12 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
                 </div>
               ))}
             </div>
-          </section>
+          </HelpSection>
 
           {/* 总部/部门操作指南 */}
           {isHQ && (
-            <section>
-              <h3 className="flex items-center gap-2 text-[14px] font-semibold text-ink mb-2.5">
-                <FileSpreadsheet className="w-4 h-4 text-ink" />
-                <span>总部/部门操作指南</span>
-              </h3>
+            <HelpSection icon={<FileSpreadsheet className="w-4 h-4 text-ink" />} title="总部/部门操作指南"
+              open={openSections.has('hq')} onToggle={() => toggleSection('hq')}>
               <div className="space-y-2.5 text-[12px] leading-[1.7]">
                 <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
                   <div className="font-semibold text-ink mb-1">模板管理</div>
@@ -259,16 +285,13 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
                   <div className="text-mute">在「智能问数」用日常说法提问即可查询报表数据，系统自动定位报表、周期与指标，生成文字结论、图表和数据明细。支持多轮对话，点击「下载」可导出 Excel（含查询说明、数据表格、图表数据）。</div>
                 </div>
               </div>
-            </section>
+            </HelpSection>
           )}
 
           {/* 数智化转型办公室操作指南 */}
           {isDigitalAdmin && (
-            <section>
-              <h3 className="flex items-center gap-2 text-[14px] font-semibold text-ink mb-2.5">
-                <FileSpreadsheet className="w-4 h-4 text-ink" />
-                <span>数智化转型办公室操作指南</span>
-              </h3>
+            <HelpSection icon={<FileSpreadsheet className="w-4 h-4 text-ink" />} title="数智化转型办公室操作指南"
+              open={openSections.has('digital')} onToggle={() => toggleSection('digital')}>
               <div className="space-y-2.5 text-[12px] leading-[1.7]">
                 <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
                   <div className="font-semibold text-ink mb-1">模板审批</div>
@@ -283,16 +306,13 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
                   <div className="text-mute">在「模板管理」页面可查看所有部门的模板及其当前状态（草稿 / 待审批 / 已发布 / 已归档）。</div>
                 </div>
               </div>
-            </section>
+            </HelpSection>
           )}
 
           {/* 分公司操作指南 */}
           {!isHQ && !isDigitalAdmin && (
-            <section>
-              <h3 className="flex items-center gap-2 text-[14px] font-semibold text-ink mb-2.5">
-                <FileSpreadsheet className="w-4 h-4 text-ink" />
-                <span>分公司操作指南</span>
-              </h3>
+            <HelpSection icon={<FileSpreadsheet className="w-4 h-4 text-ink" />} title="分公司操作指南"
+              open={openSections.has('branch')} onToggle={() => toggleSection('branch')}>
               <div className="space-y-2.5 text-[12px] leading-[1.7]">
                 <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
                   <div className="font-semibold text-ink mb-1">报表填报</div>
@@ -303,15 +323,12 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
                   <div className="text-mute">经办人提交后，复核人和审批人依次在「审批中心」处理。可查看填报详情并附审批意见。退回后经办人可修改重提。</div>
                 </div>
               </div>
-            </section>
+            </HelpSection>
           )}
 
           {/* 模版制定说明 */}
-          <section>
-            <h3 className="flex items-center gap-2 text-[14px] font-semibold text-ink mb-2.5">
-              <Grid3x3 className="w-4 h-4 text-ink" />
-              <span>模版制定说明</span>
-            </h3>
+          <HelpSection icon={<Grid3x3 className="w-4 h-4 text-ink" />} title="模版制定说明"
+            open={openSections.has('template-design')} onToggle={() => toggleSection('template-design')}>
             <div className="space-y-3">
               {/* 三种数据区域 */}
               {DATA_REGION_GUIDES.map((region) => (
@@ -406,14 +423,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
                 </ul>
               </div>
             </div>
-          </section>
+          </HelpSection>
 
           {/* 使用提示 */}
-          <section>
-            <h3 className="flex items-center gap-2 text-[14px] font-semibold text-ink mb-2.5">
-              <Zap className="w-4 h-4 text-ink" />
-              <span>使用提示</span>
-            </h3>
+          <HelpSection icon={<Zap className="w-4 h-4 text-ink" />} title="使用提示"
+            open={openSections.has('tips')} onToggle={() => toggleSection('tips')}>
             <ul className="space-y-1.5 text-[12px] text-mute leading-[1.7] list-disc pl-5">
               <li>模板字段设计完成后，可在字段设计页面直接点击「提交审批」，无需返回模板列表</li>
               <li>月报/季报/年报模板可在「模板管理 → 周期计划」配置自动下发：模板审批发布后，系统每日按设定时间自动向目标分公司生成本期任务，也可在弹窗中「立即执行一次」手动触发补发</li>
@@ -427,7 +441,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
               <li>汇总报表仅统计已审批通过的填报数据</li>
               <li>智能问数仅统计已提交并通过接收的数据，结果支持下载为 Excel（含图表数据）</li>
             </ul>
-          </section>
+          </HelpSection>
         </div>
       </aside>
     </div>
