@@ -397,6 +397,7 @@ export const swrKeys = {
   branches: '/api/companies/branches',
   targets: '/api/companies/targets',
   pendingApprovals: '/api/approvals/pending',
+  pendingTemplateApprovals: '/api/templates/pending-approvals',
   pendingReceipts: '/api/receipts/pending',
   rejectedReminders: '/api/reminders/rejected',
 };

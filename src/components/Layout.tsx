@@ -128,6 +128,7 @@ export const Layout: React.FC = () => {
 
   const access = user ? getClientAccess(user) : null;
   const isHQ = access?.isDepartmentAdmin === true;
+  const menuItems = buildMenuItems(access, isHQ, pendingCount, rejectedCount);
 
   const roleLabels: Record<string, string> = {
     super_admin: '超级管理员',
@@ -193,6 +194,107 @@ export const Layout: React.FC = () => {
       )}
     </Link>
   );
+
+/** 菜单分组标题（收缩态隐藏） */
+const NavSection: React.FC<{ label: string; collapsed: boolean }> = ({ label, collapsed }) => (
+  <div className={`pt-4 pb-1 ${collapsed ? 'md:hidden' : ''}`}>
+    <span className="text-[10px] font-bold text-faint uppercase tracking-wider">{label}</span>
+  </div>
+);
+
+/** 面包屑路径导航 */
+const Breadcrumb: React.FC<{ items: Array<{ label: string; to?: string }> }> = ({ items }) => (
+  <nav className="px-[22px] py-2.5 flex items-center gap-1.5 text-[12px]" aria-label="breadcrumb">
+    {items.map((item, idx) => (
+      <React.Fragment key={idx}>
+        {idx > 0 && <ChevronRight className="w-3 h-3 text-faint" />}
+        {item.to ? (
+          <Link to={item.to} className="text-mute hover:text-ink transition-colors">{item.label}</Link>
+        ) : (
+          <span className="text-ink font-medium">{item.label}</span>
+        )}
+      </React.Fragment>
+    ))}
+  </nav>
+);
+
+type MenuItem = {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  section: string;
+  badge?: number;
+  activePrefix: string;
+};
+
+/** 根据角色构建统一菜单配置 */
+function buildMenuItems(
+  access: ReturnType<typeof getClientAccess> | null,
+  isHQ: boolean,
+  pendingCount: number,
+  rejectedCount: number,
+): MenuItem[] {
+  if (!access) return [];
+
+  // 部门报表管理员
+  if (isHQ) {
+    return [
+      { to: '/templates', icon: FileSpreadsheet, label: '模板管理', section: '报表管理', badge: rejectedCount, activePrefix: '/templates' },
+      { to: '/assignments', icon: Send, label: '下发管理', section: '报表管理', activePrefix: '/assignments' },
+      { to: '/aggregation', icon: BarChart3, label: '汇总报表', section: '数据与分析', activePrefix: '/aggregation' },
+      { to: '/ai-query', icon: Sparkles, label: '智能问数', section: '数据与分析', activePrefix: '/ai-query' },
+    ];
+  }
+
+  // 数智化转型办公室
+  if (access.isDigitalAdmin) {
+    return [
+      { to: '/approvals', icon: CheckSquare, label: '审批中心', section: '审批', badge: pendingCount, activePrefix: '/approvals' },
+      { to: '/templates', icon: FileSpreadsheet, label: '模板查看', section: '模板', activePrefix: '/templates' },
+      { to: '/ai-query', icon: Sparkles, label: '智能问数', section: '数据与分析', activePrefix: '/ai-query' },
+    ];
+  }
+
+  // 超级管理员
+  if (access.isSuperAdmin) {
+    return [
+      { to: '/organizations', icon: Building2, label: '机构管理', section: '系统管理', activePrefix: '/organizations' },
+      { to: '/global-view', icon: Shield, label: '全局查看', section: '系统管理', activePrefix: '/global-view' },
+      { to: '/ai-query', icon: Sparkles, label: '智能问数', section: '数据与分析', activePrefix: '/ai-query' },
+    ];
+  }
+
+  // 分公司人员（经办人/复核人/审批人）
+  return [
+    { to: '/fill', icon: FileSpreadsheet, label: '报表填报', section: '报表', badge: rejectedCount, activePrefix: '/fill' },
+    { to: '/approvals', icon: CheckSquare, label: '审批中心', section: '报表', badge: pendingCount, activePrefix: '/approvals' },
+  ];
+}
+
+/** 根据路由构建面包屑 */
+function buildBreadcrumbs(pathname: string): Array<{ label: string; to?: string }> {
+  const home = { label: '工作台', to: '/' };
+
+  // 精确匹配
+  const exactMap: Record<string, Array<{ label: string; to?: string }>> = {
+    '/': [{ label: '工作台' }],
+    '/templates': [home, { label: '模板管理' }],
+    '/assignments': [home, { label: '下发管理' }],
+    '/fill': [home, { label: '报表填报' }],
+    '/approvals': [home, { label: '审批中心' }],
+    '/aggregation': [home, { label: '汇总报表' }],
+    '/organizations': [home, { label: '机构管理' }],
+    '/global-view': [home, { label: '全局查看' }],
+    '/ai-query': [home, { label: '智能问数' }],
+  };
+  if (exactMap[pathname]) return exactMap[pathname];
+
+  // 前缀匹配（子页面）
+  if (pathname.startsWith('/templates/')) return [home, { label: '模板管理', to: '/templates' }, { label: '模板设计' }];
+  if (pathname.startsWith('/fill/')) return [home, { label: '报表填报', to: '/fill' }, { label: '填报详情' }];
+
+  return [{ label: '工作台' }];
+}
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
@@ -356,46 +458,20 @@ export const Layout: React.FC = () => {
                 </button>
               </div>
 
-              {/* Common Dashboard */}
+              {/* Dashboard */}
               <NavItem to="/" active={location.pathname === '/'} icon={LayoutDashboard} label="工作台" />
 
-              {/* Headquarters Specific Routes */}
-              {isHQ && (
-                <>
-                  <NavItem to="/templates" active={location.pathname.startsWith('/templates')} icon={FileSpreadsheet} label="模板管理" badge={rejectedCount} />
-                  <NavItem to="/assignments" active={location.pathname.startsWith('/assignments')} icon={Send} label="下发管理" />
-                  <NavItem to="/aggregation" active={location.pathname.startsWith('/aggregation')} icon={BarChart3} label="汇总报表" />
-                  <NavItem to="/ai-query" active={location.pathname.startsWith('/ai-query')} icon={Sparkles} label="智能问数" />
-                </>
-              )}
-
-              {/* Digital Admin Routes */}
-              {access?.isDigitalAdmin && (
-                <>
-                  <NavItem to="/approvals" active={location.pathname.startsWith('/approvals') || location.pathname.startsWith('/template-approvals')} icon={CheckSquare} label="审批中心" badge={pendingCount} />
-                  <NavItem to="/templates" active={location.pathname.startsWith('/templates')} icon={FileSpreadsheet} label="模板管理" />
-                  <NavItem to="/ai-query" active={location.pathname.startsWith('/ai-query')} icon={Sparkles} label="智能问数" />
-                </>
-              )}
-
-              {access?.canManageOrganizations && (
-                <NavItem to="/organizations" active={location.pathname.startsWith('/organizations')} icon={Building2} label="机构管理" />
-              )}
-
-              {access?.isSuperAdmin && (
-                <>
-                  <NavItem to="/global-view" active={location.pathname.startsWith('/global-view')} icon={Shield} label="全局查看" />
-                  <NavItem to="/ai-query" active={location.pathname.startsWith('/ai-query')} icon={Sparkles} label="智能问数" />
-                </>
-              )}
-
-              {/* Branch Specific Routes */}
-              {!isHQ && !access?.isSuperAdmin && !access?.isDigitalAdmin && (
-                <>
-                  <NavItem to="/fill" active={location.pathname.startsWith('/fill')} icon={FileSpreadsheet} label="报表填报" badge={rejectedCount} />
-                  <NavItem to="/approvals" active={location.pathname.startsWith('/approvals')} icon={CheckSquare} label="审批中心" badge={pendingCount} />
-                </>
-              )}
+              {/* Role-based menu items */}
+              {menuItems.map((item, idx) => (
+                <NavItem
+                  key={idx}
+                  to={item.to}
+                  active={location.pathname === item.to || location.pathname.startsWith(item.activePrefix + '/')}
+                  icon={item.icon}
+                  label={item.label}
+                  badge={item.badge}
+                />
+              ))}
             </nav>
           </div>
 
@@ -413,6 +489,7 @@ export const Layout: React.FC = () => {
 
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto">
+          <Breadcrumb items={buildBreadcrumbs(location.pathname)} />
           {outlet ? React.cloneElement(outlet, { key: user?.username || 'guest' }) : <Outlet />}
         </main>
       </div>

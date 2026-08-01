@@ -36,6 +36,9 @@ export const AggregationView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AggregationTab>('institutions');
   const [searchQuery, setSearchQuery] = useState('');
+  // 明细数据分页
+  const [detailPage, setDetailPage] = useState(1);
+  const detailPageSize = 10;
   const periods = useMemo(() => Array.from(new Set(assignments.filter((a) => a.template_id === selectedTemplateId).map((a) => a.period_label))).sort().reverse(), [assignments, selectedTemplateId]);
   const [selectedPeriod, setSelectedPeriod] = useState(periodParam || '');
   const effectivePeriod = useMemo(() => {
@@ -195,6 +198,12 @@ export const AggregationView: React.FC = () => {
   const uncodedCount = aggregationData ? getUncountedInstitutionCount(aggregationData.company_data) : 0;
   const filteredInst = aggregationData ? filterInstitutionRows(aggregationData.company_data, searchQuery) : [];
   const filteredDet = aggregationData ? filterDetailRows(aggregationData.detail_rows, searchQuery) : [];
+    const detailTotalPages = Math.max(1, Math.ceil(filteredDet.length / detailPageSize));
+    const pagedDet = filteredDet.slice((detailPage - 1) * detailPageSize, detailPage * detailPageSize);
+    const onDetailPageChange = (page: number) => {
+      if (page < 1 || page > detailTotalPages) return;
+      setDetailPage(page);
+    };
   const progressItems = aggregationData ? buildProgressData(aggregationData.company_data) : [];
 
   // Progress statistics
@@ -399,7 +408,7 @@ export const AggregationView: React.FC = () => {
           {activeTab === 'details' && (
             <div role="tabpanel">
               <div className="flex items-center justify-between mb-3 gap-2 sm:gap-3">
-                <input type="text" placeholder="搜索明细内容..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                <input type="text" placeholder="搜索明细内容..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setDetailPage(1); }}
                   className="flex-1 max-w-sm h-10 sm:h-11 px-3 sm:px-4 bg-canvas rounded-[10px] sm:rounded-[12px] text-[12px] sm:text-[13px] text-ink placeholder:text-faint focus:outline-none focus:ring-1 focus:ring-ink focus:bg-white" />
                 <span className="text-[11px] sm:text-[12px] text-mute tabular-nums shrink-0">{aggregationData.detail_rows.length} 行明细</span>
               </div>
@@ -419,8 +428,10 @@ export const AggregationView: React.FC = () => {
                         {aggregationData.detail_fields.map((df) => (<th key={df.id} className="p-3 sm:p-4 min-w-[90px] sm:min-w-[110px] text-right font-semibold">{df.field_label}</th>))}
                       </tr></thead>
                       <tbody>
-                        {filteredDet.map((row, idx) => (
-                          <tr key={idx} className="hover:bg-hoverbg transition-colors" style={{ borderTop: '1px solid var(--hairline)' }}>
+                        {pagedDet.map((row, idx) => {
+                          const globalIdx = (detailPage - 1) * detailPageSize + idx;
+                          return (
+                          <tr key={globalIdx} className="hover:bg-hoverbg transition-colors" style={{ borderTop: '1px solid var(--hairline)' }}>
                             <td className="p-3 sm:p-4 font-semibold text-ink sticky left-0 bg-white z-10 hover:bg-hoverbg truncate">{row.company_name}</td>
                             <td className="p-3 sm:p-4 text-center text-mute tabular-nums">{row.row_index}</td>
                             <td className="p-3 sm:p-4 text-center">{row.submission_status ? getStatusBadge(row.submission_status) : <span className="text-line">—</span>}</td>
@@ -428,10 +439,39 @@ export const AggregationView: React.FC = () => {
                               <td key={df.id} className="p-3 sm:p-4 text-right tabular-nums">{row[df.field_name] ? (df.field_type === 'number' ? <span className="text-ink">{Number(row[df.field_name]).toLocaleString()}</span> : <span className="text-body">{row[df.field_name]}</span>) : <span className="text-line">—</span>}</td>
                             ))}
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
+
+                  {/* 分页控件 */}
+                  {filteredDet.length > detailPageSize && (
+                    <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-t border-line text-[12px] text-mute">
+                      <span className="tabular-nums">
+                        第 {(detailPage - 1) * detailPageSize + 1}-{Math.min(detailPage * detailPageSize, filteredDet.length)} 行，共 {filteredDet.length} 行
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={detailPage === 1}
+                          onClick={() => onDetailPageChange(detailPage - 1)}
+                          className="h-7 px-3 rounded-md border border-line bg-white hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[12px]"
+                        >
+                          上一页
+                        </button>
+                        <span className="tabular-nums">{detailPage} / {detailTotalPages}</span>
+                        <button
+                          type="button"
+                          disabled={detailPage === detailTotalPages}
+                          onClick={() => onDetailPageChange(detailPage + 1)}
+                          className="h-7 px-3 rounded-md border border-line bg-white hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[12px]"
+                        >
+                          下一页
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

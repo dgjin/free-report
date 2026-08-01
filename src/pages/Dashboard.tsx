@@ -20,7 +20,7 @@ import {
   UserCheck,
 } from '../components/icons';
 import { api, getStoredUser, swrKeys, swrFetcher, useRejectedReminders } from '../services/api';
-import { UserInfo, ReportTemplate, ReportAssignment, PendingApprovalTask, Company, PendingReceipt, ReportSubmissionDetail, RejectedReminder } from '../types';
+import { UserInfo, ReportTemplate, ReportAssignment, PendingApprovalTask, Company, PendingReceipt, ReportSubmissionDetail, RejectedReminder, TemplateApproval } from '../types';
 import { getClientAccess } from '../utils/access';
 import { SubmissionDetailTables } from '../components/SubmissionDetailTables';
 import { ApprovalTimeline } from '../components/report/ApprovalTimeline';
@@ -29,13 +29,15 @@ export const Dashboard: React.FC = () => {
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
   const navigate = useNavigate();
   const isHQ = user?.role === 'department_report_admin' || user?.role === 'super_admin';
+  const isDigitalAdmin = user?.role === 'digital_admin';
   const canFill = user ? getClientAccess(user).canFill : false;
   const canReceive = user ? getClientAccess(user).canReceive : false;
 
   const { data: assignments, isLoading: assignmentsLoading } = useSWR<ReportAssignment[]>(swrKeys.assignments, swrFetcher, { revalidateOnFocus: false });
   const { data: templates = [] } = useSWR<ReportTemplate[]>(isHQ ? swrKeys.templates : null, swrFetcher, { revalidateOnFocus: false });
   const { data: branches = [] } = useSWR<Company[]>(isHQ ? swrKeys.branches : null, swrFetcher, { revalidateOnFocus: false });
-  const { data: pendingApprovals = [] } = useSWR<PendingApprovalTask[]>(!isHQ ? swrKeys.pendingApprovals : null, swrFetcher, { revalidateOnFocus: false });
+  const { data: pendingApprovals = [] } = useSWR<PendingApprovalTask[]>(!isHQ && !isDigitalAdmin ? swrKeys.pendingApprovals : null, swrFetcher, { revalidateOnFocus: false });
+  const { data: pendingTemplateApprovals = [] } = useSWR<TemplateApproval[]>(isDigitalAdmin ? swrKeys.pendingTemplateApprovals : null, swrFetcher, { revalidateOnFocus: false });
   const { data: pendingReceipts = [], mutate: mutateReceipts } = useSWR<PendingReceipt[]>(canReceive ? swrKeys.pendingReceipts : null, swrFetcher, { revalidateOnFocus: false });
   const remindersEnabled = user ? (user.company_level === 'branch' || user.role === 'department_report_admin') : false;
   const { data: rejectedReminders = [] } = useRejectedReminders(remindersEnabled);
@@ -499,7 +501,36 @@ export const Dashboard: React.FC = () => {
 
         {/* Right Column (1 col): Pending Approvals + Quick Nav — unified panels */}
         <div className="space-y-[clamp(20px,3vw,32px)]">
-          {!isHQ && pendingApprovals.length > 0 && (
+          {/* Digital admin: pending template approvals */}
+          {isDigitalAdmin && pendingTemplateApprovals.length > 0 && (
+            <section
+              className="bg-white rounded-[12px] overflow-hidden"
+              style={{ boxShadow: 'var(--sh-panel)' }}
+            >
+              <div className="px-[clamp(17px,3vw,24px)] py-4" style={{ borderBottom: '1px solid var(--hairline)' }}>
+                <div className="flex items-center gap-2 text-ink font-semibold text-[14px]">
+                  <AlertCircle className="w-4 h-4 text-[#9F2F2D]" />
+                  <span>待审批模板</span>
+                  <span className="ml-auto text-[#9F2F2D] tabular-nums font-bold">{pendingTemplateApprovals.length}</span>
+                </div>
+                <p className="mt-2 text-[12px] text-mute leading-[1.6]">
+                  各部门提交了新的报表模板待您审核，请及时处理。
+                </p>
+              </div>
+              <div className="px-[clamp(17px,3vw,24px)] py-4">
+                <button
+                  onClick={() => navigate('/approvals')}
+                  className="w-full h-11 rounded-md bg-ink hover:bg-inkhover text-white font-semibold text-[13px] transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <span>前往模板审批中心</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* Branch users: pending submission approvals */}
+          {!isHQ && !isDigitalAdmin && pendingApprovals.length > 0 && (
             <section
               className="bg-white rounded-[12px] overflow-hidden"
               style={{ boxShadow: 'var(--sh-panel)' }}
@@ -564,6 +595,27 @@ export const Dashboard: React.FC = () => {
                       <div className="flex items-center gap-2.5">
                         <BarChart3 className="w-4 h-4 text-mute" />
                         <span className="text-[14px] font-medium text-ink">横向汇总表与指标计算</span>
+                      </div>
+                      <ArrowRight className="w-3.5 h-3.5 text-line" />
+                    </div>
+                  </Link>
+                </>
+              ) : isDigitalAdmin ? (
+                <>
+                  <Link to="/approvals" className="apple-row block px-[clamp(17px,3vw,24px)] py-4 no-underline">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <CheckSquare className="w-4 h-4 text-mute" />
+                        <span className="text-[14px] font-medium text-ink">模板审批中心</span>
+                      </div>
+                      <ArrowRight className="w-3.5 h-3.5 text-line" />
+                    </div>
+                  </Link>
+                  <Link to="/templates" className="apple-row block px-[clamp(17px,3vw,24px)] py-4 no-underline">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <FileSpreadsheet className="w-4 h-4 text-mute" />
+                        <span className="text-[14px] font-medium text-ink">模板查看与管理</span>
                       </div>
                       <ArrowRight className="w-3.5 h-3.5 text-line" />
                     </div>
