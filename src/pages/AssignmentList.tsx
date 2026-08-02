@@ -14,7 +14,7 @@ import {
 } from '../utils/reportOperations';
 import { mutate } from 'swr';
 
-export const AssignmentList: React.FC = () => {
+export const AssignmentList: React.FC<{ readOnly?: boolean }> = ({ readOnly = false }) => {
   const { data: assignments = [], isLoading: loading } = useAssignments();
   const [user, setUser] = useState<UserInfo | null>(getStoredUser());
   const navigate = useNavigate();
@@ -222,7 +222,7 @@ return (
                       >
                         查看详情
                       </button>
-                      {item.status !== 'recalled' && item.status !== 'aggregated' && (
+                      {item.status !== 'recalled' && item.status !== 'aggregated' && !readOnly && (
                         <button
                           onClick={() => { setRecallId(item.id); setRecallReason(''); }}
                           className="h-8 px-3.5 text-xs font-medium text-[#9F2F2D] bg-[#FDEBEC] hover:bg-[#FDEBEC] rounded-full transition-colors flex items-center gap-1"

@@ -80,7 +80,15 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   }
   // 兼容空响应体（void/204/null 返回），避免 res.json() 抛出 Unexpected end of JSON input
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      if (!res.ok) throw new Error(`服务返回异常 (HTTP ${res.status})`);
+      return text as unknown as T;
+    }
+  }
 
   if (!res.ok) {
     if (res.status === 401) {

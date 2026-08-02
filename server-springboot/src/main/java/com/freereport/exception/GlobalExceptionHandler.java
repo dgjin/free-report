@@ -1,5 +1,6 @@
 package com.freereport.exception;
 
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -14,9 +15,12 @@ import lombok.extern.slf4j.Slf4j;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /** 业务异常：按 DomainException 携带的 statusCode 返回 */
+    /** 业务异常：按 DomainException 携带的 statusCode 返回，403/409 记录审计日志 */
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<Map<String, String>> handleDomainException(DomainException e) {
+        if (e.getStatusCode() >= 403) {
+            log.warn("业务拒绝 [{}]: {}", e.getStatusCode(), e.getMessage());
+        }
         return ResponseEntity.status(e.getStatusCode())
                 .body(Map.of("error", e.getMessage()));
     }
@@ -43,6 +47,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         return ResponseEntity.status(400)
                 .body(Map.of("error", "参数类型不匹配: " + e.getName()));
+    }
+
+    /** 请求必填参数缺失 → 400 */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, String>> handleMissingParam(MissingServletRequestParameterException e) {
+        return ResponseEntity.status(400)
+                .body(Map.of("error", "缺少必填参数: " + e.getParameterName()));
     }
 
     /** 兜底：未预期的系统异常 → 500，记录完整堆栈便于排查 */

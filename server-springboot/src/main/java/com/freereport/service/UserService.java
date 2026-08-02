@@ -40,9 +40,13 @@ public class UserService {
      * 返回所有用户（含机构名称）。
      */
     public List<Map<String, Object>> getUsers() {
-        return userMapper.findAll().stream().map(u -> {
+        List<User> allUsers = userMapper.findAll();
+        // 一次查询所有机构，构建 Map 避免 N+1
+        Map<Long, Company> companyMap = companyMapper.findAll().stream()
+                .collect(Collectors.toMap(Company::getId, c -> c));
+        return allUsers.stream().map(u -> {
             Map<String, Object> m = toMap(u);
-            Company company = companyMapper.findById(u.getCompanyId());
+            Company company = companyMap.get(u.getCompanyId());
             if (company != null) {
                 m.put("company_name", company.getName());
                 m.put("company_level", company.getLevel());
@@ -55,9 +59,9 @@ public class UserService {
      * 查询指定机构下的用户。
      */
     public List<Map<String, Object>> getUsersByCompanyId(Long companyId) {
+        Company company = companyMapper.findById(companyId);
         return userMapper.findByCompanyId(companyId).stream().map(u -> {
             Map<String, Object> m = toMap(u);
-            Company company = companyMapper.findById(u.getCompanyId());
             if (company != null) {
                 m.put("company_name", company.getName());
             }
@@ -98,7 +102,7 @@ public class UserService {
         }
         userMapper.updatePassword(id, passwordEncoder.encode(DEFAULT_PASSWORD));
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("message", "密码已重置为默认密码 " + DEFAULT_PASSWORD);
+        result.put("message", "密码已重置为默认密码，请联系管理员获取");
         return result;
     }
 

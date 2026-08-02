@@ -41,6 +41,12 @@ public class JwtAuthFilter implements Filter {
         HttpServletResponse response = (HttpServletResponse) res;
         String path = request.getRequestURI();
 
+        // CORS 预检请求直接放行，浏览器 OPTIONS 不携带 Authorization 头
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            chain.doFilter(req, res);
+            return;
+        }
+
         // Skip auth for login and health check
         if (path.equals("/api/auth/login") || path.equals("/api/health")) {
             chain.doFilter(req, res);

@@ -9,6 +9,6 @@ export const GlobalReadOnlyView: React.FC = () => (
         可以查看全部业务数据，但不能修改、下发、填报或签收。
       </p>
     </div>
-    <AssignmentList />
+    <AssignmentList readOnly />
   </div>
 );
