@@ -9,6 +9,8 @@ import com.freereport.service.HelpAiService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
@@ -55,9 +57,13 @@ public class AiQueryController {
     @PostMapping(value = "/query/stream", produces = "text/event-stream")
     public SseEmitter queryStream(@Valid @RequestBody AiQueryRequest req) {
         AuthUser user = requireQueryPermission();
+        // 捕获当前请求上下文，传递给 SSE 线程池（SSE 在独立线程执行，默认无法访问 RequestContextHolder）
+        RequestAttributes requestAttrs = RequestContextHolder.getRequestAttributes();
         SseEmitter emitter = new SseEmitter(120_000L); // 2 分钟超时
 
         sseExecutor.execute(() -> {
+            // 恢复请求上下文到线程池线程，使 SecurityUtils.getCurrentUser() 可用
+            RequestContextHolder.setRequestAttributes(requestAttrs, true);
             try {
                 aiQueryService.queryStream(req.getQuestion().trim(), req.getHistory(), user, event -> {
                     try {
@@ -80,6 +86,8 @@ public class AiQueryController {
                             .data("{\"error\":\"服务器内部错误，请稍后重试\"}"));
                     emitter.complete();
                 } catch (Exception ignored) {}
+            } finally {
+                RequestContextHolder.resetRequestAttributes();
             }
         });
 
