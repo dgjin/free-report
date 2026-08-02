@@ -399,6 +399,76 @@ export const api = {
     });
   },
 
+  /**
+   * SSE 流式问数：渐进推送查询结果，前端可实现打字机效果。
+   * 通过 onEvent 回调逐步通知各阶段事件（status/plan/chart/table/answer_delta/scope_note/done/error）。
+   */
+  async aiQueryStream(
+    question: string,
+    onEvent: (type: string, data: string) => void,
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+  ): Promise<void> {
+    const token = getToken();
+    const res = await fetch('/api/ai/query/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ question, history: history || [] }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      let msg = `智能问数失败 (HTTP ${res.status})`;
+      try { const j = JSON.parse(text); if (j.error) msg = j.error; } catch { /* ignore */ }
+      if (res.status === 401) {
+        removeToken();
+        window.dispatchEvent(new Event('auth:unauthorized'));
+      }
+      throw new Error(msg);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('服务器不支持流式响应，请刷新后重试');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // SSE 事件以双换行分隔
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+      for (const eventText of events) {
+        const lines = eventText.split('\n');
+        let eventName = '';
+        let eventData = '';
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            eventName = line.substring(6).trim();
+          } else if (line.startsWith('data:')) {
+            eventData += (eventData ? '\n' : '') + line.substring(5).trim();
+          }
+        }
+        if (eventName) onEvent(eventName, eventData);
+      }
+    }
+    // 处理剩余 buffer
+    if (buffer.trim()) {
+      const lines = buffer.split('\n');
+      let eventName = '';
+      let eventData = '';
+      for (const line of lines) {
+        if (line.startsWith('event:')) eventName = line.substring(6).trim();
+        else if (line.startsWith('data:')) eventData += (eventData ? '\n' : '') + line.substring(5).trim();
+      }
+      if (eventName) onEvent(eventName, eventData);
+    }
+  },
+
   /** 帮助知识库 AI 问答：基于系统帮助文档回答用户咨询 */
   async helpAiAsk(
     question: string,

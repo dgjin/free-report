@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -45,6 +46,119 @@ public class AiQueryService {
         this.auditor = auditor;
         this.operationAnalyzer = operationAnalyzer;
         this.securityUtils = securityUtils;
+    }
+
+    /**
+     * 流式执行智能问数：通过 onEvent 回调逐步推送 SSE 事件，前端可实现打字机效果。
+     * 事件类型：status → text_only/plan → chart → table → answer_delta(多个) → scope_note → done
+     */
+    public void queryStream(String question, List<Map<String, String>> history, AuthUser user,
+                            Consumer<SseEvent> onEvent) {
+        auditor.executeStream(user, question, onResult -> {
+            doQueryStream(question, history, user, onEvent, onResult);
+        });
+    }
+
+    private void doQueryStream(String question, List<Map<String, String>> history, AuthUser user,
+                               Consumer<SseEvent> onEvent, Consumer<Map<String, Object>> onResult) {
+        // 运营统计类问题：规则识别直接作答，不消耗 LLM 调用
+        Map<String, Object> operationAnswer = operationAnalyzer.answerIfMatched(question, user);
+        if (operationAnswer != null) {
+            onEvent.accept(SseEvent.json("text_only", operationAnswer));
+            onEvent.accept(SseEvent.data("done", ""));
+            onResult.accept(operationAnswer);
+            return;
+        }
+
+        // 角色限制检查
+        if (securityUtils.isAiQueryLimitedToOperationStats(user)) {
+            Map<String, Object> limited = textOnly("当前角色仅支持运营统计类查询，可问我「各部门下发报表的情况」或「各分公司填报情况分析」。"
+                    + "具体报表数据请由对应部门的报表管理员查询。", List.of());
+            onEvent.accept(SseEvent.json("text_only", limited));
+            onEvent.accept(SseEvent.data("done", ""));
+            onResult.accept(limited);
+            return;
+        }
+
+        onEvent.accept(SseEvent.data("status", "正在理解您的问题..."));
+
+        List<AiTemplateContext> contexts = contextBuilder.buildContexts(user);
+        if (contexts.isEmpty()) {
+            Map<String, Object> noData = textOnly("当前没有可供问数的报表。请先创建并发布模板、下发任务并完成填报后再来提问。", contexts);
+            onEvent.accept(SseEvent.json("text_only", noData));
+            onEvent.accept(SseEvent.data("done", ""));
+            onResult.accept(noData);
+            return;
+        }
+
+        // LLM Call #1: 生成查询计划
+        String planJson = aiClient.chat(planResolver.buildPlanMessages(question, history, contexts), true);
+        AiPlanResolver.PlanResult planResult = planResolver.resolve(planJson, contexts);
+        if (planResult.isText()) {
+            Map<String, Object> textResult = textOnly(planResult.textAnswer(), contexts);
+            onEvent.accept(SseEvent.json("text_only", textResult));
+            onEvent.accept(SseEvent.data("done", ""));
+            onResult.accept(textResult);
+            return;
+        }
+        AiResolvedPlan plan = planResult.plan();
+
+        onEvent.accept(SseEvent.json("plan", planResolver.toResponseMap(plan, List.of())));
+        onEvent.accept(SseEvent.data("status", "正在查询数据..."));
+
+        // 取数
+        Map<String, Map<String, Object>> aggregations = aggregationService.getAggregationsByTemplateAndPeriods(
+                plan.ctx().template().getId(), plan.periods(), user);
+        List<AiPeriodData> periodDataList = new ArrayList<>();
+        for (String period : plan.periods()) {
+            Map<String, Object> aggregation = aggregations.get(period);
+            if (aggregation != null) {
+                periodDataList.add(new AiPeriodData(period, aggregation));
+            }
+        }
+        List<String> companyFilter = resultBuilder.effectiveCompanyFilter(periodDataList, plan.requestedCompanies());
+
+        // 发送更新后的 plan（含 companyFilter）
+        onEvent.accept(SseEvent.json("plan", planResolver.toResponseMap(plan, companyFilter)));
+
+        Map<String, Object> table = resultBuilder.buildTable(periodDataList, plan, companyFilter);
+        Map<String, Object> chart = resultBuilder.buildChart(periodDataList, plan, companyFilter);
+
+        onEvent.accept(SseEvent.json("chart", chart));
+        onEvent.accept(SseEvent.json("table", table));
+
+        onEvent.accept(SseEvent.data("status", "正在生成结论..."));
+
+        // LLM Call #2: 流式总结
+        String answer = resultBuilder.summarizeStream(question, plan, table, companyFilter,
+                chunk -> onEvent.accept(SseEvent.data("answer_delta", chunk)));
+
+        String scope = scopeNote(plan, companyFilter);
+        onEvent.accept(SseEvent.data("scope_note", scope));
+        onEvent.accept(SseEvent.data("done", ""));
+
+        // 完整结果（用于审计日志）
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("answer", answer);
+        result.put("plan", planResolver.toResponseMap(plan, companyFilter));
+        result.put("chart", chart);
+        result.put("table", table);
+        result.put("scope_note", scope);
+        onResult.accept(result);
+    }
+
+    /** SSE 事件封装：type + data，支持 JSON 对象和纯文本两种 payload */
+    public record SseEvent(String type, String data) {
+        public static SseEvent data(String type, String data) { return new SseEvent(type, data); }
+        public static SseEvent json(String type, Object obj) {
+            try {
+                return new SseEvent(type, new com.fasterxml.jackson.databind.ObjectMapper()
+                        .setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategies.SNAKE_CASE)
+                        .writeValueAsString(obj));
+            } catch (Exception e) {
+                return new SseEvent(type, "{}");
+            }
+        }
     }
 
     /** 智能问数可用性（前端据此提示配置缺失） */

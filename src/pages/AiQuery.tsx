@@ -249,23 +249,52 @@ export const AiQuery: React.FC = () => {
     }
     const trimmed = question.trim();
     const history = buildRequestHistory(messages);
-    setMessages((prev) => [...prev, { id: `m${nextId.current++}`, role: 'user', content: trimmed }]);
+    const msgId = `m${nextId.current++}`;
+    setMessages((prev) => [...prev,
+      { id: `m${nextId.current++}`, role: 'user', content: trimmed },
+      { id: msgId, role: 'assistant', content: '', statusText: '正在连接...' },
+    ]);
     setInput('');
     setLoading(true);
+
     try {
-      const res = await api.aiQuery(trimmed, history);
-      setMessages((prev) => [...prev, {
-        id: `m${nextId.current++}`,
-        role: 'assistant',
-        content: res.answer,
-        response: res,
-      }]);
+      await api.aiQueryStream(trimmed, (type, data) => {
+        setMessages((prev) => prev.map((m) => {
+          if (m.id !== msgId) return m;
+          const res = m.response || {};
+          switch (type) {
+            case 'status':
+              return { ...m, statusText: data };
+            case 'text_only': {
+              const parsed = JSON.parse(data);
+              return { ...m, content: parsed.answer || '', response: { ...res, ...parsed }, statusText: undefined };
+            }
+            case 'plan':
+              return { ...m, response: { ...res, plan: JSON.parse(data) }, statusText: undefined };
+            case 'chart':
+              return { ...m, response: { ...res, chart: JSON.parse(data) }, statusText: undefined };
+            case 'table':
+              return { ...m, response: { ...res, table: JSON.parse(data) }, statusText: undefined };
+            case 'answer_delta':
+              return { ...m, content: m.content + data, statusText: undefined };
+            case 'scope_note':
+              return { ...m, response: { ...res, scope_note: data }, statusText: undefined };
+            case 'done':
+              return { ...m, statusText: undefined };
+            case 'error': {
+              let msg = '智能问数失败，请稍后重试';
+              try { const j = JSON.parse(data); if (j.error) msg = j.error; } catch { /* ignore */ }
+              return { ...m, role: 'error' as const, content: msg, statusText: undefined };
+            }
+            default:
+              return m;
+          }
+        }));
+      }, history);
     } catch (e: any) {
-      setMessages((prev) => [...prev, {
-        id: `m${nextId.current++}`,
-        role: 'error',
-        content: e?.message || '智能问数失败，请稍后重试',
-      }]);
+      setMessages((prev) => prev.map((m) =>
+        m.id === msgId ? { ...m, role: 'error' as const, content: e?.message || '智能问数失败，请稍后重试', statusText: undefined } : m
+      ));
     } finally {
       setLoading(false);
     }
@@ -336,10 +365,32 @@ export const AiQuery: React.FC = () => {
           const res = m.response;
           return (
             <div key={m.id} className="space-y-3 rounded-[12px] bg-canvas p-3.5 sm:p-4">
-              <div className="flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-mute shrink-0 mt-0.5" />
-                <div className="text-[13px] text-ink leading-relaxed whitespace-pre-wrap">{m.content}</div>
-              </div>
+              {/* 流式状态指示器：仅在有 statusText 且无内容时显示 */}
+              {m.statusText && !m.content && !res?.chart && !res?.table && (
+                <div className="flex items-center gap-2 text-[13px] text-mute">
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-line border-t-ink animate-spin" />
+                  {m.statusText}
+                </div>
+              )}
+              {m.content && (
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-mute shrink-0 mt-0.5" />
+                  <div className="text-[13px] text-ink leading-relaxed whitespace-pre-wrap">
+                    {m.content}
+                    {/* 流式打字光标：当 statusText 为 undefined 但 loading 且这是最后一条消息时显示 */}
+                    {loading && !m.statusText && mIdx === messages.length - 1 && m.role === 'assistant' && (
+                      <span className="inline-block w-[2px] h-[14px] bg-ink ml-0.5 align-middle animate-pulse" />
+                    )}
+                  </div>
+                </div>
+              )}
+              {/* 流式阶段的状态文本（内容与数据已部分到达） */}
+              {m.statusText && (m.content || res?.chart || res?.table) && (
+                <div className="flex items-center gap-2 text-[12px] text-mute">
+                  <span className="w-3 h-3 rounded-full border-2 border-line border-t-ink animate-spin" />
+                  {m.statusText}
+                </div>
+              )}
               {res?.chart && shouldRenderChart(res.chart) && (
                 <div className="bg-white rounded-[10px] p-3">
                   <div className="text-[12px] font-semibold text-ink flex items-center gap-1.5 mb-2">
@@ -371,7 +422,9 @@ export const AiQuery: React.FC = () => {
           );
         })}
 
-        {loading && (
+        {/* loading 指示器仅在无正在流式输出的 assistant 消息时显示 */}
+        {loading && !messages.some((m) => m.role === 'assistant' && m.statusText !== undefined && m.id === messages[messages.length - 1]?.id) &&
+          messages[messages.length - 1]?.role === 'user' && (
           <div className="flex items-center gap-2 text-[13px] text-mute">
             <span className="w-3.5 h-3.5 rounded-full border-2 border-line border-t-ink animate-spin" />
             正在分析数据...

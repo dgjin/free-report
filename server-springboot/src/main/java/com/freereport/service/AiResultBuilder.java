@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -70,6 +71,45 @@ public class AiResultBuilder {
     /** 让模型基于查出的数据生成结论；调用失败时降级为规则文案，不影响数据返回 */
     public String summarize(String question, AiResolvedPlan plan, Map<String, Object> table,
                             List<String> companyFilter) {
+        List<Map<String, String>> messages = buildSummaryMessages(question, plan, table, companyFilter);
+        try {
+            String answer = aiClient.chat(messages, false);
+            if (answer != null && !answer.isBlank()) {
+                return answer.trim();
+            }
+        } catch (DomainException e) {
+            log.warn("生成结论失败，降级为规则文案: {}", e.getMessage());
+        }
+        int rowCount = rowsOf(table).size();
+        return "已按「" + plan.ctx().template().getName() + "」查询到 " + rowCount + " 条数据，详见下方图表与表格。";
+    }
+
+    /**
+     * 流式生成结论：每收到一个 token 即通过 onChunk 回调推送给调用方。
+     * 调用方负责将 chunk 写入 SSE emitter。失败时降级为规则文案。
+     *
+     * @return 最终完整的结论文本（用于审计/完整响应）
+     */
+    public String summarizeStream(String question, AiResolvedPlan plan, Map<String, Object> table,
+                                  List<String> companyFilter, Consumer<String> onChunk) {
+        List<Map<String, String>> messages = buildSummaryMessages(question, plan, table, companyFilter);
+        try {
+            String answer = aiClient.streamChat(messages, onChunk);
+            if (answer != null && !answer.isBlank()) {
+                return answer.trim();
+            }
+        } catch (DomainException e) {
+            log.warn("流式生成结论失败，降级为规则文案: {}", e.getMessage());
+        }
+        int rowCount = rowsOf(table).size();
+        String fallback = "已按「" + plan.ctx().template().getName() + "」查询到 " + rowCount + " 条数据，详见下方图表与表格。";
+        onChunk.accept(fallback);
+        return fallback;
+    }
+
+    /** 构建总结阶段的对话消息列表（非流式与流式共用） */
+    private List<Map<String, String>> buildSummaryMessages(String question, AiResolvedPlan plan,
+                                                           Map<String, Object> table, List<String> companyFilter) {
         AiTemplateContext ctx = plan.ctx();
         String dataText = tableToText(table);
         StringBuilder userPrompt = new StringBuilder();
@@ -91,16 +131,7 @@ public class AiResultBuilder {
                 你是企业报表数据分析助手。请基于给定的查询结果，用 2 到 4 句简洁中文回答用户问题。
                 要求：直接给出结论与关键数字（合计、最高/最低机构、环比变化等）；不要编造数据；不要罗列全部明细；不要使用 Markdown 表格。
                 """;
-        try {
-            String answer = aiClient.chat(AiClient.messages(systemPrompt, userPrompt.toString()), false);
-            if (answer != null && !answer.isBlank()) {
-                return answer.trim();
-            }
-        } catch (DomainException e) {
-            log.warn("生成结论失败，降级为规则文案: {}", e.getMessage());
-        }
-        int rowCount = rowsOf(table).size();
-        return "已按「" + ctx.template().getName() + "」查询到 " + rowCount + " 条数据，详见下方图表与表格。";
+        return AiClient.messages(systemPrompt, userPrompt.toString());
     }
 
     // ---- 表格构建 ----

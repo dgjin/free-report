@@ -48,6 +48,8 @@ export interface AiMessage {
   role: 'user' | 'assistant' | 'error';
   content: string;
   response?: AiQueryResponse;
+  /** 流式问数中的阶段性状态文本（如"正在理解您的问题..."），完成后清空 */
+  statusText?: string;
 }
 
 export const AI_QUESTION_MAX_LENGTH = 500;
