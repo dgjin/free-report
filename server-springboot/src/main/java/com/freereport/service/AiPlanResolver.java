@@ -54,10 +54,6 @@ public class AiPlanResolver {
                         .map(f -> f.getFieldName() + "(" + f.getFieldLabel() + ")")
                         .collect(Collectors.joining("、"))).append('\n');
             }
-            if (!c.others().isEmpty()) {
-                catalog.append("  其他字段: ").append(c.others().stream().limit(15)
-                        .map(ReportTemplateField::getFieldLabel).collect(Collectors.joining("、"))).append('\n');
-            }
             catalog.append("  已有周期: ").append(c.periods().isEmpty() ? "（尚未下发）"
                     : String.join("、", c.periods())).append('\n');
         }
@@ -179,7 +175,7 @@ public class AiPlanResolver {
         AiAgg agg = AiAgg.parse(text(plan, "aggregation"));
         // 机构筛选：模型给出的机构名在取数后与真实机构名模糊匹配，全都对不上时忽略筛选而不是返回空结果
         List<String> requestedCompanies = stringList(plan.path("company_names")).stream()
-                .distinct().limit(20).collect(Collectors.toList());
+                .distinct().limit(5).collect(Collectors.toList());
         String title = text(plan, "title");
         if (title == null || title.isBlank()) {
             title = ctx.template().getName();

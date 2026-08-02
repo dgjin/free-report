@@ -39,14 +39,17 @@ public class TemplateService {
     private final CompanyMapper companyMapper;
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
+    private final AiQueryContextBuilder aiQueryContextBuilder;
 
     public TemplateService(TemplateMapper templateMapper, AssignmentMapper assignmentMapper,
-                           CompanyMapper companyMapper, UserMapper userMapper, ObjectMapper objectMapper) {
+                           CompanyMapper companyMapper, UserMapper userMapper, ObjectMapper objectMapper,
+                           AiQueryContextBuilder aiQueryContextBuilder) {
         this.templateMapper = templateMapper;
         this.assignmentMapper = assignmentMapper;
         this.companyMapper = companyMapper;
         this.userMapper = userMapper;
         this.objectMapper = objectMapper;
+        this.aiQueryContextBuilder = aiQueryContextBuilder;
     }
 
     /**
@@ -240,6 +243,9 @@ public class TemplateService {
         Integer maxSort = templateMapper.findMaxSortOrder(templateId);
         int sortOrder = (maxSort != null ? maxSort : 0) + 1;
         ReportTemplateField field = mapToField(templateId, fieldMap, sortOrder);
+        if (fieldMap.containsKey("sensitive")) {
+            field.setSensitive(toBool(fieldMap.get("sensitive")));
+        }
         templateMapper.insertField(field);
         return fieldToMap(field);
     }
@@ -415,7 +421,12 @@ public class TemplateService {
         }
 
         String configJson = toJson(config);
-        templateMapper.updateField(templateId, fieldId, fieldName, fieldLabel, fieldType, configJson);
+        Boolean sensitive = updates.containsKey("sensitive") ? toBool(updates.get("sensitive")) : null;
+        templateMapper.updateField(templateId, fieldId, fieldName, fieldLabel, fieldType, configJson, sensitive);
+        if (sensitive != null) {
+            target.setSensitive(sensitive);
+            aiQueryContextBuilder.invalidateAll();
+        }
 
         target.setFieldName(fieldName);
         target.setFieldLabel(fieldLabel);
@@ -596,7 +607,65 @@ public class TemplateService {
         return templateMapper.findPendingApprovals();
     }
 
+    /**
+     * 设置模板的 AI 问数开关（启用/禁用后该模板不再出现在智能问数白名单中）。
+     */
+    @Transactional
+    public Map<String, Object> setAiQueryEnabled(AuthUser user, Long id, boolean enabled) {
+        ReportTemplate t = templateMapper.findByIdForUpdate(id);
+        if (t == null) {
+            throw new DomainException("模板不存在", 404);
+        }
+        if (!canManageTemplate(user, t.getOwnerDepartmentId())) {
+            throw new DomainException("无权管理该模板", 404);
+        }
+        templateMapper.setAiQueryEnabled(id, enabled);
+        aiQueryContextBuilder.invalidateAll();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", enabled ? "已开启智能问数" : "已关闭智能问数");
+        result.put("ai_query_enabled", enabled);
+        return result;
+    }
+
+    /**
+     * 设置字段的敏感标记：敏感字段不会暴露给智能问数上下文。
+     * 与字段编辑/删除不同，标记敏感度不限制模板状态（已发布模板也可操作）。
+     */
+    @Transactional
+    public Map<String, Object> setFieldSensitive(AuthUser user, Long templateId, Long fieldId, boolean sensitive) {
+        ReportTemplate t = templateMapper.findByIdForUpdate(templateId);
+        if (t == null) {
+            throw new DomainException("模板不存在", 404);
+        }
+        if (!canManageTemplate(user, t.getOwnerDepartmentId())) {
+            throw new DomainException("无权管理该模板", 404);
+        }
+        List<ReportTemplateField> fields = templateMapper.findFieldsByTemplateId(templateId);
+        ReportTemplateField target = fields.stream()
+                .filter(f -> f.getId() != null && f.getId().equals(fieldId))
+                .findFirst().orElse(null);
+        if (target == null) {
+            throw new DomainException("字段不存在", 404);
+        }
+        // updateField SQL 用 IFNULL(#{sensitive}, sensitive)，仅更新 sensitive 列
+        templateMapper.updateField(templateId, fieldId,
+                target.getFieldName(), target.getFieldLabel(), target.getFieldType(),
+                target.getFieldConfig(), sensitive);
+        aiQueryContextBuilder.invalidateAll();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", sensitive ? "已标记为敏感字段" : "已取消敏感标记");
+        result.put("field_id", fieldId);
+        result.put("sensitive", sensitive);
+        return result;
+    }
+
     // ---- helpers ----
+
+    private Boolean toBool(Object val) {
+        if (val == null) return null;
+        if (val instanceof Boolean) return (Boolean) val;
+        return Boolean.parseBoolean(String.valueOf(val));
+    }
 
     private ReportTemplate lockWritableTemplate(AuthUser user, Long templateId) {
         ReportTemplate t = templateMapper.findByIdForUpdate(templateId);
@@ -724,6 +793,7 @@ public class TemplateService {
         m.put("owner_department_id", t.getOwnerDepartmentId());
         m.put("created_at", t.getCreatedAt());
         m.put("updated_at", t.getUpdatedAt());
+        m.put("ai_query_enabled", t.getAiQueryEnabled());
         return m;
     }
 
@@ -741,6 +811,7 @@ public class TemplateService {
         m.put("field_config", f.getFieldConfig());
         m.put("sort_order", f.getSortOrder());
         m.put("status", f.getStatus());
+        m.put("sensitive", f.getSensitive());
         return m;
     }
 

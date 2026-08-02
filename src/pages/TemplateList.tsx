@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Upload,
+  Sparkles,
 } from '../components/icons';
 import { api, useTemplatesPaged, useAssignmentTargets, getStoredUser } from '../services/api';
 import { toast, confirmDialog } from '../utils/toast';
@@ -254,6 +255,12 @@ export const TemplateList: React.FC = () => {
                         {lifecycle.statusLabel}
                       </span>
                       <span className="text-[11px] text-faint tabular-nums">ID #{t.id}</span>
+                      {t.ai_query_enabled !== false && (
+                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full text-[#1a5a85] bg-[#E8F4FD] flex items-center gap-0.5">
+                          <Sparkles className="w-3 h-3" />
+                          <span>智能问数</span>
+                        </span>
+                      )}
                     </div>
 
                     <h3 className="text-base font-semibold text-ink tracking-[-0.01em]">{t.name}</h3>

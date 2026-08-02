@@ -87,8 +87,9 @@
     <!-- 插入模板（返回生成 ID） -->
     <insert id="insertTemplate" parameterType="com.freereport.entity.ReportTemplate"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO report_templates (name, description, period_type, status, created_by, owner_department_id)
-        VALUES (#{name}, #{description}, #{periodType}, #{status}, #{createdBy}, #{ownerDepartmentId})
+        INSERT INTO report_templates (name, description, period_type, status, created_by, owner_department_id, ai_query_enabled)
+        VALUES (#{name}, #{description}, #{periodType}, #{status}, #{createdBy}, #{ownerDepartmentId},
+                IFNULL(#{aiQueryEnabled}, 1))
     </insert>
 
     <!-- 更新模板基本信息 -->
@@ -104,6 +105,13 @@
     <update id="setTemplateStatus">
         UPDATE report_templates
         SET status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 设置模板的 AI 问数开关 -->
+    <update id="setAiQueryEnabled">
+        UPDATE report_templates
+        SET ai_query_enabled = #{aiQueryEnabled}
         WHERE id = #{id}
     </update>
 
@@ -138,16 +146,18 @@
     <!-- 插入字段（返回生成 ID） -->
     <insert id="insertField" parameterType="com.freereport.entity.ReportTemplateField"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO report_template_fields (template_id, field_name, field_label, field_type, data_type, field_config, sort_order, status)
-        VALUES (#{templateId}, #{fieldName}, #{fieldLabel}, #{fieldType}, #{dataType}, #{fieldConfig}, #{sortOrder}, #{status})
+        INSERT INTO report_template_fields (template_id, field_name, field_label, field_type, data_type, field_config, sort_order, status, `sensitive`)
+        VALUES (#{templateId}, #{fieldName}, #{fieldLabel}, #{fieldType}, #{dataType}, #{fieldConfig}, #{sortOrder}, #{status},
+                IFNULL(#{sensitive}, 0))
     </insert>
 
     <!-- 批量插入字段 -->
     <insert id="insertFieldsBatch" parameterType="java.util.List">
-        INSERT INTO report_template_fields (template_id, field_name, field_label, field_type, data_type, field_config, sort_order, status)
+        INSERT INTO report_template_fields (template_id, field_name, field_label, field_type, data_type, field_config, sort_order, status, `sensitive`)
         VALUES
         <foreach collection="list" item="field" separator=",">
-            (#{field.templateId}, #{field.fieldName}, #{field.fieldLabel}, #{field.fieldType}, #{field.dataType}, #{field.fieldConfig}, #{field.sortOrder}, #{field.status})
+            (#{field.templateId}, #{field.fieldName}, #{field.fieldLabel}, #{field.fieldType}, #{field.dataType}, #{field.fieldConfig}, #{field.sortOrder}, #{field.status},
+             IFNULL(#{field.sensitive}, 0))
         </foreach>
     </insert>
 
@@ -165,7 +175,8 @@
         SET field_name = #{fieldName},
             field_label = #{fieldLabel},
             field_type = #{fieldType},
-            field_config = #{fieldConfig}
+            field_config = #{fieldConfig},
+            `sensitive` = IFNULL(#{sensitive}, `sensitive`)
         WHERE id = #{fieldId}
           AND template_id = #{templateId}
     </update>

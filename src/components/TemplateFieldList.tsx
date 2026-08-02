@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sliders, Grid3x3, Type, Hash, Calendar, List, FileText } from './icons';
+import { Sliders, Grid3x3, Type, Hash, Calendar, List, FileText, Eye, EyeOff } from './icons';
 import { api } from '../services/api';
 import { toast, confirmDialog } from '../utils/toast';
 import { ReportTemplate, ReportTemplateField, FieldType } from '../types';
@@ -69,6 +69,17 @@ export const TemplateFieldList: React.FC<TemplateFieldListProps> = ({ template, 
     }
   };
 
+  const handleToggleSensitive = async (field: ReportTemplateField) => {
+    const nextSensitive = !field.sensitive;
+    try {
+      const res = await api.setFieldSensitive(template.id, field.id, nextSensitive);
+      toast(res.message, 'success');
+      onChanged();
+    } catch (err: any) {
+      toast(err.message || '操作失败', 'error');
+    }
+  };
+
   return (
     <>
       {/* Unified Template Fields List */}
@@ -128,10 +139,39 @@ export const TemplateFieldList: React.FC<TemplateFieldListProps> = ({ template, 
                       <div className="text-[11px] text-mute font-mono mt-1 truncate">
                         {field.field_name}
                       </div>
-                      <div className="mt-2">
+                      <div className="flex items-center gap-1.5 mt-2">
                         <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-line text-body">
                           {isMatrix ? '交叉表列' : fieldTypeLabels[field.field_type]}
                         </span>
+                        {canWrite && (
+                          <button
+                            onClick={() => handleToggleSensitive(field)}
+                            title={field.sensitive ? '敏感字段：不会暴露给智能问数（点击取消）' : '点击标记为敏感字段，不会暴露给智能问数'}
+                            className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${
+                              field.sensitive
+                                ? 'text-[#9F2F2D] bg-[#FDEBEC]'
+                                : 'text-mute bg-line hover:text-body hover:bg-hoverbg'
+                            }`}
+                          >
+                            {field.sensitive ? (
+                              <>
+                                <EyeOff className="w-3 h-3" />
+                                <span>敏感</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-3 h-3" />
+                                <span>标记敏感</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                        {!canWrite && field.sensitive && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-2 py-0.5 rounded-full text-[#9F2F2D] bg-[#FDEBEC]">
+                            <EyeOff className="w-3 h-3" />
+                            <span>敏感</span>
+                          </span>
+                        )}
                       </div>
 
                       {isMatrix && config.matrix ? (

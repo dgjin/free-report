@@ -97,6 +97,8 @@ const TEMPLATE_DESIGN_RULES: string[] = [
   '字段唯一标识（Key）在模板内必须唯一，留空时系统按控件类型自动生成',
   '数字型字段自动参与汇总统计；文本、日期、下拉仅作展示不合计',
   '下拉单选的预设选项用逗号分隔（如：正常, 待维修, 报废）',
+  '新增字段时可勾选「标记为敏感字段」，敏感字段不会暴露给智能问数，适用于包含个人隐私、商业秘密的数据',
+  '模板头部的「智能问数 · 开/关」徽章可控制整个模板是否对 AI 查询可见',
   '模板未下发前（设计阶段）可自由修改、删除字段；一经下发遵循「只增不减」规范：字段不可物理删除，仅可停用，停用后历史数据完整保留、新填报不再要求',
   '草稿与已发布状态可继续追加字段；待审批、已停用状态的字段配置为只读',
   '汇总指标、明细行、交叉表可在同一模板中混合搭配',
@@ -114,15 +116,15 @@ const FIELD_TYPE_LEGEND: Array<{ label: string; desc: string }> = [
 const AI_QA_KNOWLEDGE_BASE: Array<{ q: string; a: string }> = [
   {
     q: '如何创建报表模板？',
-    a: '进入「模板管理」→ 点击「新建模板」→ 填写模板名称、周期类型、说明 → 在字段设计页通过「新增模版字段」「导入Excel」或「创建交叉表」添加字段 → 完成后点击「提交审批」，数智化转型办公室审批通过后即可下发。',
+    a: '进入「模板管理」→ 点击「新建模板」→ 填写模板的名称、周期类型、说明 → 在字段设计页通过「新增模版字段」「导入Excel」或「创建交叉表」添加字段 → 完成后点击「提交审批」，数智化转型办公室审批通过后即可下发。',
   },
   {
     q: '如何下发报表任务？',
-    a: '进入「下发管理」→ 选择已发布的模板 → 指定目标分公司、周期与截止日期 → 点击「下发」。支持「一次性下发」用于补充调查场景。也可在「周期计划」中配置自动下发，系统每日按设定时间自动生成任务。',
+    a: '进入「下发管理」→ 选择已发布的模板 → 指定目标分公司、周期与截止日期 → 点击「下发」。支持「一次性下发」用于补充调查场景（不受周期去重约束）。也可在「周期计划」中配置自动下发，系统每日按设定时间自动生成任务。',
   },
   {
     q: '如何填报报表？',
-    a: '进入「报表填报」→ 查看收到的下发任务 → 点击进入填报页 → 填写汇总指标、明细行或交叉表数据 → 点击「提交」。支持「导入Excel」批量导入明细数据。提交后进入三级审批流程。',
+    a: '进入「报表填报」→ 查看收到的下发任务 → 点击进入填报页 → 填写汇总指标、明细行或交叉表数据 → 点击「提交」。支持「导入Excel」批量导入明细数据，系统会自动跳过标题/说明/落款行并定位表头，数字、日期与下拉值自动规范化。',
   },
   {
     q: '审批流程是怎样的？',
@@ -134,15 +136,23 @@ const AI_QA_KNOWLEDGE_BASE: Array<{ q: string; a: string }> = [
   },
   {
     q: '如何使用智能问数？',
-    a: '进入「智能问数」→ 用日常说法提问（如「北京分公司上月的裸车价是多少」）→ 系统自动定位报表、周期与指标 → 生成文字结论、图表和数据明细。支持多轮对话，点击「下载」可导出 Excel。',
+    a: '进入「智能问数」→ 用日常说法提问（如「北京分公司上月的裸车价是多少」）→ 系统自动定位报表、周期与指标 → 生成文字结论、图表和数据明细。支持多轮对话，点击「下载」可导出 Excel。敏感字段和关闭了智能问数开关的模板不会出现在查询结果中。',
   },
   {
     q: '智能问数可以查询哪些数据？',
-    a: '部门报表管理员可查询本部门模板的具体报表数据；超级管理员与数智化转型办公室仅限运营统计（如「各部门下发报表的情况」「各分公司填报情况分析」），不可查询具体报表数值。',
+    a: '部门报表管理员可查询本部门模板的具体报表数据；超级管理员与数智化转型办公室仅限运营统计（如「各部门下发报表的情况」「各分公司填报情况分析」），不可查询具体报表数值。标记为「敏感」的字段和关闭了「智能问数」开关的模板会被自动排除。',
+  },
+  {
+    q: '如何设置敏感字段？',
+    a: '两种方式：① 新增字段时勾选「标记为敏感字段」；② 在字段设计页的字段卡片上点击「标记敏感」按钮。敏感字段不会出现在智能问数的上下文中，也无法被 LLM 选中为查询指标，适用于包含个人隐私、商业秘密等不宜公开查询的数据。',
+  },
+  {
+    q: '如何开关模板的智能问数功能？',
+    a: '在模板设计页的头部区域，点击「智能问数 · 开/关」徽章即可切换。关闭后该模板的所有字段都不会出现在智能问数中，但不影响模板的正常填报和汇总功能。',
   },
   {
     q: '如何导出报表数据？',
-    a: '两种导出：① 汇总报表页点击「导出 Excel」，生成机构对比、明细、进度三张表；② 智能问数结果点击「下载」，生成查询说明、数据表格、图表数据三张表。',
+    a: '两种导出：① 汇总报表页点击「导出 Excel」，生成机构对比、明细、进度三张表；② 智能问数结果点击「下载」，生成查询说明、数据表格、图表数据三张表。填报页面也支持导出当前任务的填报数据。',
   },
   {
     q: '如何处理被退回的报表？',
@@ -157,6 +167,10 @@ const AI_QA_KNOWLEDGE_BASE: Array<{ q: string; a: string }> = [
     a: '进入「汇总报表」→ 选择模板 → 查看多机构对比、明细数据与填报进度。数字型指标自动加总对比，明细可逐条穿透查看。仅统计已审批通过的填报数据。',
   },
   {
+    q: '如何强制收回已下发的任务？',
+    a: '在「下发管理」列表中找到未汇总的任务 → 点击「收回」→ 填写收回原因 → 确认。收回后任务终止，相关审批记录自动取消。已汇总的任务不可收回。',
+  },
+  {
     q: '模板字段可以删除吗？',
     a: '模板未下发前（设计阶段）可自由修改、删除字段；一经下发遵循「只增不减」规范：字段不可物理删除，仅可停用。停用后历史数据完整保留，新填报不再要求填写。',
   },
@@ -166,7 +180,7 @@ const AI_QA_KNOWLEDGE_BASE: Array<{ q: string; a: string }> = [
   },
   {
     q: '各角色的权限是什么？',
-    a: '超级管理员：全局只读，可管理机构与用户，不可填报；部门报表管理员：设计模板、下发任务、签收报表、查看汇总、智能问数（限本部门）；数智化转型办公室：审批模板，可查看所有模板；分公司经办人：填写并提交报表；复核人/审批人：审批操作（不可填报）。',
+    a: '超级管理员：全局只读视图，可管理机构与用户，智能问数仅限运营统计；部门报表管理员：设计模板、下发任务、签收报表、查看汇总、智能问数（限本部门）；数智化转型办公室：审批模板，可查看所有模板，智能问数仅限运营统计；分公司经办人：填写并提交报表；复核人/审批人：审批操作（不可填报）。',
   },
 ];
 
@@ -237,9 +251,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
 
   const toggleSection = (id: string) => {
     setOpenSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
+      // 手风琴模式：展开一个时自动收起其他
+      if (prev.has(id)) {
+        return new Set<string>();
+      }
+      return new Set<string>([id]);
     });
   };
 
@@ -395,9 +411,9 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
           <HelpSection icon={<Shield className="w-4 h-4 text-ink" />} title="角色与权限"
             open={openSections.has('roles')} onToggle={() => toggleSection('roles')}>
             <div className="space-y-2 text-[12px] leading-[1.7]">
-              <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">超级管理员</span><span className="text-mute">全局只读视图，可管理机构与用户，不可填报或签收</span></div>
-              <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">部门报表管理员</span><span className="text-mute">设计模板、下发任务、签收报表、查看汇总、智能问数（仅限本部门）</span></div>
-              <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">数智化转型办公室</span><span className="text-mute">审批各部门提交的报表模板；可查看所有部门模板</span></div>
+              <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">超级管理员</span><span className="text-mute">全局只读视图，可管理机构与用户，不可填报或签收；智能问数仅限运营统计</span></div>
+              <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">部门报表管理员</span><span className="text-mute">设计模板、下发任务、签收报表、查看汇总、智能问数（仅限本部门），可设置敏感字段与 AI 开关</span></div>
+              <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">数智化转型办公室</span><span className="text-mute">审批各部门提交的报表模板；可查看所有部门模板；智能问数仅限运营统计</span></div>
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">分公司经办人</span><span className="text-mute">填写并提交报表数据</span></div>
               <div className="flex gap-3"><span className="font-semibold text-ink shrink-0 w-24">复核人 / 审批人</span><span className="text-mute">查看填报信息，进行审批操作（不可填报）</span></div>
             </div>
@@ -473,7 +489,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
                 </div>
                 <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
                   <div className="font-semibold text-ink mb-1">智能问数</div>
-                  <div className="text-mute">在「智能问数」用日常说法提问即可查询报表数据，系统自动定位报表、周期与指标，生成文字结论、图表和数据明细。支持多轮对话，点击「下载」可导出 Excel（含查询说明、数据表格、图表数据）。</div>
+                  <div className="text-mute">在「智能问数」用日常说法提问即可查询报表数据，系统自动定位报表、周期与指标，生成文字结论、图表和数据明细。支持多轮对话，点击「下载」可导出 Excel（含查询说明、数据表格、图表数据）。可在模板设计页头部切换「智能问数 · 开/关」。</div>
+                </div>
+                <div className="apple-row px-4 py-3 bg-canvas rounded-[12px]">
+                  <div className="font-semibold text-ink mb-1">敏感字段与 AI 开关</div>
+                  <div className="text-mute">新增字段时可勾选「标记为敏感字段」，或在字段卡片上点击「标记敏感」切换。敏感字段不会出现在智能问数中。模板头部的「智能问数 · 开/关」徽章可控制整个模板是否对 AI 可见。</div>
                 </div>
               </div>
             </HelpSection>
@@ -639,9 +659,12 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({ open, onClose, user }) =
               <li>填报、复核、审核与查看页面的汇总/明细/交叉表数据区均支持全屏展示：点击数据区右上角全屏按钮铺满屏幕（按 Esc 或再次点击退出），宽表数据可完整展开查看</li>
               <li>已签收的报表状态为「已签收」，可在汇总报表中查看</li>
               <li>逾期任务会在列表中标记「已逾期」</li>
-              <li>一次性下发的任务会标注「⚡ 一次性」徽章</li>
+              <li>一次性下发的任务会标注「⚡ 一次性」徽章，不受周期去重约束，适用于补充调查场景</li>
               <li>汇总报表仅统计已审批通过的填报数据</li>
               <li>智能问数仅统计已提交并通过接收的数据，结果支持下载为 Excel（含图表数据）</li>
+              <li>新增字段时可勾选「标记为敏感字段」，或在字段卡片上点击「标记敏感」切换；敏感字段不会暴露在智能问数中</li>
+              <li>模板设计页头部的「智能问数 · 开/关」徽章可控制整个模板是否对 AI 查询可见</li>
+              <li>每用户智能问数每小时最多 20 次调用，超限后请稍后再试</li>
             </ul>
           </HelpSection>
         </div>

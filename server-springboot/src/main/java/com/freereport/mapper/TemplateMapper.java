@@ -83,6 +83,12 @@ public interface TemplateMapper {
                           @Param("status") String status);
 
     /**
+     * 设置模板的 AI 问数开关。
+     */
+    int setAiQueryEnabled(@Param("id") Long id,
+                           @Param("aiQueryEnabled") boolean aiQueryEnabled);
+
+    /**
      * 根据模板 ID 查询字段。
      */
     List<ReportTemplateField> findFieldsByTemplateId(@Param("templateId") Long templateId);
@@ -122,7 +128,8 @@ public interface TemplateMapper {
                     @Param("fieldName") String fieldName,
                     @Param("fieldLabel") String fieldLabel,
                     @Param("fieldType") String fieldType,
-                    @Param("fieldConfig") String fieldConfig);
+                    @Param("fieldConfig") String fieldConfig,
+                    @Param("sensitive") Boolean sensitive);
 
     /**
      * 物理删除字段（仅设计阶段未下发前允许）。

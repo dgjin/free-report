@@ -60,6 +60,7 @@ export interface ReportTemplateField {
   field_config: FieldConfig | string;
   sort_order: number;
   status: FieldStatus;
+  sensitive?: boolean;
 }
 
 export interface ReportTemplate {
@@ -73,6 +74,7 @@ export interface ReportTemplate {
   created_by_name?: string;
   field_count?: number;
   assignment_count?: number;
+  ai_query_enabled?: boolean;
   created_at: string;
   updated_at: string;
   fields?: ReportTemplateField[];

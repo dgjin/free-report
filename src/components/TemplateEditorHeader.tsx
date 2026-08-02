@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Upload, Grid3x3, CheckCircle, ShieldCheck } from './icons';
+import { ArrowLeft, Plus, Upload, Grid3x3, CheckCircle, ShieldCheck, Sparkles } from './icons';
 import { api } from '../services/api';
 import { toast, confirmDialog } from '../utils/toast';
 import { ReportTemplate } from '../types';
@@ -48,6 +48,28 @@ export const TemplateEditorHeader: React.FC<TemplateEditorHeaderProps> = ({
     }
   };
 
+  const [togglingAi, setTogglingAi] = useState(false);
+  const aiEnabled = template.ai_query_enabled !== false;
+
+  const handleToggleAi = async () => {
+    if (togglingAi) return;
+    const nextEnabled = !aiEnabled;
+    const msg = nextEnabled
+      ? '开启后本报表将出现在智能问数白名单中，管理员可用自然语言查询数据。'
+      : '关闭后本报表将从智能问数白名单中移除，不影响其他功能。确认关闭？';
+    if (!(await confirmDialog(msg))) return;
+    setTogglingAi(true);
+    try {
+      const res = await api.setAiQueryEnabled(template.id, nextEnabled);
+      toast(res.message, 'success');
+      onChanged();
+    } catch (err: any) {
+      toast(err.message || '操作失败', 'error');
+    } finally {
+      setTogglingAi(false);
+    }
+  };
+
   return (
     <>
       {/* Top Header */}
@@ -71,6 +93,19 @@ export const TemplateEditorHeader: React.FC<TemplateEditorHeaderProps> = ({
               <span className="px-2.5 py-0.5 bg-line text-ink text-[11px] font-semibold rounded-full">
                 {template.period_type}
               </span>
+              <button
+                onClick={canWrite ? handleToggleAi : undefined}
+                disabled={togglingAi || !canWrite}
+                title={aiEnabled ? '智能问数已开启，点击关闭' : '智能问数已关闭，点击开启'}
+                className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-full flex items-center gap-1 transition-colors ${
+                  aiEnabled
+                    ? 'text-[#1a5a85] bg-[#E8F4FD]'
+                    : 'text-mute bg-line'
+                } ${canWrite ? 'hover:opacity-80 cursor-pointer' : 'cursor-default'}`}
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>{aiEnabled ? '智能问数 · 开' : '智能问数 · 关'}</span>
+              </button>
             </div>
             <p className="text-xs text-mute">{template.description || '暂无说明'}</p>
           </div>

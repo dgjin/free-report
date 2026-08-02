@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   WarningCircle, ArrowLeft, ArrowRight, Prohibit, ChartBar, BookOpen, Buildings, Calculator, CalendarBlank,
-  CheckCircle, CheckSquare, CaretDown, Clock, Copy, Download, PencilSimple, Eye, Files, FileArrowDown,
+  CheckCircle, CheckSquare, CaretDown, Clock, Copy, Download, PencilSimple, Eye, EyeSlash, Files, FileArrowDown,
   Table, FileText, GridFour, Hash, Question, ClockCounterClockwise, Tray, Stack, SquaresFour, ListBullets,
   ListPlus, Lock, SignOut, List, ChatCircle, Plus, Power, ArrowsClockwise, ArrowCounterClockwise, FloppyDisk,
   MagnifyingGlass, PaperPlaneRight, Shield, ShieldCheck, SlidersHorizontal, Trash, TrendUp, TextT, Upload,
@@ -50,6 +50,7 @@ export { DownloadIcon as Download };
 export const Edit = bold(PencilSimple);
 export const EyeIcon = bold(Eye);
 export { EyeIcon as Eye };
+export const EyeOff = bold(EyeSlash);
 export const FileCheck2 = bold(Files);
 export const FileDown = bold(FileArrowDown);
 export const FileSpreadsheet = bold(Table);

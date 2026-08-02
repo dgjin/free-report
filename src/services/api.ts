@@ -201,6 +201,16 @@ export const api = {
     });
   },
 
+  async setAiQueryEnabled(
+    templateId: number,
+    enabled: boolean,
+  ): Promise<{ message: string; ai_query_enabled: boolean }> {
+    return request(`/api/templates/${templateId}/ai-query`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  },
+
   async addField(templateId: number, field: Partial<ReportTemplateField>): Promise<ReportTemplateField> {
     return request<ReportTemplateField>(`/api/templates/${templateId}/fields`, {
       method: 'POST',
@@ -230,6 +240,18 @@ export const api = {
   async deleteField(templateId: number, fieldId: number): Promise<{ message: string; field: ReportTemplateField }> {
     return request(`/api/templates/${templateId}/fields/${fieldId}`, {
       method: 'DELETE',
+    });
+  },
+
+  /** 设置字段敏感标记：敏感字段不会暴露给智能问数上下文 */
+  async setFieldSensitive(
+    templateId: number,
+    fieldId: number,
+    sensitive: boolean,
+  ): Promise<{ message: string; field_id: number; sensitive: boolean }> {
+    return request(`/api/templates/${templateId}/fields/${fieldId}/sensitive`, {
+      method: 'PUT',
+      body: JSON.stringify({ sensitive }),
     });
   },
 

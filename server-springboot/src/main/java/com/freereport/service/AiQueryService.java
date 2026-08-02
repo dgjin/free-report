@@ -25,6 +25,14 @@ import java.util.stream.Collectors;
 @Service
 public class AiQueryService {
 
+    /** 用户问题最大长度，超出截断 */
+    private static final int MAX_QUESTION_LENGTH = 500;
+    /** 历史消息内容最大长度 */
+    private static final int MAX_HISTORY_CONTENT_LENGTH = 300;
+    /** 协议级注入标记正则：匹配 system:、<|...|>、[INST]、<<SYS>> 等 */
+    private static final java.util.regex.Pattern PROTOCOL_INJECTION =
+            java.util.regex.Pattern.compile("(?i)system\\s*:|<\\|[^|]*\\|>|\\[INST\\]|<<SYS>>|\\[/INST\\]|<</SYS>>");
+
     private final AiClient aiClient;
     private final AggregationService aggregationService;
     private final AiQueryContextBuilder contextBuilder;
@@ -54,15 +62,36 @@ public class AiQueryService {
      */
     public void queryStream(String question, List<Map<String, String>> history, AuthUser user,
                             Consumer<SseEvent> onEvent) {
-        auditor.executeStream(user, question, onResult -> {
-            doQueryStream(question, history, user, onEvent, onResult);
+        AiAuditContext[] auditCtxRef = new AiAuditContext[1];
+        auditor.executeStream(user, question, auditCtxRef, onResult -> {
+            doQueryStream(question, history, user, onEvent, onResult, auditCtxRef);
         });
     }
 
     private void doQueryStream(String question, List<Map<String, String>> history, AuthUser user,
-                               Consumer<SseEvent> onEvent, Consumer<Map<String, Object>> onResult) {
+                               Consumer<SseEvent> onEvent, Consumer<Map<String, Object>> onResult,
+                               AiAuditContext[] auditCtxRef) {
+        // 输入净化：防止 prompt injection
+        String safeQuestion = sanitizeQuestion(question);
+        if (safeQuestion == null) {
+            Map<String, Object> rejected = textOnly("您的问题包含不支持的指令，请重新描述您的数据需求。", List.of());
+            onEvent.accept(SseEvent.json("text_only", rejected));
+            onEvent.accept(SseEvent.data("done", ""));
+            onResult.accept(rejected);
+            return;
+        }
+
+        // 防御性权限检查（Controller 层已拦截，此处为 defense-in-depth）
+        Map<String, Object> permDenied = checkQueryPermission(user);
+        if (permDenied != null) {
+            onEvent.accept(SseEvent.json("text_only", permDenied));
+            onEvent.accept(SseEvent.data("done", ""));
+            onResult.accept(permDenied);
+            return;
+        }
+
         // 运营统计类问题：规则识别直接作答，不消耗 LLM 调用
-        Map<String, Object> operationAnswer = operationAnalyzer.answerIfMatched(question, user);
+        Map<String, Object> operationAnswer = operationAnalyzer.answerIfMatched(safeQuestion, user);
         if (operationAnswer != null) {
             onEvent.accept(SseEvent.json("text_only", operationAnswer));
             onEvent.accept(SseEvent.data("done", ""));
@@ -91,8 +120,8 @@ public class AiQueryService {
             return;
         }
 
-        // LLM Call #1: 生成查询计划
-        String planJson = aiClient.chat(planResolver.buildPlanMessages(question, history, contexts), true);
+        // LLM Call #1: 生成查询计划（对话历史经过净化，仅保留用户消息）
+        String planJson = aiClient.chat(planResolver.buildPlanMessages(safeQuestion, sanitizeHistory(history), contexts), true);
         AiPlanResolver.PlanResult planResult = planResolver.resolve(planJson, contexts);
         if (planResult.isText()) {
             Map<String, Object> textResult = textOnly(planResult.textAnswer(), contexts);
@@ -129,8 +158,8 @@ public class AiQueryService {
 
         onEvent.accept(SseEvent.data("status", "正在生成结论..."));
 
-        // LLM Call #2: 流式总结
-        String answer = resultBuilder.summarizeStream(question, plan, table, companyFilter,
+        // LLM Call #2: 流式总结（使用净化后的问题）
+        String answer = resultBuilder.summarizeStream(safeQuestion, plan, table, companyFilter,
                 chunk -> onEvent.accept(SseEvent.data("answer_delta", chunk)));
 
         String scope = scopeNote(plan, companyFilter);
@@ -145,6 +174,8 @@ public class AiQueryService {
         result.put("table", table);
         result.put("scope_note", scope);
         onResult.accept(result);
+        // 填充审计上下文：暴露的模板/指标、选中的模板
+        auditCtxRef[0] = buildAuditContext(contexts, plan);
     }
 
     /** SSE 事件封装：type + data，支持 JSON 对象和纯文本两种 payload */
@@ -174,13 +205,28 @@ public class AiQueryService {
      * @param history  最近若干轮对话 [{role: user|assistant, content: ...}]
      */
     public Map<String, Object> query(String question, List<Map<String, String>> history, AuthUser user) {
-        return auditor.execute(user, question, () -> doQuery(question, history, user));
+        AiAuditContext[] auditCtxRef = new AiAuditContext[1];
+        Map<String, Object> result = auditor.execute(user, question, auditCtxRef, () -> doQuery(question, history, user, auditCtxRef));
+        return result;
     }
 
-    private Map<String, Object> doQuery(String question, List<Map<String, String>> history, AuthUser user) {
+    private Map<String, Object> doQuery(String question, List<Map<String, String>> history, AuthUser user,
+                                         AiAuditContext[] auditCtxRef) {
+        // 输入净化：防止 prompt injection
+        String safeQuestion = sanitizeQuestion(question);
+        if (safeQuestion == null) {
+            return textOnly("您的问题包含不支持的指令，请重新描述您的数据需求。", List.of());
+        }
+
+        // 防御性权限检查（Controller 层已拦截，此处为 defense-in-depth）
+        Map<String, Object> permDenied = checkQueryPermission(user);
+        if (permDenied != null) {
+            return permDenied;
+        }
+
         // 运营统计类问题（各部门下发情况 / 各机构填报情况）：固定口径规则识别直接作答，
         // 不消耗 LLM 调用，AI 服务不可用时也可用；数据范围仍按用户权限过滤
-        Map<String, Object> operationAnswer = operationAnalyzer.answerIfMatched(question, user);
+        Map<String, Object> operationAnswer = operationAnalyzer.answerIfMatched(safeQuestion, user);
         if (operationAnswer != null) {
             return operationAnswer;
         }
@@ -197,7 +243,7 @@ public class AiQueryService {
             return textOnly("当前没有可供问数的报表。请先创建并发布模板、下发任务并完成填报后再来提问。", contexts);
         }
 
-        String planJson = aiClient.chat(planResolver.buildPlanMessages(question, history, contexts), true);
+        String planJson = aiClient.chat(planResolver.buildPlanMessages(safeQuestion, sanitizeHistory(history), contexts), true);
         AiPlanResolver.PlanResult planResult = planResolver.resolve(planJson, contexts);
         if (planResult.isText()) {
             return textOnly(planResult.textAnswer(), contexts);
@@ -220,11 +266,13 @@ public class AiQueryService {
         Map<String, Object> chart = resultBuilder.buildChart(periodDataList, plan, companyFilter);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("answer", resultBuilder.summarize(question, plan, table, companyFilter));
+        result.put("answer", resultBuilder.summarize(safeQuestion, plan, table, companyFilter));
         result.put("plan", planResolver.toResponseMap(plan, companyFilter));
         result.put("chart", chart);
         result.put("table", table);
         result.put("scope_note", scopeNote(plan, companyFilter));
+        // 填充审计上下文
+        auditCtxRef[0] = buildAuditContext(contexts, plan);
         return result;
     }
 
@@ -244,6 +292,65 @@ public class AiQueryService {
         }
         scopeNote.append(" ｜ 仅统计已提交并通过接收的数据");
         return scopeNote.toString();
+    }
+
+    // ---- 审计上下文 ----
+
+    /** 构建审计上下文：记录本次请求暴露给 LLM 的模板/指标范围 */
+    private AiAuditContext buildAuditContext(List<AiTemplateContext> contexts, AiResolvedPlan plan) {
+        List<Long> exposedIds = contexts.stream()
+                .map(c -> c.template().getId())
+                .collect(Collectors.toList());
+        int metricCount = contexts.stream()
+                .mapToInt(c -> c.metrics().size())
+                .sum();
+        Long selectedId = plan != null ? plan.ctx().template().getId() : null;
+        return new AiAuditContext(exposedIds, metricCount, selectedId);
+    }
+
+    // ---- 输入净化与权限防御 ----
+
+    /** 净化用户输入：长度截断 + 协议级注入标记过滤，过滤量超过 70% 则拒绝 */
+    private String sanitizeQuestion(String question) {
+        if (question == null || question.isBlank()) return null;
+        String cleaned = question.trim();
+        if (cleaned.length() > MAX_QUESTION_LENGTH) {
+            cleaned = cleaned.substring(0, MAX_QUESTION_LENGTH);
+        }
+        cleaned = PROTOCOL_INJECTION.matcher(cleaned).replaceAll("[已过滤]");
+        if (cleaned.isEmpty() || cleaned.length() < question.trim().length() * 0.3) {
+            return null;
+        }
+        return cleaned;
+    }
+
+    /**
+     * 净化对话历史：仅保留 user 消息（丢弃 assistant 消息，避免上一轮的实际数据泄露给 LLM），
+     * 并对内容做长度截断与协议标记过滤。
+     */
+    private List<Map<String, String>> sanitizeHistory(List<Map<String, String>> history) {
+        if (history == null || history.isEmpty()) return List.of();
+        return history.stream()
+                .filter(h -> "user".equals(h.get("role")))
+                .filter(h -> h.get("content") != null && !h.get("content").isBlank())
+                .map(h -> {
+                    String content = h.get("content");
+                    if (content.length() > MAX_HISTORY_CONTENT_LENGTH) {
+                        content = content.substring(0, MAX_HISTORY_CONTENT_LENGTH);
+                    }
+                    content = PROTOCOL_INJECTION.matcher(content).replaceAll("[已过滤]");
+                    return Map.of("role", "user", "content", content);
+                })
+                .collect(Collectors.toList());
+    }
+
+    /** 防御性权限检查：仅 super_admin / digital_admin / department_report_admin 可使用智能问数 */
+    private Map<String, Object> checkQueryPermission(AuthUser user) {
+        String role = user.getRole();
+        if (!"super_admin".equals(role) && !"digital_admin".equals(role) && !"department_report_admin".equals(role)) {
+            return textOnly("智能问数功能仅向报表管理员开放。如需查询数据，请使用汇总报表页面。", List.of());
+        }
+        return null;
     }
 
     private Map<String, Object> textOnly(String answer, List<AiTemplateContext> contexts) {

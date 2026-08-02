@@ -80,6 +80,14 @@ public class TemplateController {
         return templateService.setTemplateEnabled(user, id, true);
     }
 
+    @PutMapping("/{id}/ai-query")
+    public Map<String, Object> setAiQueryEnabled(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        securityUtils.requireDepartmentReportAdmin();
+        AuthUser user = securityUtils.getCurrentUser();
+        boolean enabled = Boolean.TRUE.equals(body.get("enabled"));
+        return templateService.setAiQueryEnabled(user, id, enabled);
+    }
+
     @PostMapping("/{id}/fields")
     public Map<String, Object> addTemplateField(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         securityUtils.requireDepartmentReportAdmin();
@@ -113,6 +121,15 @@ public class TemplateController {
         securityUtils.requireDepartmentReportAdmin();
         AuthUser user = securityUtils.getCurrentUser();
         return templateService.deleteTemplateField(user, id, fieldId);
+    }
+
+    @PutMapping("/{id}/fields/{fieldId}/sensitive")
+    public Map<String, Object> setFieldSensitive(@PathVariable Long id, @PathVariable Long fieldId,
+                                                  @RequestBody Map<String, Object> body) {
+        securityUtils.requireDepartmentReportAdmin();
+        AuthUser user = securityUtils.getCurrentUser();
+        boolean sensitive = Boolean.TRUE.equals(body.get("sensitive"));
+        return templateService.setFieldSensitive(user, id, fieldId, sensitive);
     }
 
     @PostMapping("/{id}/matrix-fields")

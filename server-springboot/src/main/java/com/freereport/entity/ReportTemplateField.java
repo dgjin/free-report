@@ -13,4 +13,6 @@ public class ReportTemplateField {
     private String fieldConfig; // JSON string
     private Integer sortOrder;
     private String status; // active, inactive
+    /** 是否敏感字段（默认 false） */
+    private Boolean sensitive = false;
 }

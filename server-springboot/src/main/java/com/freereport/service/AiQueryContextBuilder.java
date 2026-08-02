@@ -5,6 +5,8 @@ import com.freereport.entity.ReportTemplateField;
 import com.freereport.mapper.AssignmentMapper;
 import com.freereport.mapper.TemplateMapper;
 import com.freereport.security.AuthUser;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -12,7 +14,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -32,17 +34,39 @@ public class AiQueryContextBuilder {
     private final TemplateMapper templateMapper;
     private final AssignmentMapper assignmentMapper;
 
+    /** 用户上下文缓存：key = userId，5 分钟过期，避免每次问数都重建白名单 */
+    private final Cache<Long, List<AiTemplateContext>> contextCache = Caffeine.newBuilder()
+            .maximumSize(50)
+            .expireAfterWrite(5, TimeUnit.MINUTES)
+            .build();
+
     public AiQueryContextBuilder(TemplateMapper templateMapper, AssignmentMapper assignmentMapper) {
         this.templateMapper = templateMapper;
         this.assignmentMapper = assignmentMapper;
     }
 
-    /** 当前用户可问数的报表清单（模板 + 数值指标 + 已有周期） */
+    /** 当前用户可问数的报表清单（模板 + 数值指标 + 已有周期），优先从缓存读取 */
     public List<AiTemplateContext> buildContexts(AuthUser user) {
+        List<AiTemplateContext> cached = contextCache.getIfPresent(user.getId());
+        if (cached != null) {
+            return cached;
+        }
+        List<AiTemplateContext> contexts = doBuildContexts(user);
+        contextCache.put(user.getId(), contexts);
+        return contexts;
+    }
+
+    /** 模板/字段变更时主动失效缓存 */
+    public void invalidateAll() {
+        contextCache.invalidateAll();
+    }
+
+    private List<AiTemplateContext> doBuildContexts(AuthUser user) {
         List<ReportTemplate> templates = templateMapper.findForUser(
                 user.getCompanyId(), user.getRole(), user.getCompanyLevel());
         List<ReportTemplate> usable = templates.stream()
                 .filter(t -> "published".equals(t.getStatus()))
+                .filter(t -> !Boolean.FALSE.equals(t.getAiQueryEnabled()))
                 .limit(MAX_TEMPLATES_IN_PROMPT)
                 .collect(Collectors.toList());
         if (usable.isEmpty()) {
@@ -69,10 +93,12 @@ public class AiQueryContextBuilder {
             List<AiMetric> metrics = new ArrayList<>();
             fields.stream()
                     .filter(f -> "summary".equals(f.getDataType()) && "number".equals(f.getFieldType()))
+                    .filter(f -> !Boolean.TRUE.equals(f.getSensitive()))
                     .forEach(f -> metrics.add(new AiMetric(f.getFieldName(), f.getFieldLabel(), AiMetric.Source.SUMMARY)));
             List<ReportTemplateField> detailNumbers = fields.stream()
                     .filter(f -> ("detail".equals(f.getDataType()) || "matrix".equals(f.getDataType()))
                             && "number".equals(f.getFieldType()))
+                    .filter(f -> !Boolean.TRUE.equals(f.getSensitive()))
                     .collect(Collectors.toList());
             boolean hasDetailArea = fields.stream()
                     .anyMatch(f -> "detail".equals(f.getDataType()) || "matrix".equals(f.getDataType()));
@@ -87,11 +113,7 @@ public class AiQueryContextBuilder {
                     .filter(f -> ("detail".equals(f.getDataType()) || "matrix".equals(f.getDataType()))
                             && !"number".equals(f.getFieldType())
                             && "active".equals(f.getStatus()))
-                    .collect(Collectors.toList());
-            Set<String> metricFieldNames = metrics.stream()
-                    .map(AiMetric::fieldName).collect(Collectors.toSet());
-            List<ReportTemplateField> others = fields.stream()
-                    .filter(f -> !metricFieldNames.contains(f.getFieldName()))
+                    .filter(f -> !Boolean.TRUE.equals(f.getSensitive()))
                     .collect(Collectors.toList());
             List<String> periods = periodsByTemplate.getOrDefault(t.getId(), List.of()).stream()
                     .filter(p -> p != null && !p.isBlank())
@@ -99,7 +121,7 @@ public class AiQueryContextBuilder {
                     .sorted(Comparator.reverseOrder())
                     .limit(MAX_PERIODS_IN_PROMPT)
                     .collect(Collectors.toList());
-            contexts.add(new AiTemplateContext(t, metrics, groupableFields, others, periods));
+            contexts.add(new AiTemplateContext(t, metrics, groupableFields, periods));
         }
         return contexts;
     }

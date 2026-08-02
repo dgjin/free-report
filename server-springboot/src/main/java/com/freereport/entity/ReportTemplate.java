@@ -14,4 +14,6 @@ public class ReportTemplate {
     private Long ownerDepartmentId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    /** 是否在智能问数中可用（默认 true） */
+    private Boolean aiQueryEnabled = true;
 }

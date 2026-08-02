@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X } from './icons';
+import { X, EyeOff } from './icons';
 import { api } from '../services/api';
 import { toast } from '../utils/toast';
 import { FieldType } from '../types';
@@ -24,6 +24,7 @@ export const AddFieldModal: React.FC<AddFieldModalProps> = ({
   const [fieldLabel, setFieldLabel] = useState('');
   const [fieldType, setFieldType] = useState<FieldType>('text');
   const [required, setRequired] = useState(true);
+  const [sensitive, setSensitive] = useState(false);
   const [optionsStr, setOptionsStr] = useState('');
   const [minStr, setMinStr] = useState('');
   const [maxStr, setMaxStr] = useState('');
@@ -74,6 +75,7 @@ export const AddFieldModal: React.FC<AddFieldModalProps> = ({
         data_type: DEFAULT_FIELD_DATA_TYPE,
         field_config: { required, options, min, max },
         sort_order: existingFieldNames.length + 1,
+        sensitive,
       });
 
       onClose();
@@ -196,17 +198,34 @@ export const AddFieldModal: React.FC<AddFieldModalProps> = ({
             </div>
           )}
 
-          <div className="flex items-center space-x-2 pt-1">
-            <input
-              type="checkbox"
-              id="req_check"
-              checked={required}
-              onChange={(e) => setRequired(e.target.checked)}
-              className="w-4 h-4 accent-ink rounded"
-            />
-            <label htmlFor="req_check" className="text-xs font-semibold text-ink">
-              设定为必填字段
-            </label>
+          <div className="space-y-2.5 pt-1">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="req_check"
+                checked={required}
+                onChange={(e) => setRequired(e.target.checked)}
+                className="w-4 h-4 accent-ink rounded"
+              />
+              <label htmlFor="req_check" className="text-xs font-semibold text-ink">
+                设定为必填字段
+              </label>
+            </div>
+            <div className="flex items-start space-x-2">
+              <input
+                type="checkbox"
+                id="sensitive_check"
+                checked={sensitive}
+                onChange={(e) => setSensitive(e.target.checked)}
+                className="w-4 h-4 accent-[#9F2F2D] rounded mt-[2px]"
+              />
+              <label htmlFor="sensitive_check" className="text-xs text-ink cursor-pointer">
+                <span className="font-semibold">标记为敏感字段</span>
+                <span className="block text-[10px] text-mute font-normal mt-0.5 leading-relaxed">
+                  敏感字段不会暴露给智能问数，适用于包含个人隐私、商业秘密等不宜公开查询的数据
+                </span>
+              </label>
+            </div>
           </div>
 
           <div
