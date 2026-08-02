@@ -55,6 +55,8 @@ ai:
   reasoning-effort: ${AI_REASONING_EFFORT:}
 
 logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{36} - %msg%n"
   level:
     com.freereport: info
     org.mybatis: warn

@@ -1,5 +1,6 @@
 package com.freereport.exception;
 
+import org.slf4j.MDC;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -56,11 +57,14 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "缺少必填参数: " + e.getParameterName()));
     }
 
-    /** 兜底：未预期的系统异常 → 500，记录完整堆栈便于排查 */
+    /** 兆底：未预期的系统异常 → 500，记录完整堆栈 + traceId 便于排查 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleException(Exception e) {
         log.error("未处理异常", e);
-        return ResponseEntity.status(500)
-                .body(Map.of("error", "服务器内部错误，请稍后重试"));
+        Map<String, String> body = new java.util.LinkedHashMap<>();
+        body.put("error", "服务器内部错误，请稍后重试");
+        String traceId = MDC.get("traceId");
+        if (traceId != null) body.put("trace_id", traceId);
+        return ResponseEntity.status(500).body(body);
     }
 }

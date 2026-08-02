@@ -17,8 +17,8 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedOrigins(allowedOrigins.split(","))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                // 暴露滑动过期续签头，跨域场景下前端 fetch 才能读取
-                .exposedHeaders("X-Refreshed-Token")
+                // 暴露滑动过期续签头 + 请求追踪头，跨域场景下前端 fetch 才能读取
+                .exposedHeaders("X-Refreshed-Token", "X-Trace-Id")
                 .allowCredentials(true)
                 .maxAge(3600);
     }

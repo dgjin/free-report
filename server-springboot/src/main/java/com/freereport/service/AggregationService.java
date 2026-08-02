@@ -1,5 +1,7 @@
 package com.freereport.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.freereport.entity.Company;
 import com.freereport.entity.ReportAggregation;
@@ -27,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -48,6 +51,16 @@ import java.util.stream.Collectors;
  */
 @Service
 public class AggregationService {
+
+    /**
+     * 汇总查询本地缓存：5 分钟 TTL，最多 200 个缓存条目。
+     * key = "templateId:period1,period2,..."（周期排序后拼接，保证相同查询命中同一缓存）
+     * 数据变更时通过 invalidateAggregationCache 主动失效。
+     */
+    private final Cache<String, Map<String, Map<String, Object>>> aggregationCache = Caffeine.newBuilder()
+            .maximumSize(200)
+            .expireAfterWrite(5, TimeUnit.MINUTES)
+            .build();
 
     private final AggregationMapper aggregationMapper;
     private final TemplateMapper templateMapper;
@@ -93,6 +106,7 @@ public class AggregationService {
      */
     public Map<String, Map<String, Object>> getAggregationsByTemplateAndPeriods(
             Long templateId, List<String> periodLabels, AuthUser user) {
+        // 权限校验在缓存之前，确保无权用户始终被拦截
         ReportTemplate t = templateMapper.findById(templateId);
         if (t == null) {
             throw new DomainException("模板不存在", 404);
@@ -100,14 +114,32 @@ public class AggregationService {
         if (!securityUtils.canReadTemplate(t.getOwnerDepartmentId())) {
             throw new DomainException("无权查看该模板", 403);
         }
-    
-        // 周期去重且保序，避免重复周期重复取数
+
+        // 周期去重且保序
         List<String> periods = new ArrayList<>(new LinkedHashSet<>(periodLabels));
-        Map<String, Map<String, Object>> resultByPeriod = new LinkedHashMap<>();
         if (periods.isEmpty()) {
-            return resultByPeriod;
+            return new LinkedHashMap<>();
         }
-    
+
+        // 缓存 key：模板ID + 排序后的周期列表（不同顺序的相同周期集合命中同一缓存）
+        String cacheKey = templateId + ":" + periods.stream().sorted().collect(Collectors.joining(","));
+        Map<String, Map<String, Object>> cached = aggregationCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        Map<String, Map<String, Object>> result = computeAggregations(t, templateId, periods);
+        aggregationCache.put(cacheKey, result);
+        return result;
+    }
+
+    /**
+     * 实际计算汇总数据（抽取自 getAggregationsByTemplateAndPeriods，便于缓存包裹）。
+     */
+    private Map<String, Map<String, Object>> computeAggregations(
+            ReportTemplate t, Long templateId, List<String> periods) {
+
+        Map<String, Map<String, Object>> resultByPeriod = new LinkedHashMap<>();
         List<ReportAssignment> allAssignments = assignmentMapper.findByTemplateAndPeriods(templateId, periods);
         Map<String, List<ReportAssignment>> assignmentsByPeriod = allAssignments.stream()
                 .collect(Collectors.groupingBy(ReportAssignment::getPeriodLabel, LinkedHashMap::new, Collectors.toList()));
@@ -190,6 +222,15 @@ public class AggregationService {
                     sqlTotalsByPeriod.getOrDefault(period, Collections.emptyMap())));
         }
         return resultByPeriod;
+    }
+
+    /**
+     * 失效汇总缓存（数据变更时调用）。
+     */
+    public void invalidateAggregationCache(Long templateId) {
+        if (templateId != null) {
+            aggregationCache.asMap().keySet().removeIf(key -> key.startsWith(templateId + ":"));
+        }
     }
     
     /**
@@ -361,6 +402,8 @@ public class AggregationService {
 
         aggregationMapper.insertAggregation(t.getId(), assignmentId, toJson(data), 1, submittedCount);
         assignmentMapper.updateStatus(assignmentId, "aggregated");
+        // 数据变更，主动失效该模板的汇总缓存
+        invalidateAggregationCache(t.getId());
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "汇总完成");
