@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 数据导入控制器。
+ * 提供报表数据初始化导入接口，支持存档导入和预填充两种模式。
+ * 仅限部门报表管理员访问。
+ */
 @RestController
 @RequestMapping("/api/templates")
 public class DataImportController {

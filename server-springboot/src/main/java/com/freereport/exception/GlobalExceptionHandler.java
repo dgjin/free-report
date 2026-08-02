@@ -12,6 +12,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * 全局异常处理器。
+ * 统一拦截 Controller 层抛出的异常，转换为规范的 JSON 错误响应。
+ * 确保所有异常都有明确的错误消息和适当的 HTTP 状态码。
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -57,7 +62,7 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "缺少必填参数: " + e.getParameterName()));
     }
 
-    /** 兆底：未预期的系统异常 → 500，记录完整堆栈 + traceId 便于排查 */
+    /** 兆底处理：未预期的系统异常 → 500，记录完整堆栈 + traceId 便于排查 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleException(Exception e) {
         log.error("未处理异常", e);
