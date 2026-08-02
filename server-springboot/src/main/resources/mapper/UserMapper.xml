@@ -18,6 +18,11 @@
         SELECT * FROM users ORDER BY id
     </select>
 
+    <!-- 查询指定机构下的用户 -->
+    <select id="findByCompanyId" resultType="com.freereport.entity.User">
+        SELECT * FROM users WHERE company_id = #{companyId} ORDER BY id
+    </select>
+
     <!-- 根据 ID 列表批量查询用户 -->
     <select id="findByIds" resultType="com.freereport.entity.User">
         <choose>
@@ -49,6 +54,23 @@
         SET company_id = #{companyId},
             role = #{role}
         WHERE id = #{id}
+    </update>
+
+    <!-- 创建用户 -->
+    <insert id="createUser" parameterType="map"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (username, password_hash, display_name, company_id, role)
+        VALUES (#{username}, #{passwordHash}, #{displayName}, #{companyId}, #{role})
+    </insert>
+
+    <!-- 重置密码 -->
+    <update id="updatePassword">
+        UPDATE users SET password_hash = #{passwordHash} WHERE id = #{id}
+    </update>
+
+    <!-- 更新用户状态 -->
+    <update id="updateStatus">
+        UPDATE users SET status = #{status} WHERE id = #{id}
     </update>
 
 </mapper>

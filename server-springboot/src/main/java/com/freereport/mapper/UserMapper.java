@@ -29,6 +29,11 @@ public interface UserMapper {
     List<User> findAll();
 
     /**
+     * 查询指定机构下的用户。
+     */
+    List<User> findByCompanyId(@Param("companyId") Long companyId);
+
+    /**
      * 根据 ID 列表批量查询用户。
      */
     List<User> findByIds(@Param("ids") List<Long> ids);
@@ -49,4 +54,23 @@ public interface UserMapper {
     void updateUserOrganizationRole(@Param("id") Long id,
                                     @Param("companyId") Long companyId,
                                     @Param("role") String role);
+
+    /**
+     * 创建用户。
+     */
+    void createUser(@Param("username") String username,
+                     @Param("passwordHash") String passwordHash,
+                     @Param("displayName") String displayName,
+                     @Param("companyId") Long companyId,
+                     @Param("role") String role);
+
+    /**
+     * 重置密码。
+     */
+    void updatePassword(@Param("id") Long id, @Param("passwordHash") String passwordHash);
+
+    /**
+     * 更新用户状态。
+     */
+    void updateStatus(@Param("id") Long id, @Param("status") String status);
 }

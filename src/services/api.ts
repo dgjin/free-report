@@ -2,6 +2,8 @@ import useSWR from 'swr';
 import {
   UserInfo,
   Company,
+  CompanyTreeNode,
+  User,
   ReportTemplate,
   ReportTemplateField,
   ReportAssignment,
@@ -108,8 +110,8 @@ export const api = {
   },
 
   // Companies
-  async getCompanies(): Promise<Company> {
-    return request<Company>('/api/companies');
+  async getCompanyTree(): Promise<CompanyTreeNode> {
+    return request<CompanyTreeNode>('/api/companies');
   },
 
   async getBranches(): Promise<Company[]> {
@@ -120,10 +122,24 @@ export const api = {
   async createCompany(data: Partial<Company>): Promise<Company> {
     return request('/api/companies', { method: 'POST', body: JSON.stringify(data) });
   },
+  async updateCompany(id: number, data: Partial<Company>): Promise<Company> {
+    return request(`/api/companies/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
   async disableCompany(id: number): Promise<Company> { return request(`/api/companies/${id}/disable`, { method: 'PUT' }); },
-  async getUsers(): Promise<any[]> { return request('/api/users'); },
-  async updateUserOrganizationRole(id: number, company_id: number, role: string): Promise<any> {
+  async enableCompany(id: number): Promise<Company> { return request(`/api/companies/${id}/enable`, { method: 'PUT' }); },
+  async getUsers(): Promise<User[]> { return request('/api/users'); },
+  async getUsersByCompany(companyId: number): Promise<User[]> { return request(`/api/users/by-company/${companyId}`); },
+  async createUser(data: { username: string; display_name: string; company_id: number; role: string }): Promise<User> {
+    return request('/api/users', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateUserOrganizationRole(id: number, company_id: number, role: string): Promise<User> {
     return request(`/api/users/${id}/organization-role`, { method: 'PUT', body: JSON.stringify({ company_id, role }) });
+  },
+  async resetPassword(id: number): Promise<{ message: string }> {
+    return request(`/api/users/${id}/password`, { method: 'PUT' });
+  },
+  async toggleUserStatus(id: number, status: string): Promise<User> {
+    return request(`/api/users/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
   },
   async getPendingReceipts(): Promise<PendingReceipt[]> { return request('/api/receipts/pending'); },
 

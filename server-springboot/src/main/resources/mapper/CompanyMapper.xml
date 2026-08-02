@@ -47,12 +47,38 @@
         ORDER BY level, name
     </select>
 
+    <!-- 查询指定父机构下的子机构 -->
+    <select id="findChildren" resultType="com.freereport.entity.Company">
+        SELECT * FROM companies WHERE parent_id = #{parentId} ORDER BY level, name
+    </select>
+
     <!-- 创建机构（返回包含生成的 ID） -->
     <insert id="createCompany" parameterType="map"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO companies (name, code, parent_id, level)
         VALUES (#{name}, #{code}, #{parentId}, #{level})
     </insert>
+
+    <!-- 编辑机构基本信息 -->
+    <update id="updateCompany">
+        UPDATE companies
+        SET name = #{name},
+            code = #{code},
+            address = #{address},
+            contact = #{contact},
+            phone = #{phone}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据 code 查询机构（排除指定 id，用于唯一性校验） -->
+    <select id="findByCodeExcludeId" resultType="com.freereport.entity.Company">
+        SELECT * FROM companies WHERE code = #{code} AND id &lt;&gt; #{excludeId}
+    </select>
+
+    <!-- 启用机构 -->
+    <update id="enableCompany">
+        UPDATE companies SET status = 'active' WHERE id = #{id} AND level &lt;&gt; 'headquarter'
+    </update>
 
     <!-- 查询该机构未完成任务数（用于停用前检查） -->
     <select id="countActiveAssignments" resultType="int">
@@ -68,5 +94,10 @@
         WHERE id = #{id}
           AND level &lt;&gt; 'headquarter'
     </update>
+
+    <!-- 查询指定机构下的用户数 -->
+    <select id="countUsersByCompanyId" resultType="int">
+        SELECT COUNT(*) FROM users WHERE company_id = #{companyId} AND status = 'active'
+    </select>
 
 </mapper>

@@ -91,6 +91,22 @@ export interface Company {
   children?: Company[];
 }
 
+export interface CompanyTreeNode extends Company {
+  children?: CompanyTreeNode[];
+}
+
+export interface User {
+  id: number;
+  username: string;
+  display_name: string;
+  company_id: number;
+  company_name?: string;
+  company_level?: CompanyLevel;
+  role: Role;
+  status: string;
+  created_at: string;
+}
+
 export type AssignmentStatus =
   | 'pending'
   | 'filling'

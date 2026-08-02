@@ -43,12 +43,37 @@ public interface CompanyMapper {
     List<Company> findAssignmentTargets(@Param("excludeId") Long excludeId);
 
     /**
+     * 查询指定父机构下的子机构。
+     */
+    List<Company> findChildren(@Param("parentId") Long parentId);
+
+    /**
      * 创建机构，返回受影响行数（生成的主键通过 useGeneratedKeys 回填到参数 map，但 @Param 场景下无法取回，需重新查询）。
      */
     int createCompany(@Param("name") String name,
                       @Param("code") String code,
                       @Param("parentId") Long parentId,
                       @Param("level") String level);
+
+    /**
+     * 编辑机构基本信息。
+     */
+    int updateCompany(@Param("id") Long id,
+                      @Param("name") String name,
+                      @Param("code") String code,
+                      @Param("address") String address,
+                      @Param("contact") String contact,
+                      @Param("phone") String phone);
+
+    /**
+     * 根据 code 查询机构（排除指定 id，用于唯一性校验）。
+     */
+    Company findByCodeExcludeId(@Param("code") String code, @Param("excludeId") Long excludeId);
+
+    /**
+     * 启用机构。
+     */
+    int enableCompany(@Param("id") Long id);
 
     /**
      * 查询该机构未完成任务数（用于停用前检查）。
@@ -59,4 +84,9 @@ public interface CompanyMapper {
      * 停用机构（总部不可停用）。
      */
     int disableCompany(@Param("id") Long id);
+
+    /**
+     * 查询指定机构下的用户数（用于停用前检查）。
+     */
+    int countUsersByCompanyId(@Param("companyId") Long companyId);
 }
