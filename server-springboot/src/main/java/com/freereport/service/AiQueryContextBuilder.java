@@ -1,5 +1,7 @@
 package com.freereport.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.freereport.entity.ReportTemplate;
 import com.freereport.entity.ReportTemplateField;
 import com.freereport.mapper.AssignmentMapper;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +36,7 @@ public class AiQueryContextBuilder {
 
     private final TemplateMapper templateMapper;
     private final AssignmentMapper assignmentMapper;
+    private final ObjectMapper objectMapper;
 
     /** 用户上下文缓存：key = userId，5 分钟过期，避免每次问数都重建白名单 */
     private final Cache<Long, List<AiTemplateContext>> contextCache = Caffeine.newBuilder()
@@ -40,9 +44,11 @@ public class AiQueryContextBuilder {
             .expireAfterWrite(5, TimeUnit.MINUTES)
             .build();
 
-    public AiQueryContextBuilder(TemplateMapper templateMapper, AssignmentMapper assignmentMapper) {
+    public AiQueryContextBuilder(TemplateMapper templateMapper, AssignmentMapper assignmentMapper,
+                                 ObjectMapper objectMapper) {
         this.templateMapper = templateMapper;
         this.assignmentMapper = assignmentMapper;
+        this.objectMapper = objectMapper;
     }
 
     /** 当前用户可问数的报表清单（模板 + 数值指标 + 已有周期），优先从缓存读取 */
@@ -115,15 +121,76 @@ public class AiQueryContextBuilder {
                             && "active".equals(f.getStatus()))
                     .filter(f -> !Boolean.TRUE.equals(f.getSensitive()))
                     .collect(Collectors.toList());
+            // 交叉表维度：解析 matrix 字段的 field_config，按 row_label 分组提取行列结构
+            List<AiMatrixDimension> matrixDimensions = buildMatrixDimensions(
+                    fields.stream().filter(f -> "matrix".equals(f.getDataType())).collect(Collectors.toList()));
             List<String> periods = periodsByTemplate.getOrDefault(t.getId(), List.of()).stream()
                     .filter(p -> p != null && !p.isBlank())
                     .distinct()
                     .sorted(Comparator.reverseOrder())
                     .limit(MAX_PERIODS_IN_PROMPT)
                     .collect(Collectors.toList());
-            contexts.add(new AiTemplateContext(t, metrics, groupableFields, periods));
+            contexts.add(new AiTemplateContext(t, metrics, groupableFields, periods, matrixDimensions));
         }
         return contexts;
+    }
+
+    /**
+     * 解析交叉表字段的 field_config，按 row_label 分组提取行列结构。
+     * 同一个 row_label 下的多个 matrix 字段属于同一个交叉表，每个字段是一列。
+     */
+    @SuppressWarnings("unchecked")
+    List<AiMatrixDimension> buildMatrixDimensions(List<ReportTemplateField> matrixFields) {
+        if (matrixFields.isEmpty()) return List.of();
+        // 按 row_label 分组（同一交叉表的字段共享 row_label 与 row_options）
+        Map<String, List<ReportTemplateField>> groups = new LinkedHashMap<>();
+        Map<String, String> groupRowLabel = new HashMap<>();
+        Map<String, List<String>> groupRowOptions = new HashMap<>();
+        for (ReportTemplateField f : matrixFields) {
+            String rowLabel = null;
+            List<String> parsedRowOptions = null;
+            String columnLabel = f.getFieldLabel();
+            try {
+                JsonNode config = objectMapper.readTree(f.getFieldConfig() != null ? f.getFieldConfig() : "{}");
+                JsonNode matrixNode = config.path("matrix");
+                if (matrixNode.isObject()) {
+                    JsonNode rl = matrixNode.path("row_label");
+                    rowLabel = rl.isTextual() ? rl.asText() : null;
+                    JsonNode ro = matrixNode.path("row_options");
+                    if (ro.isArray()) {
+                        List<String> tmp = new ArrayList<>();
+                        ro.forEach(n -> tmp.add(n.asText()));
+                        parsedRowOptions = tmp;
+                    }
+                    JsonNode cl = matrixNode.path("column_label");
+                    if (cl.isTextual()) columnLabel = cl.asText();
+                }
+            } catch (Exception ignored) {
+                // field_config 解析失败时跳过，不影响其他维度
+            }
+            if (rowLabel == null || rowLabel.isBlank()) continue;
+            groups.computeIfAbsent(rowLabel, k -> new ArrayList<>()).add(f);
+            groupRowLabel.put(rowLabel, rowLabel);
+            // row_options 可能来自多个字段，取首次有效的
+            if (parsedRowOptions != null && !parsedRowOptions.isEmpty()) {
+                groupRowOptions.putIfAbsent(rowLabel, parsedRowOptions);
+            }
+            // columnLabel 存入 field_label 供后续使用
+            if (columnLabel != null) {
+                f.setFieldLabel(columnLabel);
+            }
+        }
+        List<AiMatrixDimension> result = new ArrayList<>();
+        for (String rowLabel : groups.keySet()) {
+            List<String> rowOptions = groupRowOptions.getOrDefault(rowLabel, List.of());
+            List<String> columnLabels = groups.get(rowLabel).stream()
+                    .map(ReportTemplateField::getFieldLabel)
+                    .collect(Collectors.toList());
+            if (!rowOptions.isEmpty()) {
+                result.add(new AiMatrixDimension(rowLabel, rowOptions, columnLabels));
+            }
+        }
+        return result;
     }
 
     /** 车牌号、发动机号一类的标识字段虽存为数值，但求和无意义，默认不作为指标 */

@@ -284,6 +284,12 @@ public class AiQueryService {
         if (plan.groupByFieldLabel() != null) {
             scopeNote.append(" ｜ 分组：").append(plan.groupByFieldLabel());
         }
+        if (plan.matrixDimension() != null) {
+            scopeNote.append(" ｜ 交叉表行维度：").append(plan.matrixDimension().rowLabel());
+            if ("matrix_column".equals(plan.dimension())) {
+                scopeNote.append(" ｜ 列维度对比");
+            }
+        }
         if (!companyFilter.isEmpty()) {
             scopeNote.append(" ｜ 机构：").append(String.join("、", companyFilter));
         }

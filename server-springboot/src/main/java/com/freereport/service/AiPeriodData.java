@@ -104,6 +104,26 @@ final class AiPeriodData {
                         LinkedHashMap::new, Collectors.toList()));
     }
 
+    /**
+     * 按交叉表行维度分组明细行：row_index 映射到 rowOptions[row_index-1]。
+     * 用于交叉表行维度统计（如按品牌汇总各列数值之和）。
+     */
+    Map<String, List<Map<String, Object>>> matrixRowGroups(List<String> rowOptions) {
+        return detailRows().stream()
+                .collect(Collectors.groupingBy(
+                        r -> {
+                            Object ri = r.get("row_index");
+                            if (ri instanceof Number) {
+                                int idx = ((Number) ri).intValue();
+                                if (idx > 0 && idx <= rowOptions.size()) {
+                                    return rowOptions.get(idx - 1);
+                                }
+                            }
+                            return "(未知行)";
+                        },
+                        LinkedHashMap::new, Collectors.toList()));
+    }
+
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> detailRows() {
         Object rows = aggregation.get("detail_rows");

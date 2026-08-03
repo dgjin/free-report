@@ -9,5 +9,6 @@ import java.util.List;
 record AiTemplateContext(ReportTemplate template,
                          List<AiMetric> metrics,
                          List<ReportTemplateField> groupableFields,
-                         List<String> periods) {
+                         List<String> periods,
+                         List<AiMatrixDimension> matrixDimensions) {
 }

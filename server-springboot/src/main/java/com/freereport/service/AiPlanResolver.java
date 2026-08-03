@@ -54,6 +54,14 @@ public class AiPlanResolver {
                         .map(f -> f.getFieldName() + "(" + f.getFieldLabel() + ")")
                         .collect(Collectors.joining("、"))).append('\n');
             }
+            if (!c.matrixDimensions().isEmpty()) {
+                catalog.append("  交叉表维度:\n");
+                for (AiMatrixDimension md : c.matrixDimensions()) {
+                    catalog.append("    行维度=").append(md.rowLabel())
+                            .append(" 行选项=").append(String.join("/", md.rowOptions()))
+                            .append(" 列=").append(String.join("/", md.columnLabels())).append('\n');
+                }
+            }
             catalog.append("  已有周期: ").append(c.periods().isEmpty() ? "（尚未下发）"
                     : String.join("、", c.periods())).append('\n');
         }
@@ -68,10 +76,14 @@ public class AiPlanResolver {
                 - template_id: 整数，必须来自上面清单
                 - period_labels: 字符串数组，必须原样来自该模板的「已有周期」；用户未指定时取最近 1 个周期；问趋势/多期对比时可取多个（最多 12 个）
                 - metric_field_names: 字符串数组，必须来自该模板的「可用指标」字段名；用户未指定时留空数组表示全部
-                - dimension: "company" 表示按上报机构横向对比，"period" 表示按周期看趋势，"field" 表示按某个明细字段分组统计
+                - dimension: "company" 表示按上报机构横向对比，"period" 表示按周期看趋势，"field" 表示按某个明细字段分组统计，
+                  "matrix_row" 表示按交叉表行维度分组统计（如按品牌汇总各列数值），"matrix_column" 表示按交叉表列维度对比（如各月份的数值对比）
                 - group_by_field: 当 dimension="field" 时必填，填写要分组的字段名（必须来自「可分组字段」列出的字段名）；否则为 null
                   使用规则：用户说「按XX统计/按XX分析/按XX分组」时，若XX与「可分组字段」中某个字段的标签匹配，必须用 dimension="field" 且 group_by_field 填对应字段名
                   注意：「机构名称」这类字段是明细数据中的列，与上报机构(company)不同；按它分组时应选 dimension="field"
+                - matrix_row_label: 当 dimension="matrix_row" 或 "matrix_column" 时必填，填写交叉表的行维度标签（必须来自「交叉表维度」中的行维度）；否则为 null
+                  使用规则：用户说「按品牌统计/各品牌的数据」时，若品牌是交叉表行维度，选 dimension="matrix_row" 且 matrix_row_label 填该行维度标签
+                  用户说「各月份/各列的数据对比」时，选 dimension="matrix_column" 且 matrix_row_label 填对应的行维度标签
                 - aggregation: "sum" | "avg" | "max" | "min"; 默认 sum; 用户问「平均/均值」用 avg，「最高/最大」用 max，「最低/最小」用 min
                 - company_names: 字符串数组；用户点名了具体机构（如「北京分公司」「上海」）时填写机构名，否则留空数组表示全部机构
                 - chart_type: "bar" | "line" | "pie" | "table"; 趋势用 line，机构对比用 bar，占比用 pie，分组对比用 bar，无需图表用 table
@@ -171,6 +183,25 @@ public class AiPlanResolver {
                         .filter(f -> groupByField.equals(f.getFieldName()))
                         .map(ReportTemplateField::getFieldLabel).findFirst().orElse(groupByField)
                 : null;
+        // 交叉表维度：解析 matrix_row_label，匹配模板中的交叉表行维度
+        AiMatrixDimension matrixDimension = null;
+        if ("matrix_row".equals(dimension) || "matrix_column".equals(dimension)) {
+            String rawMatrixRowLabel = text(plan, "matrix_row_label");
+            if (rawMatrixRowLabel != null && !rawMatrixRowLabel.isBlank()) {
+                matrixDimension = ctx.matrixDimensions().stream()
+                        .filter(md -> rawMatrixRowLabel.equals(md.rowLabel()))
+                        .findFirst().orElse(null);
+            }
+            // 匹配不到行维度标签时回退到机构维度
+            if (matrixDimension == null) {
+                // 如果模板有交叉表维度但 LLM 没给 label，取第一个
+                if (!ctx.matrixDimensions().isEmpty()) {
+                    matrixDimension = ctx.matrixDimensions().get(0);
+                } else {
+                    dimension = "company";
+                }
+            }
+        }
         String chartType = normalizeChartType(text(plan, "chart_type"));
         AiAgg agg = AiAgg.parse(text(plan, "aggregation"));
         // 机构筛选：模型给出的机构名在取数后与真实机构名模糊匹配，全都对不上时忽略筛选而不是返回空结果
@@ -182,7 +213,7 @@ public class AiPlanResolver {
         }
 
         return PlanResult.plan(new AiResolvedPlan(ctx, periods, metrics, dimension,
-                groupByField, groupByFieldLabel, chartType, agg, requestedCompanies, title));
+                groupByField, groupByFieldLabel, chartType, agg, requestedCompanies, title, matrixDimension));
     }
 
     /** 回传给前端的已解析计划（companyFilter 为取数后确认的有效机构筛选） */
@@ -202,6 +233,9 @@ public class AiPlanResolver {
         if (plan.groupByField() != null) {
             resolvedPlan.put("group_by_field", plan.groupByField());
             resolvedPlan.put("group_by_field_label", plan.groupByFieldLabel());
+        }
+        if (plan.matrixDimension() != null) {
+            resolvedPlan.put("matrix_row_label", plan.matrixDimension().rowLabel());
         }
         return resolvedPlan;
     }
@@ -260,10 +294,12 @@ public class AiPlanResolver {
         };
     }
 
-    /** 解析维度：company / period / field */
+    /** 解析维度：company / period / field / matrix_row / matrix_column */
     private String parseDimension(String raw) {
         if ("period".equals(raw)) return "period";
         if ("field".equals(raw)) return "field";
+        if ("matrix_row".equals(raw)) return "matrix_row";
+        if ("matrix_column".equals(raw)) return "matrix_column";
         return "company";
     }
 

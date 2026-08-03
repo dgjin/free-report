@@ -43,7 +43,11 @@ public class AiResultBuilder {
     /** 按维度分派构建表格 */
     public Map<String, Object> buildTable(List<AiPeriodData> periodDataList, AiResolvedPlan plan,
                                           List<String> companyFilter) {
-        if ("field".equals(plan.dimension()) && plan.groupByField() != null) {
+        if ("matrix_row".equals(plan.dimension()) && plan.matrixDimension() != null) {
+            return buildMatrixRowTable(periodDataList, plan.matrixDimension(), plan.metrics(), plan.agg());
+        } else if ("matrix_column".equals(plan.dimension()) && plan.matrixDimension() != null) {
+            return buildMatrixColumnTable(periodDataList, plan.matrixDimension(), plan.metrics(), plan.agg());
+        } else if ("field".equals(plan.dimension()) && plan.groupByField() != null) {
             return buildFieldGroupTable(periodDataList, plan.groupByField(), plan.groupByFieldLabel(),
                     plan.metrics(), plan.agg());
         } else if ("period".equals(plan.dimension())) {
@@ -56,7 +60,13 @@ public class AiResultBuilder {
     /** 按维度分派构建图表 */
     public Map<String, Object> buildChart(List<AiPeriodData> periodDataList, AiResolvedPlan plan,
                                           List<String> companyFilter) {
-        if ("field".equals(plan.dimension()) && plan.groupByField() != null) {
+        if ("matrix_row".equals(plan.dimension()) && plan.matrixDimension() != null) {
+            return buildMatrixRowChart(periodDataList, plan.matrixDimension(), plan.metrics(),
+                    plan.chartType(), plan.title(), plan.agg());
+        } else if ("matrix_column".equals(plan.dimension()) && plan.matrixDimension() != null) {
+            return buildMatrixColumnChart(periodDataList, plan.matrixDimension(), plan.metrics(),
+                    plan.chartType(), plan.title(), plan.agg());
+        } else if ("field".equals(plan.dimension()) && plan.groupByField() != null) {
             return buildFieldGroupChart(periodDataList, plan.groupByField(), plan.groupByFieldLabel(),
                     plan.metrics(), plan.chartType(), plan.title(), plan.agg());
         } else if ("period".equals(plan.dimension())) {
@@ -119,6 +129,10 @@ public class AiResultBuilder {
                 .append("指标：").append(plan.metrics().stream().map(AiMetric::label).collect(Collectors.joining("、"))).append('\n');
         if (plan.groupByFieldLabel() != null) {
             userPrompt.append("分组字段：").append(plan.groupByFieldLabel()).append('\n');
+        }
+        if (plan.matrixDimension() != null) {
+            userPrompt.append("交叉表行维度：").append(plan.matrixDimension().rowLabel())
+                    .append("（").append(String.join("、", plan.matrixDimension().rowOptions())).append("）\n");
         }
         if (plan.agg() != AiAgg.SUM) {
             userPrompt.append("聚合方式：").append(plan.agg().cn()).append('\n');
@@ -243,6 +257,78 @@ public class AiResultBuilder {
         return table;
     }
 
+    /**
+     * 交叉表行维度表格：行选项 × 指标（列）聚合值。
+     * 每行一个行选项（如品牌A），每列一个交叉表列指标，
+     * 值为该行选项下所有机构所有列的聚合值。
+     */
+    private Map<String, Object> buildMatrixRowTable(List<AiPeriodData> periodDataList,
+                                                     AiMatrixDimension md,
+                                                     List<AiMetric> metrics, AiAgg agg) {
+        boolean multiPeriod = periodDataList.size() > 1;
+        List<String> columns = new ArrayList<>();
+        if (multiPeriod) columns.add("周期");
+        columns.add(md.rowLabel());
+        metrics.forEach(m -> columns.add(m.periodColumn(agg)));
+
+        List<List<String>> rows = new ArrayList<>();
+        for (AiPeriodData pd : periodDataList) {
+            Map<String, List<Map<String, Object>>> groups = pd.matrixRowGroups(md.rowOptions());
+            for (String rowOption : md.rowOptions()) {
+                List<Map<String, Object>> groupRows = groups.getOrDefault(rowOption, List.of());
+                List<String> row = new ArrayList<>();
+                if (multiPeriod) row.add(pd.period());
+                row.add(rowOption);
+                for (AiMetric m : metrics) {
+                    if (m.source() == AiMetric.Source.ROW_COUNT) {
+                        row.add(String.valueOf(groupRows.size()));
+                    } else {
+                        List<Double> values = groupRows.stream()
+                                .map(r -> parseDouble(r.get(m.fieldName())))
+                                .collect(Collectors.toList());
+                        row.add(formatNumber(agg.apply(values)));
+                    }
+                }
+                rows.add(row);
+            }
+        }
+        Map<String, Object> table = new LinkedHashMap<>();
+        table.put("columns", columns);
+        table.put("rows", rows);
+        return table;
+    }
+
+    /**
+     * 交叉表列维度表格：列标签 × 聚合值。
+     * 每行一个交叉表列指标，值为该列所有行所有机构的聚合值。
+     */
+    private Map<String, Object> buildMatrixColumnTable(List<AiPeriodData> periodDataList,
+                                                        AiMatrixDimension md,
+                                                        List<AiMetric> metrics, AiAgg agg) {
+        boolean multiPeriod = periodDataList.size() > 1;
+        List<String> columns = new ArrayList<>();
+        if (multiPeriod) columns.add("周期");
+        columns.add("指标");
+        columns.add(agg.cn() + "值");
+
+        List<List<String>> rows = new ArrayList<>();
+        for (AiPeriodData pd : periodDataList) {
+            for (AiMetric m : metrics) {
+                if (m.source() == AiMetric.Source.ROW_COUNT) continue;
+                List<String> row = new ArrayList<>();
+                if (multiPeriod) row.add(pd.period());
+                row.add(m.label());
+                List<Double> values = pd.detailValues(List.of(), m.fieldName(), this::matchesCompany);
+                row.add(formatNumber(agg.apply(values)));
+                rows.add(row);
+            }
+        }
+        Map<String, Object> table = new LinkedHashMap<>();
+        table.put("columns", columns);
+        table.put("rows", rows);
+        return table;
+    }
+
     // ---- 图表构建 ----
 
     private Map<String, Object> buildCompanyChart(List<AiPeriodData> periodDataList, List<AiMetric> metrics,
@@ -328,6 +414,64 @@ public class AiResultBuilder {
                 s.put("data", data);
                 series.add(s);
             }
+        }
+        return chart(chartType, title, categories, series);
+    }
+
+    /** 交叉表行维度图表：categories = 行选项，series = 各指标（列） */
+    private Map<String, Object> buildMatrixRowChart(List<AiPeriodData> periodDataList,
+                                                     AiMatrixDimension md, List<AiMetric> metrics,
+                                                     String chartType, String title, AiAgg agg) {
+        List<String> categories = md.rowOptions();
+        List<Map<String, Object>> series = new ArrayList<>();
+        boolean multiPeriod = periodDataList.size() > 1;
+        for (AiPeriodData pd : periodDataList) {
+            Map<String, List<Map<String, Object>>> groups = pd.matrixRowGroups(md.rowOptions());
+            for (AiMetric m : metrics) {
+                List<Double> data = new ArrayList<>();
+                for (String rowOption : categories) {
+                    List<Map<String, Object>> groupRows = groups.getOrDefault(rowOption, List.of());
+                    if (m.source() == AiMetric.Source.ROW_COUNT) {
+                        data.add((double) groupRows.size());
+                    } else {
+                        List<Double> values = groupRows.stream()
+                                .map(r -> parseDouble(r.get(m.fieldName())))
+                                .collect(Collectors.toList());
+                        data.add(agg.apply(values));
+                    }
+                }
+                Map<String, Object> s = new LinkedHashMap<>();
+                s.put("name", multiPeriod ? pd.period() + " " + m.label() : m.label());
+                s.put("data", data);
+                series.add(s);
+            }
+        }
+        return chart(chartType, title, categories, series);
+    }
+
+    /** 交叉表列维度图表：categories = 列标签，series = 周期 */
+    private Map<String, Object> buildMatrixColumnChart(List<AiPeriodData> periodDataList,
+                                                        AiMatrixDimension md, List<AiMetric> metrics,
+                                                        String chartType, String title, AiAgg agg) {
+        List<String> categories = metrics.stream()
+                .filter(m -> m.source() != AiMetric.Source.ROW_COUNT)
+                .map(AiMetric::label)
+                .collect(Collectors.toList());
+        List<AiMetric> chartMetrics = metrics.stream()
+                .filter(m -> m.source() != AiMetric.Source.ROW_COUNT)
+                .collect(Collectors.toList());
+        List<Map<String, Object>> series = new ArrayList<>();
+        boolean multiPeriod = periodDataList.size() > 1;
+        for (AiPeriodData pd : periodDataList) {
+            List<Double> data = new ArrayList<>();
+            for (AiMetric m : chartMetrics) {
+                List<Double> values = pd.detailValues(List.of(), m.fieldName(), this::matchesCompany);
+                data.add(agg.apply(values));
+            }
+            Map<String, Object> s = new LinkedHashMap<>();
+            s.put("name", multiPeriod ? pd.period() : "合计");
+            s.put("data", data);
+            series.add(s);
         }
         return chart(chartType, title, categories, series);
     }

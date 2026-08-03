@@ -26,12 +26,13 @@ export interface AiQueryPlan {
   template_name: string;
   period_labels: string[];
   metrics: Array<{ field_name: string; field_label: string }>;
-  dimension: 'company' | 'period' | 'field';
+  dimension: 'company' | 'period' | 'field' | 'matrix_row' | 'matrix_column';
   chart_type: AiChart['type'];
   aggregation?: 'sum' | 'avg' | 'max' | 'min';
   company_names?: string[];
   group_by_field?: string;
   group_by_field_label?: string;
+  matrix_row_label?: string;
 }
 
 export interface AiQueryResponse {
@@ -133,7 +134,7 @@ export function formatPlanContext(plan: AiQueryPlan | null | undefined): string 
     `报表=${plan.template_name}`,
     `周期=${plan.period_labels.join('、')}`,
     `指标=${plan.metrics.map((m) => m.field_label).join('、')}`,
-    `维度=${plan.dimension === 'period' ? '周期趋势' : plan.dimension === 'field' ? `按${plan.group_by_field_label || plan.group_by_field}分组` : '机构对比'}`,
+    `维度=${plan.dimension === 'period' ? '周期趋势' : plan.dimension === 'field' ? `按${plan.group_by_field_label || plan.group_by_field}分组` : plan.dimension === 'matrix_row' ? `按交叉表行维度${plan.matrix_row_label || ''}分组` : plan.dimension === 'matrix_column' ? `交叉表列维度对比（行维度${plan.matrix_row_label || ''}）` : '机构对比'}`,
   ];
   if (plan.aggregation && plan.aggregation !== 'sum') {
     parts.push(`聚合=${plan.aggregation}`);
