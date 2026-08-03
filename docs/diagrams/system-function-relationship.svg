@@ -1,0 +1,217 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 730" width="1200" height="730">
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", "SimHei", sans-serif; }
+    .title { font-size: 18px; fill: #111827; font-weight: 700; }
+    .layer-label { font-size: 11px; fill: #6b7280; font-weight: 600; }
+    .domain-header { font-size: 14px; font-weight: 700; }
+    .feature { font-size: 12px; fill: #374151; }
+    .legend-text { font-size: 11px; fill: #6b7280; }
+  </style>
+  <defs>
+    <marker id="arr-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+    </marker>
+    <marker id="arr-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/>
+    </marker>
+    <marker id="arr-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/>
+    </marker>
+    <marker id="arr-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/>
+    </marker>
+    <marker id="arr-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/>
+    </marker>
+    <marker id="arr-big" markerWidth="12" markerHeight="10" refX="11" refY="5" orient="auto">
+      <polygon points="0 0, 12 5, 0 10" fill="#2563eb"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="730" fill="#ffffff"/>
+  <text x="600" y="28" text-anchor="middle" class="title">FreeReport 系统功能关系图</text>
+  <rect x="40" y="45" width="210" height="220" rx="8" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <rect x="40" y="45" width="210" height="32" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <rect x="40" y="61" width="210" height="16" fill="#eff6ff" stroke="none"/>
+  <line x1="40" y1="77" x2="250" y2="77" stroke="#bfdbfe" stroke-width="1"/>
+  <text x="145" y="67" text-anchor="middle" class="domain-header" fill="#111827">模板管理</text>
+  <rect x="48" y="91" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="145" y="107" text-anchor="middle" class="feature">字段设计: 汇总 / 明细 / 交叉表</text>
+  <rect x="48" y="121" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="145" y="137" text-anchor="middle" class="feature">模板审批: draft→published</text>
+  <rect x="48" y="151" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="145" y="167" text-anchor="middle" class="feature">定时下发计划 Schedule</text>
+  <rect x="48" y="181" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="145" y="197" text-anchor="middle" class="feature">Excel 字段导入</text>
+  <rect x="48" y="211" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="145" y="227" text-anchor="middle" class="feature">敏感字段标记 + AI问数开关</text>
+  <rect x="272" y="45" width="210" height="220" rx="8" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <rect x="272" y="45" width="210" height="32" rx="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <rect x="272" y="61" width="210" height="16" fill="#fff7ed" stroke="none"/>
+  <line x1="272" y1="77" x2="482" y2="77" stroke="#fed7aa" stroke-width="1"/>
+  <text x="377" y="67" text-anchor="middle" class="domain-header" fill="#111827">任务下发</text>
+  <rect x="280" y="91" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="377" y="107" text-anchor="middle" class="feature">手动 / 自动下发</text>
+  <rect x="280" y="121" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="377" y="137" text-anchor="middle" class="feature">批量分配 AutoAssign</text>
+  <rect x="280" y="151" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="377" y="167" text-anchor="middle" class="feature">周期性 / 一次性任务</text>
+  <rect x="280" y="181" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="377" y="197" text-anchor="middle" class="feature">撤回重发 Recall</text>
+  <rect x="504" y="45" width="210" height="220" rx="8" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <rect x="504" y="45" width="210" height="32" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+  <rect x="504" y="61" width="210" height="16" fill="#f0fdf4" stroke="none"/>
+  <line x1="504" y1="77" x2="714" y2="77" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="609" y="67" text-anchor="middle" class="domain-header" fill="#111827">填报提交</text>
+  <rect x="512" y="91" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="609" y="107" text-anchor="middle" class="feature">在线填报 ReportFill</text>
+  <rect x="512" y="121" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="609" y="137" text-anchor="middle" class="feature">多版本管理 Version</text>
+  <rect x="512" y="151" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="609" y="167" text-anchor="middle" class="feature">数据导入 DataImport</text>
+  <rect x="512" y="181" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="609" y="197" text-anchor="middle" class="feature">跨字段校验 (sum_of)</text>
+  <rect x="512" y="211" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="609" y="227" text-anchor="middle" class="feature">草稿 → 提交</text>
+  <rect x="736" y="45" width="210" height="220" rx="8" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <rect x="736" y="45" width="210" height="32" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+  <rect x="736" y="61" width="210" height="16" fill="#fef2f2" stroke="none"/>
+  <line x1="736" y1="77" x2="946" y2="77" stroke="#fecaca" stroke-width="1"/>
+  <text x="841" y="67" text-anchor="middle" class="domain-header" fill="#111827">审批签收</text>
+  <rect x="744" y="91" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="841" y="107" text-anchor="middle" class="feature">三级审批 handler→reviewer→approver</text>
+  <rect x="744" y="121" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="841" y="137" text-anchor="middle" class="feature">签收回执 Receipt</text>
+  <rect x="744" y="151" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="841" y="167" text-anchor="middle" class="feature">退回 / 驳回</text>
+  <rect x="744" y="181" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="841" y="197" text-anchor="middle" class="feature">催报提醒 Reminder</text>
+  <rect x="968" y="45" width="210" height="220" rx="8" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <rect x="968" y="45" width="210" height="32" rx="8" fill="#faf5ff" stroke="#e9d5fe" stroke-width="1.5"/>
+  <rect x="968" y="61" width="210" height="16" fill="#faf5ff" stroke="none"/>
+  <line x1="968" y1="77" x2="1178" y2="77" stroke="#e9d5fe" stroke-width="1"/>
+  <text x="1073" y="67" text-anchor="middle" class="domain-header" fill="#111827">汇总统计</text>
+  <rect x="976" y="91" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="1073" y="107" text-anchor="middle" class="feature">多维度汇总 Aggregation</text>
+  <rect x="976" y="121" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="1073" y="137" text-anchor="middle" class="feature">部门级数据隔离</text>
+  <rect x="976" y="151" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="1073" y="167" text-anchor="middle" class="feature">全局只读视图</text>
+  <rect x="976" y="181" width="194" height="24" rx="4" fill="#ffffff" stroke="#f3f4f6" stroke-width="1"/>
+  <text x="1073" y="197" text-anchor="middle" class="feature">Excel 三Sheet 导出</text>
+  <line x1="250" y1="145" x2="272" y2="145" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arr-big)"/>
+  <line x1="482" y1="145" x2="504" y2="145" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arr-big)"/>
+  <line x1="714" y1="145" x2="736" y2="145" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arr-big)"/>
+  <line x1="946" y1="145" x2="968" y2="145" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arr-big)"/>
+  <rect x="40" y="285" width="210" height="110" rx="8" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <rect x="40" y="285" width="210" height="28" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+  <rect x="40" y="299" width="210" height="14" fill="#fef2f2" stroke="none"/>
+  <line x1="40" y1="313" x2="250" y2="313" stroke="#fecaca" stroke-width="1"/>
+  <text x="145" y="304" text-anchor="middle" class="domain-header" fill="#111827">认证与权限</text>
+  <text x="145" y="325" text-anchor="middle" class="feature">JWT 登录 / Token 刷新</text>
+  <text x="145" y="345" text-anchor="middle" class="feature">7 角色 RBAC</text>
+  <text x="145" y="365" text-anchor="middle" class="feature">双层权限校验</text>
+  <rect x="272" y="285" width="210" height="110" rx="8" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <rect x="272" y="285" width="210" height="28" rx="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <rect x="272" y="299" width="210" height="14" fill="#fff7ed" stroke="none"/>
+  <line x1="272" y1="313" x2="482" y2="313" stroke="#fed7aa" stroke-width="1"/>
+  <text x="377" y="304" text-anchor="middle" class="domain-header" fill="#111827">组织管理</text>
+  <text x="377" y="325" text-anchor="middle" class="feature">三级机构树 (总部→部门→分公司)</text>
+  <text x="377" y="345" text-anchor="middle" class="feature">公司 CRUD + 状态管理</text>
+  <text x="377" y="365" text-anchor="middle" class="feature">部门归属与隔离</text>
+  <rect x="504" y="285" width="210" height="110" rx="8" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <rect x="504" y="285" width="210" height="28" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+  <rect x="504" y="299" width="210" height="14" fill="#f0fdf4" stroke="none"/>
+  <line x1="504" y1="313" x2="714" y2="313" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="609" y="304" text-anchor="middle" class="domain-header" fill="#111827">数据导入</text>
+  <text x="609" y="325" text-anchor="middle" class="feature">Excel 批量导入</text>
+  <text x="609" y="345" text-anchor="middle" class="feature">智能识别汇总/明细/交叉表</text>
+  <text x="609" y="365" text-anchor="middle" class="feature">错误行级报告</text>
+  <rect x="736" y="285" width="210" height="110" rx="8" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <rect x="736" y="285" width="210" height="28" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+  <rect x="736" y="299" width="210" height="14" fill="#fef2f2" stroke="none"/>
+  <line x1="736" y1="313" x2="946" y2="313" stroke="#fecaca" stroke-width="1"/>
+  <text x="841" y="304" text-anchor="middle" class="domain-header" fill="#111827">催报与提醒</text>
+  <text x="841" y="325" text-anchor="middle" class="feature">退回提醒 (驳回/退回)</text>
+  <text x="841" y="345" text-anchor="middle" class="feature">截止日期提醒</text>
+  <text x="841" y="365" text-anchor="middle" class="feature">模板驳回通知</text>
+  <rect x="968" y="285" width="210" height="110" rx="8" fill="none" stroke="#c4b5fd" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <rect x="968" y="285" width="210" height="28" rx="8" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+  <rect x="968" y="299" width="210" height="14" fill="#ede9fe" stroke="none"/>
+  <line x1="968" y1="313" x2="1178" y2="313" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="1073" y="304" text-anchor="middle" class="domain-header" fill="#5b21b6">智能问数</text>
+  <text x="1073" y="325" text-anchor="middle" class="feature">双阶段 LLM 编排</text>
+  <text x="1073" y="343" text-anchor="middle" class="feature">SSE 流式输出</text>
+  <text x="1073" y="361" text-anchor="middle" class="feature">8 层纵深安全</text>
+  <text x="1073" y="379" text-anchor="middle" class="feature">Ollama / DeepSeek</text>
+  <line x1="1073" y1="265" x2="1073" y2="283" stroke="#9333ea" stroke-width="2" marker-end="url(#arr-purple)" stroke-dasharray="4,2"/>
+  <text x="1081" y="280" class="legend-text" fill="#9333ea">复用聚合服务</text>
+  <line x1="145" y1="285" x2="145" y2="267" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="377" y1="285" x2="377" y2="267" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="609" y1="285" x2="609" y2="267" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="841" y1="285" x2="841" y2="267" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,3"/>
+  <rect x="40" y="415" width="1120" height="80" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="52" y="431" class="layer-label">用户角色 (7 种) 与机构层级 (3 级)</text>
+  <rect x="52" y="437" width="150" height="26" rx="13" fill="#ffffff" stroke="#dc2626" stroke-width="1.2"/>
+  <circle cx="66" cy="450" r="4" fill="#dc2626"/>
+  <text x="76" y="454" font-size="11" fill="#374151" font-weight="600">超级管理员</text>
+  <rect x="210" y="437" width="150" height="26" rx="13" fill="#ffffff" stroke="#ea580c" stroke-width="1.2"/>
+  <circle cx="224" cy="450" r="4" fill="#ea580c"/>
+  <text x="234" y="454" font-size="11" fill="#374151" font-weight="600">部门报表管理员</text>
+  <rect x="368" y="437" width="150" height="26" rx="13" fill="#ffffff" stroke="#d97706" stroke-width="1.2"/>
+  <circle cx="382" cy="450" r="4" fill="#d97706"/>
+  <text x="392" y="454" font-size="11" fill="#374151" font-weight="600">数转办</text>
+  <rect x="526" y="437" width="150" height="26" rx="13" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
+  <circle cx="540" cy="450" r="4" fill="#2563eb"/>
+  <text x="550" y="454" font-size="11" fill="#374151" font-weight="600">分公司管理员</text>
+  <rect x="684" y="437" width="150" height="26" rx="13" fill="#ffffff" stroke="#059669" stroke-width="1.2"/>
+  <circle cx="698" cy="450" r="4" fill="#059669"/>
+  <text x="708" y="454" font-size="11" fill="#374151" font-weight="600">填报人</text>
+  <rect x="842" y="437" width="150" height="26" rx="13" fill="#ffffff" stroke="#0891b2" stroke-width="1.2"/>
+  <circle cx="856" cy="450" r="4" fill="#0891b2"/>
+  <text x="866" y="454" font-size="11" fill="#374151" font-weight="600">复核人</text>
+  <rect x="1000" y="437" width="150" height="26" rx="13" fill="#ffffff" stroke="#7c3aed" stroke-width="1.2"/>
+  <circle cx="1014" cy="450" r="4" fill="#7c3aed"/>
+  <text x="1024" y="454" font-size="11" fill="#374151" font-weight="600">审批人</text>
+  <rect x="360" y="467" width="160" height="22" rx="11" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+  <text x="440" y="482" text-anchor="middle" font-size="11" fill="#374151">总部 headquarter</text>
+  <rect x="540" y="467" width="160" height="22" rx="11" fill="#ffffff" stroke="#0891b2" stroke-width="1"/>
+  <text x="620" y="482" text-anchor="middle" font-size="11" fill="#374151">部门 department</text>
+  <rect x="720" y="467" width="160" height="22" rx="11" fill="#ffffff" stroke="#059669" stroke-width="1"/>
+  <text x="800" y="482" text-anchor="middle" font-size="11" fill="#374151">分公司 branch</text>
+  <rect x="40" y="515" width="1120" height="55" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="52" y="531" class="layer-label">基础设施层</text>
+  <rect x="60" y="535" width="260" height="30" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.2"/>
+  <text x="70" y="553" font-size="12" fill="#111827" font-weight="600">MySQL 8.0</text>
+  <text x="70" y="565" font-size="10" fill="#9ca3af">模板/字段/任务/提交/审批/回执</text>
+  <rect x="340" y="535" width="260" height="30" rx="6" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/>
+  <text x="350" y="553" font-size="12" fill="#111827" font-weight="600">Spring Boot 3</text>
+  <text x="350" y="565" font-size="10" fill="#9ca3af">13 Controller + 22 Service</text>
+  <rect x="620" y="535" width="260" height="30" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/>
+  <text x="630" y="553" font-size="12" fill="#111827" font-weight="600">React 18 + Vite</text>
+  <text x="630" y="565" font-size="10" fill="#9ca3af">10 页面 + Lazy Loading</text>
+  <rect x="900" y="535" width="260" height="30" rx="6" fill="#faf5ff" stroke="#e9d5fe" stroke-width="1.2"/>
+  <text x="910" y="553" font-size="12" fill="#111827" font-weight="600">Caffeine 缓存</text>
+  <text x="910" y="565" font-size="10" fill="#9ca3af">50 用户 × 5min TTL</text>
+  <rect x="40" y="585" width="1120" height="50" rx="6" fill="#fef2f2" stroke="#fecaca" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="52" y="601" class="layer-label" fill="#dc2626">安全与运维</text>
+  <rect x="70" y="605" width="150" height="22" rx="11" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="145" y="620" text-anchor="middle" font-size="11" fill="#dc2626">JWT 鉴权</text>
+  <rect x="230" y="605" width="150" height="22" rx="11" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="305" y="620" text-anchor="middle" font-size="11" fill="#dc2626">bcrypt 加密</text>
+  <rect x="390" y="605" width="150" height="22" rx="11" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="465" y="620" text-anchor="middle" font-size="11" fill="#dc2626">CORS 白名单</text>
+  <rect x="550" y="605" width="150" height="22" rx="11" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="625" y="620" text-anchor="middle" font-size="11" fill="#dc2626">健康检查</text>
+  <rect x="710" y="605" width="150" height="22" rx="11" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="785" y="620" text-anchor="middle" font-size="11" fill="#dc2626">数据备份/恢复</text>
+  <rect x="870" y="605" width="150" height="22" rx="11" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="945" y="620" text-anchor="middle" font-size="11" fill="#dc2626">环境隔离 dev/prod</text>
+  <g transform="translate(40, 655)">
+    <line x1="0" y1="8" x2="30" y2="8" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arr-big)"/>
+    <text x="40" y="12" class="legend-text">核心业务流</text>
+    <line x1="130" y1="8" x2="160" y2="8" stroke="#9333ea" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arr-purple)"/>
+    <text x="168" y="12" class="legend-text">AI 复用</text>
+    <line x1="230" y1="8" x2="260" y2="8" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,3"/>
+    <text x="268" y="12" class="legend-text">功能支撑</text>
+  </g>
+</svg>

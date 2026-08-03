@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS report_template_fields (
   field_name VARCHAR(100) NOT NULL,
   field_label VARCHAR(160) NOT NULL,
   field_type ENUM('text','number','date','select','textarea','matrix') NOT NULL,
-  data_type ENUM('summary','detail') NOT NULL,
+  data_type ENUM('summary','detail','matrix') NOT NULL,
   field_config JSON NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
   status ENUM('active','inactive') NOT NULL DEFAULT 'active',

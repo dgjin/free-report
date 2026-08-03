@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 820" width="960" height="820">
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", "SimHei", sans-serif; }
+    .layer-label { font-size: 11px; fill: #6b7280; font-weight: 600; }
+    .node-title { font-size: 13px; fill: #111827; font-weight: 600; }
+    .node-sub { font-size: 11px; fill: #6b7280; }
+    .title { font-size: 18px; fill: #111827; font-weight: 700; }
+    .legend-text { font-size: 11px; fill: #6b7280; }
+  </style>
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/>
+    </marker>
+    <marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/>
+    </marker>
+  </defs>
+  <rect width="960" height="820" fill="#ffffff"/>
+  <text x="480" y="32" text-anchor="middle" class="title">智能问数功能架构图</text>
+  <!-- Layer 1: User -->
+  <rect x="40" y="50" width="880" height="52" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="52" y="68" class="layer-label">用户层</text>
+  <rect x="350" y="62" width="260" height="34" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+  <text x="480" y="84" text-anchor="middle" class="node-title">用户自然语言提问</text>
+  <line x1="480" y1="102" x2="480" y2="118" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <!-- Layer 2: Frontend -->
+  <rect x="40" y="118" width="880" height="68" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="52" y="136" class="layer-label">前端层 (React)</text>
+  <rect x="80" y="138" width="230" height="40" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="195" y="156" text-anchor="middle" class="node-title">AiQuery.tsx</text>
+  <text x="195" y="170" text-anchor="middle" class="node-sub">SSE EventSource + 打字机渲染</text>
+  <rect x="370" y="138" width="210" height="40" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="475" y="156" text-anchor="middle" class="node-title">Recharts 图表</text>
+  <text x="475" y="170" text-anchor="middle" class="node-sub">柱状/折线/饼图</text>
+  <rect x="640" y="138" width="230" height="40" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="755" y="156" text-anchor="middle" class="node-title">xlsx 结果导出</text>
+  <text x="755" y="170" text-anchor="middle" class="node-sub">三 Sheet (说明+数据+图表)</text>
+  <line x1="480" y1="186" x2="480" y2="202" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <!-- Layer 3: Controller -->
+  <rect x="40" y="202" width="880" height="62" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="52" y="220" class="layer-label">网关层 (Spring Boot)</text>
+  <rect x="200" y="216" width="560" height="40" rx="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <text x="480" y="234" text-anchor="middle" class="node-title">AiQueryController</text>
+  <text x="480" y="248" text-anchor="middle" class="node-sub">SSE 线程池 · RequestContextHolder 上下文传递 · 权限前置校验</text>
+  <line x1="480" y1="264" x2="480" y2="284" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <!-- Layer 4: Orchestration -->
+  <rect x="40" y="284" width="880" height="250" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="52" y="302" class="layer-label">编排层 — AiQueryService (双阶段 LLM)</text>
+  <!-- Row A: Pre-processing -->
+  <rect x="60" y="312" width="200" height="44" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+  <text x="160" y="330" text-anchor="middle" class="node-title">输入净化</text>
+  <text x="160" y="345" text-anchor="middle" class="node-sub">sanitizeQuestion · 截断500字</text>
+  <rect x="280" y="312" width="200" height="44" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+  <text x="380" y="330" text-anchor="middle" class="node-title">权限校验</text>
+  <text x="380" y="345" text-anchor="middle" class="node-sub">checkQueryPermission</text>
+  <rect x="500" y="312" width="200" height="44" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+  <text x="600" y="330" text-anchor="middle" class="node-title">运营统计直答</text>
+  <text x="600" y="345" text-anchor="middle" class="node-sub">AiOperationAnalyzer</text>
+  <rect x="720" y="312" width="180" height="44" rx="8" fill="#faf5ff" stroke="#e9d5fe" stroke-width="1.5"/>
+  <text x="810" y="330" text-anchor="middle" class="node-title">上下文构建</text>
+  <text x="810" y="345" text-anchor="middle" class="node-sub">白名单+敏感过滤+缓存</text>
+  <line x1="260" y1="334" x2="280" y2="334" stroke="#6b7280" stroke-width="1" marker-end="url(#arrow-gray)"/>
+  <line x1="480" y1="334" x2="500" y2="334" stroke="#6b7280" stroke-width="1" marker-end="url(#arrow-gray)"/>
+  <line x1="700" y1="334" x2="720" y2="334" stroke="#6b7280" stroke-width="1" marker-end="url(#arrow-gray)"/>
+  <line x1="810" y1="356" x2="810" y2="372" stroke="#6b7280" stroke-width="1" marker-end="url(#arrow-gray)"/>
+  <!-- Row B: LLM + Data -->
+  <rect x="80" y="392" width="220" height="44" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="190" y="410" text-anchor="middle" class="node-title">计划解析 (LLM Call #1)</text>
+  <text x="190" y="425" text-anchor="middle" class="node-sub">AiPlanResolver → JSON 计划</text>
+  <rect x="370" y="392" width="200" height="44" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+  <text x="470" y="410" text-anchor="middle" class="node-title">聚合取数 (无 SQL)</text>
+  <text x="470" y="425" text-anchor="middle" class="node-sub">AggregationService</text>
+  <rect x="640" y="392" width="240" height="44" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="760" y="410" text-anchor="middle" class="node-title">结果构建 (LLM Call #2)</text>
+  <text x="760" y="425" text-anchor="middle" class="node-sub">AiResultBuilder · SSE 流式总结</text>
+  <line x1="300" y1="414" x2="370" y2="414" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <line x1="570" y1="414" x2="640" y2="414" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <path d="M 810,356 L 810,375 L 190,375 L 190,392" stroke="#6b7280" stroke-width="1" fill="none" marker-end="url(#arrow-gray)"/>
+  <!-- Row C: Output -->
+  <rect x="280" y="460" width="400" height="38" rx="8" fill="#fffbeb" stroke="#fde68a" stroke-width="1.5"/>
+  <text x="480" y="478" text-anchor="middle" class="node-title">SSE 事件流: status → plan → chart → table → answer_delta → done</text>
+  <text x="480" y="492" text-anchor="middle" class="node-sub">AiQueryAuditor · 并发限1 + 20次/小时 + 审计日志</text>
+  <line x1="760" y1="436" x2="760" y2="455" stroke="#2563eb" stroke-width="1.5"/>
+  <line x1="760" y1="455" x2="480" y2="455" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <path d="M 680,479 C 930,479 930,479 930,300 C 930,170 870,158 870,158" stroke="#2563eb" stroke-width="1.5" fill="none" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="938" y="320" class="legend-text" transform="rotate(90 938,320)">SSE 回传前端</text>
+  <line x1="480" y1="264" x2="480" y2="284" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <!-- Layer 5: Infrastructure -->
+  <rect x="40" y="548" width="880" height="68" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="52" y="566" class="layer-label">基础设施层</text>
+  <rect x="80" y="568" width="250" height="40" rx="8" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="205" y="586" text-anchor="middle" class="node-title">AiClient (OpenAI 兼容)</text>
+  <text x="205" y="600" text-anchor="middle" class="node-sub">Ollama qwen3.6 / DeepSeek</text>
+  <rect x="400" y="568" width="180" height="40" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+  <text x="490" y="586" text-anchor="middle" class="node-title">MySQL 8.0</text>
+  <text x="490" y="600" text-anchor="middle" class="node-sub">模板/字段/任务/数据</text>
+  <rect x="650" y="568" width="220" height="40" rx="8" fill="#faf5ff" stroke="#e9d5fe" stroke-width="1.5"/>
+  <text x="760" y="586" text-anchor="middle" class="node-title">Caffeine 缓存</text>
+  <text x="760" y="600" text-anchor="middle" class="node-sub">50用户 × 5min TTL</text>
+  <path d="M 190,436 L 190,538 L 205,538 L 205,568" stroke="#9333ea" stroke-width="1.2" fill="none" stroke-dasharray="4,2" marker-end="url(#arrow-purple)"/>
+  <path d="M 760,436 L 760,538 L 205,538" stroke="#9333ea" stroke-width="1.2" fill="none" stroke-dasharray="4,2" marker-end="url(#arrow-purple)"/>
+  <path d="M 810,356 L 890,356 L 890,540 L 490,540 L 490,568" stroke="#16a34a" stroke-width="1.2" fill="none" marker-end="url(#arrow-green)"/>
+  <path d="M 470,436 L 470,450 L 700,450 L 700,550 L 490,550 L 490,568" stroke="#16a34a" stroke-width="1.2" fill="none" marker-end="url(#arrow-green)"/>
+  <path d="M 810,356 L 810,365 L 900,365 L 900,548 L 760,548 L 760,568" stroke="#16a34a" stroke-width="1" fill="none" stroke-dasharray="5,3" marker-end="url(#arrow-green)"/>
+  <!-- Layer 6: Security Defense -->
+  <rect x="40" y="636" width="880" height="72" rx="6" fill="#fef2f2" stroke="#fecaca" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="52" y="654" class="layer-label" fill="#dc2626">8 层纵深安全防御</text>
+  <rect x="70" y="660" width="100" height="38" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="120" y="677" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">输入层</text>
+  <text x="120" y="691" text-anchor="middle" font-size="9" fill="#9ca3af">截断+过滤+拒绝</text>
+  <rect x="182" y="660" width="100" height="38" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="232" y="677" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">权限层</text>
+  <text x="232" y="691" text-anchor="middle" font-size="9" fill="#9ca3af">Controller+Service</text>
+  <rect x="294" y="660" width="100" height="38" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="344" y="677" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">上下文层</text>
+  <text x="344" y="691" text-anchor="middle" font-size="9" fill="#9ca3af">sensitive过滤</text>
+  <rect x="406" y="660" width="100" height="38" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="456" y="677" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">历史层</text>
+  <text x="456" y="691" text-anchor="middle" font-size="9" fill="#9ca3af">assistant丢弃</text>
+  <rect x="518" y="660" width="100" height="38" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="568" y="677" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">频率层</text>
+  <text x="568" y="691" text-anchor="middle" font-size="9" fill="#9ca3af">20次/小时</text>
+  <rect x="630" y="660" width="100" height="38" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="680" y="677" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">审计层</text>
+  <text x="680" y="691" text-anchor="middle" font-size="9" fill="#9ca3af">AiAuditContext</text>
+  <rect x="742" y="660" width="100" height="38" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="792" y="677" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">UI层</text>
+  <text x="792" y="691" text-anchor="middle" font-size="9" fill="#9ca3af">AI开关+敏感标记</text>
+  <rect x="854" y="660" width="100" height="38" rx="6" fill="#ffffff" stroke="#fca5a5" stroke-width="1"/>
+  <text x="904" y="677" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">测试层</text>
+  <text x="904" y="691" text-anchor="middle" font-size="9" fill="#9ca3af">35项JUnit</text>
+  <!-- Legend -->
+  <g transform="translate(40, 730)">
+    <line x1="0" y1="8" x2="30" y2="8" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+    <text x="36" y="12" class="legend-text">主流程</text>
+    <line x1="120" y1="8" x2="150" y2="8" stroke="#16a34a" stroke-width="1.2" marker-end="url(#arrow-green)"/>
+    <text x="156" y="12" class="legend-text">数据读取</text>
+    <line x1="230" y1="8" x2="260" y2="8" stroke="#9333ea" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#arrow-purple)"/>
+    <text x="266" y="12" class="legend-text">LLM 调用</text>
+    <line x1="340" y1="8" x2="370" y2="8" stroke="#6b7280" stroke-width="1" marker-end="url(#arrow-gray)"/>
+    <text x="376" y="12" class="legend-text">编排流转</text>
+    <line x1="450" y1="8" x2="480" y2="8" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+    <text x="486" y="12" class="legend-text">SSE 回传</text>
+  </g>
+</svg>
